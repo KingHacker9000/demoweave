@@ -10,12 +10,12 @@ DemoWeave is **multi-surface by design**. A repository may expose web, CLI, desk
 |---|---|---|
 | M0 — Repository bootstrap | ✅ Complete | TypeScript/pnpm monorepo, CLI, package boundaries, CI |
 | M1 — Project analyzer | ✅ Complete | Frozen `ProjectProfile v1`; Node, Python, Rust, Go baseline |
-| M2 — Flow / Evidence / Manifest | ✅ Complete | Frozen platform-neutral contracts + `SurfaceDriver v1` |
-| **M3 — Terminal driver** | **🚧 Current** | Execute and capture terminal Flows deterministically |
-| M4 — Media renderer | Next | Render terminal evidence to PNG/GIF/WebM/MP4 |
-| **P0 — DemoWeave documents itself** | Target | First public-quality dogfood demo |
+| M2 — Flow / Evidence / Manifest | ✅ Complete | Platform-neutral contracts + `SurfaceDriver v1` |
+| M3 — Terminal driver | ✅ Complete | Cross-platform terminal Flow execution + `TerminalTrack v1` |
+| **M4 — Media renderer** | **🚧 Current** | TerminalTrack → polished PNG/GIF, lightweight FFmpeg pipeline |
+| **P0 — DemoWeave documents itself** | Target | First public-quality dogfood README demo |
 
-M0/M1 landed in PR #1. M2 landed in PR #2. `ProjectProfile v1`, `Flow v1`, `Evidence v1`, `Manifest v1`, and `SurfaceDriver v1` are now compatibility baselines for runtime-driver work.
+M0/M1 landed in PR #1, M2 in PR #2, and M3 in PR #3. The first full runtime evidence path now works end to end: a Flow can execute DemoWeave itself and leave behind structured terminal Evidence with manifest provenance.
 
 ## Product principles
 
@@ -28,7 +28,7 @@ M0/M1 landed in PR #1. M2 landed in PR #2. `ProjectProfile v1`, `Flow v1`, `Evid
 - **One source of truth for demos.** Structured Flows should feed screenshots, GIFs, docs, and videos.
 - **Incremental by default.** Provenance should make stale evidence selectively regenerable.
 - **Claude Code and Codex share the same workflow contracts.**
-- Keep the core lightweight; platform-specific drivers stay optional.
+- Keep the core lightweight; platform-specific drivers and renderers stay optional where practical.
 
 ## Core architecture
 
@@ -45,20 +45,22 @@ Flow v1
    ↓
 SurfaceDriver v1
    ↓
-Structured execution + Evidence v1
+Structured execution
    ↓
-Manifest v1 / provenance
+Evidence v1 + Manifest v1
    ↓
-Renderer / document composer
+Renderer
    ↓
-README · docs · PNG · GIF · MP4
+PNG · GIF · WebM · MP4
+   ↓
+README · docs · tutorials
 ```
 
-## Frozen contracts
+## Frozen / established contracts
 
 ### ProjectProfile v1
 
-Deterministic repository facts: components, ecosystems, manifests, workspaces, entrypoints, languages, frameworks, commands, existing docs, and stable user-surface IDs.
+Deterministic repository facts: components, ecosystems, manifests, workspaces, entrypoints, languages, frameworks, commands, existing docs, and stable surface IDs.
 
 Baseline ecosystems:
 
@@ -83,19 +85,33 @@ assert
 capture
 ```
 
-Drivers translate those semantic actions into platform-specific behavior. Flows must not contain Playwright/Appium/VHS-specific implementation code.
+Terminal `run` steps may optionally declare `expectedExitCodes`; omission means `[0]`. Drivers translate semantic actions into platform behavior. Flows must not contain Playwright/Appium/VHS/renderer-specific implementation code.
 
 ### Evidence v1
 
-Evidence can represent screenshots, recordings, structured terminal tracks, images, diagrams, plots, tables, results, code/text, and comparisons. It has lifecycle state, optional artifact metadata, producer metadata, provenance, and derivation links.
+Evidence represents screenshots, recordings, structured terminal tracks, images, diagrams, plots, tables, results, code/text, and comparisons. It has lifecycle state, artifact metadata, producer metadata, provenance, and derivation links.
 
 ### Manifest v1
 
-Repository-level index connecting Flow files and Evidence to stable IDs and `ProjectProfile v1` surfaces. Cross-reference validation checks Flow → surface, capture → Evidence, Evidence → Flow/step/surface, and derivation links.
+Repository-level index connecting Flow files and Evidence to stable IDs and `ProjectProfile v1` surfaces. Derived media should be linked back to its source Evidence rather than becoming an unrelated asset.
+
+### TerminalTrack v1
+
+Renderer-independent terminal playback artifact containing:
+
+- terminal dimensions
+- pipe capture mode
+- command/args + portable cwd
+- ordered timestamped input/stdout/stderr events
+- ANSI-preserving output
+- factual process lifecycle (`completed`, `timedOut`, `spawnFailed`, `signaled`)
+- exit code, signal, and duration
+
+A normal non-zero process exit is still `completed`; Flow success is evaluated separately against the run step's expected exit codes.
 
 ---
 
-# Milestones
+# Completed milestones
 
 ## M0 — Repository bootstrap ✅
 
@@ -120,7 +136,7 @@ demoweave status
 demoweave validate
 ```
 
-Key boundary: nested non-workspace manifests are retained as deterministic component facts but do not automatically become user-facing surfaces.
+Baseline ecosystem-neutral component detection works for Node, Python, Rust, and Go. Nested non-workspace manifests are retained as deterministic facts without automatically leaking into user-facing surfaces.
 
 ## M2 — Flow IR + Evidence + Manifest ✅
 
@@ -130,122 +146,156 @@ Delivered:
 - `Evidence v1`
 - `Manifest v1`
 - `SurfaceDriver v1`
-- published JSON Schemas
-- terminal + web Flow examples using the same contract
+- synchronized published JSON Schemas
+- terminal + web example Flows using the same contract
 - deterministic manifest normalization
 - cross-file metadata validation
 - `.demoweave/flows/`
 - `.demoweave/evidence/manifest.json`
 
-No runtime capture or renderer was added in M2.
+## M3 — Terminal driver ✅
+
+Delivered:
+
+- `TerminalDriver → TerminalSession → ProcessTerminalSession`
+- lightweight pipe-based capture; no PTY requirement for non-interactive commands
+- cross-platform command execution on Windows and Linux/WSL
+- `demoweave run <flow-id-or-path>`
+- stdout/stderr/combined assertions, file assertions, waits, timeouts, and structured failure behavior
+- optional Flow `expectedExitCodes`
+- `TerminalTrack v1` runtime + published schema
+- ANSI-preserving timestamped terminal events
+- atomic terminal artifact + Manifest updates
+- Git/Flow/step/surface/source provenance
+- self-dogfood Flow `.demoweave/flows/inspect-project.json`
+- committed DemoWeave self-inspection terminal Evidence
+- Windows + Ubuntu hosted CI running the real self-dogfood Flow
+
+Intentional M3 boundary: pipe mode only; no interactive PTY, no visual renderer.
 
 ---
 
-## M3 — Terminal driver 🚧
+# Current milestone
 
-**Goal:** execute a terminal Flow against a real CLI and produce a deterministic, replayable structured terminal track.
+## M4 — Lightweight media renderer 🚧
 
-### Required capabilities
+**Goal:** turn structured terminal Evidence into polished documentation media without recording the user's desktop and without requiring OBS.
 
-- Resolve a `terminal` surface from `ProjectProfile v1`.
-- Implement `SurfaceDriver v1` for terminal-compatible Flow steps.
-- Execute commands without going through the user's personal terminal UI.
-- Capture timestamped terminal events suitable for replay/rendering.
-- Preserve stdout/stderr semantics where possible.
-- Record exit code and command completion.
-- Support terminal dimensions.
-- Preserve ANSI styling when useful.
-- Sanitize obvious machine-specific presentation details where possible.
-- Support terminal assertions from Flow v1.
-- Convert a `capture` step of kind `terminal` into `Evidence v1` plus manifest provenance.
-- Fail with structured errors rather than silently continuing.
-
-### Terminal track v1
-
-M3 may introduce an internal/public structured artifact for terminal playback. It should be deterministic and renderer-independent, for example conceptually:
-
-```json
-{
-  "schemaVersion": 1,
-  "columns": 100,
-  "rows": 30,
-  "events": [
-    { "t": 0, "stream": "input", "data": "demoweave inspect ." },
-    { "t": 32, "stream": "stdout", "data": "DemoWeave inspected ..." }
-  ],
-  "exitCode": 0
-}
-```
-
-The exact format should be decided from real PTY/process experiments, not guessed in advance.
-
-### Cross-platform strategy
-
-M3 should establish a clean abstraction before overcommitting to one PTY library:
+The first vertical slice is deliberately narrow:
 
 ```text
-TerminalDriver
-    ↓
-TerminalSession adapter
-    ├── process/pipe mode
-    └── PTY mode when interaction requires it
+inspect-project TerminalTrack
+        ↓
+terminal replay/model
+        ↓
+controlled visual frame
+        ↓
+clean PNG
+        ↓
+frame sequence
+        ↓
+FFmpeg
+        ↓
+optimized README GIF
+        ↓
+derived Evidence + Manifest provenance
 ```
 
-A non-interactive command should not require a PTY just to be recordable. PTY should be used where terminal semantics/interactivity genuinely require it.
+### M4 architectural boundaries
 
-### M3 dogfood Flow
+- Rendering consumes `TerminalTrack v1`; it does not rerun the Flow.
+- Keep terminal parsing/replay separate from visual styling and encoding.
+- Preserve the source track untouched.
+- Do not depend on the user's shell theme, terminal app, wallpaper, or desktop recorder.
+- Do not require OBS, Electron, or a bundled browser just to render terminal media.
+- FFmpeg is the default substantial media dependency for animated/video encoding.
+- If a lightweight rasterizer/ANSI parser is required for deterministic frame generation, keep it isolated behind the renderer package.
+- Cross-platform render semantics matter more than byte-identical pixels across operating systems.
+- Do not build the future split-screen/tutorial compositor in M4.
 
-Primary target:
+### First terminal visual style
+
+The default renderer should produce a clean controlled presentation:
 
 ```text
-DemoWeave → demoweave inspect .
+╭────────────────────────────────────────────────────╮
+│  ●  ●  ●                         DemoWeave         │
+├────────────────────────────────────────────────────┤
+│  $ node packages/cli/dist/index.js inspect .       │
+│                                                    │
+│  DemoWeave inspected demoweave-workspace           │
+│  Languages: TypeScript ...                         │
+│  Detected surfaces:                                │
+│    - library    @demoweave/core                     │
+│    - library    @demoweave/drivers                  │
+│    - library    @demoweave/renderer                 │
+│    - terminal   demoweave                           │
+│                                                    │
+│  Wrote .demoweave/project.json                     │
+╰────────────────────────────────────────────────────╯
 ```
 
-Expected Flow:
+The frame should be intentionally designed for README readability: controlled padding, high contrast, monospace text, sensible chrome, bounded dimensions, and no dependence on the user's terminal configuration.
+
+### M4 CLI target
+
+Prefer one coherent command rather than format-specific commands, conceptually:
+
+```bash
+demoweave render <evidence-id-or-path> --format png
+demoweave render <evidence-id-or-path> --format gif
+```
+
+The exact options should stay small. Defaults should be good enough that an agent does not need to tune twenty rendering parameters.
+
+### Derived Evidence
+
+Rendering should create new Evidence entries rather than mutate the source terminal Evidence.
+
+Conceptually:
 
 ```text
-run demoweave inspect .
-assert output contains "Detected surfaces"
-capture terminal evidence
+inspect-project-terminal       kind: terminal
+    ↓ derivedFrom
+inspect-project-terminal-png   kind: image, format: png
+inspect-project-terminal-gif   kind: recording, format: gif
 ```
 
-### M3 exit criteria
+Rendered files should go through `.demoweave/config.json`'s `mediaDir` (currently `docs-media`) and be safe to reference from Markdown.
 
-- Terminal driver executes the DemoWeave self-inspection Flow.
-- CLI fixture also executes through the same driver.
-- Run/output/exit assertions work.
-- A deterministic terminal-track artifact is written to disk.
-- Evidence + manifest are updated with Flow/step/surface/source/Git provenance.
-- Failure cases return structured errors and non-zero CLI exit status.
-- Repeated runs produce structurally equivalent tracks apart from explicitly nondeterministic timing fields.
-- Tests run on Linux CI.
-- Real local validation is performed on the development Windows/WSL environment before merge.
-- **No GIF rendering in M3.** Rendering belongs to M4.
+### GIF defaults
 
----
+Initial README-oriented targets:
 
-## M4 — Lightweight media renderer
-
-**Goal:** turn structured evidence into polished visual assets without OBS.
-
-Default substantial media dependency: **FFmpeg**.
-
-Initial outputs:
-
-- PNG
-- GIF
-- WebM
-- MP4
-
-First target: render M3 terminal tracks into a clean controlled terminal presentation, independent of the user's actual shell theme/window chrome.
+- roughly 8–15 fps
+- bounded width around documentation-friendly desktop sizes
+- short duration derived from the track; avoid gratuitous holds
+- optimized palette
+- loop cleanly where sensible
+- aggressive but readable size control
+- warn/fail when an asset is obviously unsuitable for Markdown rather than silently producing a huge GIF
 
 ### M4 exit criteria
 
-- Terminal track → clean PNG.
-- Terminal track → optimized Markdown GIF.
-- Reasonable duration/dimension/file-size limits.
-- Deterministic render settings.
-- `demoweave doctor` reports renderer/FFmpeg capability clearly.
+M4 is complete when all of the following are true:
+
+1. The committed DemoWeave self-inspection TerminalTrack can be loaded by the renderer.
+2. TerminalTrack → clean PNG works locally.
+3. TerminalTrack → animated GIF works locally using FFmpeg.
+4. The GIF visibly replays the recorded command/output rather than merely displaying the final frame.
+5. ANSI SGR styling used by pipe-mode tracks is handled safely; unsupported escape behavior does not corrupt output.
+6. The renderer does not expose absolute project/home paths that the source track already sanitized.
+7. Render settings are explicit and deterministic.
+8. Output dimensions/duration/file size are reported.
+9. Rendered assets are written under configured `mediaDir`.
+10. PNG/GIF are indexed as derived Evidence with renderer provenance and `derivedFrom` linking to the source terminal Evidence.
+11. `demoweave validate` accepts the resulting manifest/assets metadata.
+12. `demoweave doctor` clearly reports FFmpeg availability/capability.
+13. Renderer unit/integration tests pass without requiring a desktop environment.
+14. Hosted CI remains green; FFmpeg-dependent tests may run where FFmpeg is explicitly installed/available.
+15. The real generated self-inspection PNG and GIF are visually reviewed before merge.
+
+**Do not patch README in M4.** Embedding the new GIF into the README is Pilot P0 immediately after M4.
 
 ---
 
@@ -257,11 +307,9 @@ First target: render M3 terminal tracks into a clean controlled terminal present
 agent understands repo
   → demoweave inspect .
   → chooses useful CLI workflow
-  → writes Flow
-  → DemoWeave executes Flow
-  → terminal Evidence
+  → Flow already captures terminal Evidence
   → renderer creates GIF
-  → agent patches README
+  → agent patches README intentionally
   → DemoWeave validates references/provenance
 ```
 
@@ -272,17 +320,19 @@ agent understands repo
 3. DemoWeave profiles itself correctly.
 4. Claude Code can follow the shared DemoWeave skill.
 5. Codex can follow the same workflow.
-6. Agent creates a valid useful Flow.
+6. Agent can identify/use a valid useful Flow.
 7. DemoWeave executes the Flow.
 8. A clean terminal track is captured.
 9. Renderer creates a Markdown-appropriate GIF.
 10. README embeds it intentionally.
 11. Useful existing manual sections survive.
 12. `demoweave validate` verifies metadata/assets/references.
-13. No-change rerun avoids unnecessary churn.
-14. Relevant source changes can eventually mark evidence stale.
+13. A no-change rerun avoids unnecessary churn where supported.
+14. Relevant source changes can eventually mark evidence stale (M6).
 
 ---
+
+# Later milestones
 
 ## M5 — Document planning + safe Markdown patching
 
@@ -364,8 +414,8 @@ DemoWeave 1.0 should provide stable contracts, Claude/Codex workflows, multi-sur
 | 1 | ✅ M0 — scaffold | real project skeleton |
 | 2 | ✅ M1 — analyzer | understands repositories |
 | 3 | ✅ M2 — Flow/Evidence/Manifest | stable internal contracts |
-| 4 | **🚧 M3 — terminal driver** | DemoWeave runs itself |
-| 5 | M4 — GIF renderer | first visual artifact |
+| 4 | ✅ M3 — terminal driver | DemoWeave runs itself |
+| 5 | **🚧 M4 — GIF renderer** | first visual artifact |
 | 6 | **P0 — self-document README** | **first killer demo** |
 | 7 | M5 — safe Markdown patching | reliable docs |
 | 8 | M6 — stale tracking | living documentation |
@@ -383,12 +433,23 @@ DemoWeave 1.0 should provide stable contracts, Claude/Codex workflows, multi-sur
 
 # Current next step
 
-## NOW: M3 — Terminal Driver
+## NOW: M4 — TerminalTrack → first polished GIF
 
-Implement and locally validate the first real `SurfaceDriver v1` against DemoWeave itself.
+Implement and visually validate the smallest complete renderer path against DemoWeave's **already committed self-inspection terminal Evidence**.
 
-**Do now:** terminal-session abstraction, command execution, structured terminal track, Flow assertions, terminal Evidence creation, manifest updates, tests, and self-dogfood execution.
+Immediate work:
 
-**Do not do yet:** terminal PNG/GIF rendering, FFmpeg composition, Playwright, Markdown rewriting, or stale-detection logic.
+1. Inspect `TerminalTrack v1`, `Evidence v1`, Manifest v1, `.demoweave/config.json`, and the current empty renderer package.
+2. Define a small renderer API: source track → deterministic visual frames → encoded asset.
+3. Implement pipe-track replay sufficient for current ANSI/line-oriented terminal evidence without tying the renderer to a specific terminal app.
+4. Produce a controlled terminal frame as vector/structured layout, then a PNG.
+5. Add FFmpeg detection/invocation and encode an optimized animated GIF from replay frames.
+6. Add one `demoweave render` command supporting `png` and `gif` first.
+7. Write outputs under configured `docs-media` and update Manifest with derived Evidence + renderer provenance.
+8. Add tests for replay, ANSI handling, dimensions, output paths, manifest derivation, missing FFmpeg, and invalid source evidence.
+9. Render the real `inspect-project-terminal` Evidence on the development machine.
+10. **Open and visually inspect the PNG and GIF** before declaring M4 complete.
 
-The immediate goal is simple: **DemoWeave must be able to execute its own `demoweave inspect .` Flow and leave behind a clean, replayable terminal Evidence artifact with correct provenance.**
+Do not add Playwright, PTY interaction, split-screen composition, narration, YouTube generation, or README patching yet.
+
+The milestone ends when we have a genuinely good-looking DemoWeave-generated GIF ready to embed in the README. That asset becomes the input to Pilot P0.
