@@ -45,3 +45,29 @@ export interface SurfaceDriver {
   execute(step: FlowStep, context: DriverContext): Promise<DriverStepResult>;
   close(context: DriverContext): Promise<void>;
 }
+
+export {
+  ProcessTerminalSession,
+} from './terminal-session.js';
+export type {
+  TerminalOutputStream,
+  TerminalSession,
+  TerminalSessionResult,
+  TerminalSessionRunOptions,
+} from './terminal-session.js';
+
+export {
+  TerminalDriver,
+  terminalDriverVersion,
+} from './terminal-driver.js';
+export type { TerminalDriverOptions } from './terminal-driver.js';
+
+export {
+  executeFlow,
+  FlowExecutionError,
+  runFlow,
+} from './executor.js';
+export type {
+  FlowExecutionOptions,
+  FlowExecutionResult,
+} from './executor.js';

@@ -80,3 +80,20 @@ export type {
 
 export { validateMetadataBindings } from './validation.js';
 export type { FlowFile, MetadataIssue } from './validation.js';
+
+export {
+  TerminalCommandSchema,
+  TerminalCommandStatusSchema,
+  TerminalEventSchema,
+  TerminalEventStreamSchema,
+  TerminalTrackSchema,
+  TerminalTrackStatusSchema,
+} from './terminal-track.js';
+export type {
+  TerminalCommand,
+  TerminalCommandStatus,
+  TerminalEvent,
+  TerminalEventStream,
+  TerminalTrack,
+  TerminalTrackStatus,
+} from './terminal-track.js';

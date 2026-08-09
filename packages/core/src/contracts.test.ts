@@ -8,6 +8,7 @@ import {
   EvidenceSchema,
   EvidenceStatusSchema,
   FlowSchema,
+  TerminalTrackSchema,
   type Flow,
 } from './index.js';
 import { ManifestSchema, normalizeManifest, type Manifest } from './manifest.js';
@@ -219,4 +220,40 @@ test('published M2 schemas expose the same primary enums as runtime contracts', 
   assert.equal(evidenceSchema.properties.schemaVersion.const, 1);
   assert.equal(manifestSchema.properties.schemaVersion.const, 1);
   assert.equal(manifestSchema.properties.projectProfileVersion.const, 1);
+});
+
+test('TerminalTrack v1 validates deterministic ordering and its published schema shape', async () => {
+  const track = {
+    schemaVersion: 1,
+    columns: 100,
+    rows: 30,
+    mode: 'pipe',
+    commands: [{
+      stepId: 'run',
+      command: 'demo',
+      args: ['inspect', '.'],
+      cwd: '.',
+      startedAt: 0,
+      durationMs: 4,
+      status: 'completed',
+      exitCode: 0,
+    }],
+    events: [
+      { sequence: 0, t: 0, stepId: 'run', stream: 'input', data: 'demo inspect .\n' },
+      { sequence: 1, t: 3, stepId: 'run', stream: 'stdout', data: 'done\n' },
+    ],
+    status: 'completed',
+    exitCode: 0,
+    durationMs: 4,
+  };
+  assert.equal(TerminalTrackSchema.safeParse(track).success, true);
+  assert.equal(TerminalTrackSchema.safeParse({
+    ...track,
+    events: [track.events[1], track.events[0]],
+  }).success, false);
+
+  const published = await readJson('schemas/terminal-track.schema.json') as any;
+  assert.equal(published.properties.schemaVersion.const, 1);
+  assert.equal(published.properties.mode.const, 'pipe');
+  assert.deepEqual(published.properties.events.items.properties.stream.enum, ['input', 'stdout', 'stderr']);
 });

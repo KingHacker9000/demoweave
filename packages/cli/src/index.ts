@@ -11,6 +11,7 @@ import {
   validateMetadataBindings,
   type FlowFile,
 } from '@demoweave/core';
+import { FlowExecutionError, runFlow } from '@demoweave/drivers';
 
 const program = new Command();
 program.name('demoweave').description('Agent-native documentation tooling for software repositories').version('0.0.1');
@@ -57,6 +58,12 @@ async function listJsonFiles(directory: string): Promise<string[]> {
     }
   }
   return files;
+}
+
+function positiveInteger(value: string): number {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed <= 0) throw new Error(`Expected a positive integer, received ${value}`);
+  return parsed;
 }
 
 program.command('doctor').description('Check local DemoWeave prerequisites').action(() => {
@@ -156,6 +163,38 @@ program.command('status').description('Show current DemoWeave metadata status').
   }
   console.log('Automatic staleness detection: not available until M6');
 });
+
+program.command('run')
+  .description('Execute a DemoWeave Flow with a compatible surface driver')
+  .argument('<flow-id-or-path>', 'Flow id from the manifest or path to a Flow v1 JSON file')
+  .option('--project <path>', 'project root', '.')
+  .option('--timeout <ms>', 'per-command timeout in milliseconds', positiveInteger, 30_000)
+  .action(async (reference, options) => {
+    try {
+      const result = await runFlow(reference, {
+        projectRoot: options.project,
+        commandTimeoutMs: options.timeout,
+      });
+      console.log(`Flow: ${result.flowId}`);
+      console.log(`Surface: ${result.surfaceId} (${result.surfaceType})`);
+      console.log(`Driver: ${result.driverId ?? 'none'}`);
+      for (const step of result.steps) {
+        const marker = step.status === 'passed' ? 'PASS' : step.status === 'failed' ? 'FAIL' : 'SKIP';
+        console.log(`[${marker}] ${step.stepId}${step.exitCode === undefined ? '' : ` (exit ${step.exitCode})`}`);
+        if (step.error) console.error(`       ${step.error.code ?? 'ERROR'}: ${step.error.message}`);
+        for (const evidence of step.evidence ?? []) console.log(`       Evidence: ${evidence.path ?? evidence.id}`);
+      }
+      if (result.error && !result.steps.some((step) => step.error)) {
+        console.error(`${result.error.code ?? 'ERROR'}: ${result.error.message}`);
+      }
+      console.log(`Final: ${result.status.toUpperCase()}`);
+      if (result.status === 'failed') process.exitCode = 1;
+    } catch (error) {
+      const code = error instanceof FlowExecutionError ? error.code : 'RUN_FAILED';
+      console.error(`${code}: ${error instanceof Error ? error.message : String(error)}`);
+      process.exitCode = 1;
+    }
+  });
 
 program.command('validate').description('Validate DemoWeave project and M2 metadata').argument('[path]', 'project path', '.').action(async (input) => {
   const root = path.resolve(input);

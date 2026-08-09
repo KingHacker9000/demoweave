@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "projectProfileVersion": 1,
+  "flows": [
+    {
+      "id": "inspect-project",
+      "path": ".demoweave/flows/inspect-project.json",
+      "surfaceId": "terminal-demoweave-cli"
+    }
+  ],
+  "evidence": [
+    {
+      "schemaVersion": 1,
+      "id": "inspect-project-terminal",
+      "kind": "terminal",
+      "status": "planned",
+      "label": "DemoWeave self-inspection terminal session",
+      "provenance": {
+        "flowId": "inspect-project",
+        "stepId": "capture-terminal",
+        "surfaceId": "terminal-demoweave-cli",
+        "sources": [
+          {
+            "path": "packages/cli/src/index.ts",
+            "role": "implementation"
+          },
+          {
+            "path": "packages/core/src/analyzer.ts",
+            "role": "implementation"
+          }
+        ]
+      }
+    }
+  ]
+}
