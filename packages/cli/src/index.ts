@@ -5,6 +5,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import {
   analyzeProject,
+  DocumentPlanSchema,
   FlowSchema,
   ManifestSchema,
   ProjectProfileSchema,
@@ -17,6 +18,7 @@ import {
   renderEvidence,
   RendererError,
 } from '@demoweave/renderer';
+import { registerDocsCommands } from './docs.js';
 
 const program = new Command();
 program.name('demoweave').description('Agent-native documentation tooling for software repositories').version('0.0.1');
@@ -105,8 +107,10 @@ program.command('init').description('Initialize DemoWeave metadata in a reposito
   const metadataRoot = path.join(root, '.demoweave');
   const flowDir = path.join(metadataRoot, 'flows');
   const evidenceDir = path.join(metadataRoot, 'evidence');
+  const planDir = path.join(metadataRoot, 'plans');
   await fs.mkdir(flowDir, { recursive: true });
   await fs.mkdir(evidenceDir, { recursive: true });
+  await fs.mkdir(planDir, { recursive: true });
 
   const configPath = path.join(metadataRoot, 'config.json');
   if (!(await exists(configPath))) {
@@ -126,6 +130,7 @@ program.command('init').description('Initialize DemoWeave metadata in a reposito
 
   console.log(`Initialized ${repoRelative(process.cwd(), metadataRoot)}`);
   console.log(`Flows: ${repoRelative(process.cwd(), flowDir)}`);
+  console.log(`Document plans: ${repoRelative(process.cwd(), planDir)}`);
   console.log(`Evidence manifest: ${repoRelative(process.cwd(), manifestPath)}`);
 });
 
@@ -240,7 +245,9 @@ program.command('render')
     }
   });
 
-program.command('validate').description('Validate DemoWeave project metadata and evidence bindings').argument('[path]', 'project path', '.').action(async (input) => {
+registerDocsCommands(program);
+
+program.command('validate').description('Validate DemoWeave project metadata, document plans, and evidence bindings').argument('[path]', 'project path', '.').action(async (input) => {
   const root = path.resolve(input);
   const projectPath = path.join(root, '.demoweave', 'project.json');
   let failed = false;
@@ -275,6 +282,25 @@ program.command('validate').description('Validate DemoWeave project metadata and
         }
       } else {
         flowFiles.push({ path: repoRelative(root, file), flow: parsed.data });
+      }
+    } catch (error) {
+      failed = true;
+      console.error(`${repoRelative(root, file)}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  const planDirectory = path.join(root, '.demoweave', 'plans');
+  let planCount = 0;
+  for (const file of await listJsonFiles(planDirectory)) {
+    try {
+      const parsed = DocumentPlanSchema.safeParse(JSON.parse(await fs.readFile(file, 'utf8')));
+      if (!parsed.success) {
+        failed = true;
+        for (const issue of parsed.error.issues) {
+          console.error(`${repoRelative(root, file)}:${issue.path.join('.')}: ${issue.message}`);
+        }
+      } else {
+        planCount += 1;
       }
     } catch (error) {
       failed = true;
@@ -319,8 +345,9 @@ program.command('validate').description('Validate DemoWeave project metadata and
 
   console.log('ProjectProfile v1 is valid.');
   console.log(`Flow v1 files valid: ${flowFiles.length}.`);
+  console.log(`DocumentPlan v1 files valid: ${planCount}.`);
   console.log(`Manifest v1: ${manifest ? 'valid' : 'not present'}.`);
-  console.log('M2 metadata bindings are valid.');
+  console.log('Metadata bindings are valid.');
 });
 
 await program.parseAsync(process.argv);
