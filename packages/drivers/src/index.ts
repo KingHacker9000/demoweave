@@ -67,6 +67,8 @@ export {
   webDriverVersion,
 } from './web-driver.js';
 export type { WebDriverOptions } from './web-driver.js';
+export { getWebDriverCapabilities } from './web-capabilities.js';
+export type { WebDriverCapabilities } from './web-capabilities.js';
 
 export {
   executeFlow,
