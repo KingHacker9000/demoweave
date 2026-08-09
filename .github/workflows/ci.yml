@@ -21,9 +21,11 @@ jobs:
       - run: pnpm build
       - run: pnpm test
       - run: pnpm typecheck
-      - name: Smoke test built CLI
+      - name: Smoke test built CLI and M2 metadata
         run: |
           node packages/cli/dist/index.js --help
           node packages/cli/dist/index.js doctor
+          node packages/cli/dist/index.js init .
           node packages/cli/dist/index.js inspect .
+          node packages/cli/dist/index.js status .
           node packages/cli/dist/index.js validate .
