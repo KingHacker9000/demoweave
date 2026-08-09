@@ -115,10 +115,6 @@ type Replacement = {
   anchorSectionId?: string;
 };
 
-function sha256(value: string): string {
-  return createHash('sha256').update(value).digest('hex');
-}
-
 function canonicalize(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(canonicalize);
   if (value && typeof value === 'object') {
@@ -444,7 +440,7 @@ export async function applyDocumentPlan(projectRoot: string, planPath: string, s
 }
 
 export async function discardDocumentPlan(projectRoot: string, planPath: string): Promise<void> {
-  const { absolutePath } = await readPlan(projectRoot, planPath);
+  const absolutePath = await resolveProjectFile(projectRoot, planPath, { mustExist: true, rejectSymlink: true });
   await fs.rm(absolutePath);
 }
 
