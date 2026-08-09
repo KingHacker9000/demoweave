@@ -15,6 +15,7 @@
   "dependencies": {
     "@demoweave/core": "workspace:*",
     "@demoweave/drivers": "workspace:*",
+    "@demoweave/renderer": "workspace:*",
     "commander": "^13.0.0"
   },
   "devDependencies": {

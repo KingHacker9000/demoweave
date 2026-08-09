@@ -12,20 +12,33 @@ import {
   type FlowFile,
 } from '@demoweave/core';
 import { FlowExecutionError, runFlow } from '@demoweave/drivers';
+import {
+  getRendererCapabilities,
+  renderEvidence,
+  RendererError,
+} from '@demoweave/renderer';
 
 const program = new Command();
 program.name('demoweave').description('Agent-native documentation tooling for software repositories').version('0.0.1');
 
 function commandAvailable(command: string): { ok: boolean; version?: string } {
-  const executable = process.platform === 'win32' ? process.env.ComSpec ?? 'cmd.exe' : command;
-  const args = process.platform === 'win32'
-    ? ['/d', '/s', '/c', `${command} --version`]
-    : ['--version'];
-  const result = spawnSync(executable, args, { encoding: 'utf8' });
+  if (command === 'node') return { ok: true, version: `v${process.versions.node}` };
+  const result = spawnSync(command, ['--version'], { encoding: 'utf8', shell: false, windowsHide: true });
   return {
     ok: result.status === 0,
     version: (result.stdout || result.stderr || '').trim().split('\n')[0] || undefined,
   };
+}
+
+function renderFormat(value: string): 'png' | 'gif' {
+  if (value === 'png' || value === 'gif') return value;
+  throw new Error(`Unsupported render format: ${value}. Expected png or gif.`);
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1_024) return `${bytes} B`;
+  if (bytes < 1_048_576) return `${(bytes / 1_024).toFixed(1)} KiB`;
+  return `${(bytes / 1_048_576).toFixed(2)} MiB`;
 }
 
 async function exists(file: string): Promise<boolean> {
@@ -66,12 +79,11 @@ function positiveInteger(value: string): number {
   return parsed;
 }
 
-program.command('doctor').description('Check local DemoWeave prerequisites').action(() => {
+program.command('doctor').description('Check local DemoWeave prerequisites').action(async () => {
   const checks = [
     ['node', true],
     ['git', true],
     ['pnpm', false],
-    ['ffmpeg', false],
   ] as const;
   let failedRequired = false;
   console.log('DemoWeave doctor\n');
@@ -81,6 +93,10 @@ program.command('doctor').description('Check local DemoWeave prerequisites').act
     console.log(`${status.padEnd(8)} ${command}${result.version ? `  ${result.version}` : ''}`);
     if (required && !result.ok) failedRequired = true;
   }
+  const renderer = await getRendererCapabilities();
+  console.log(`${'OK'.padEnd(8)} renderer PNG  headless SVG rasterization`);
+  const ffmpegStatus = renderer.gif ? 'OK' : 'OPTIONAL';
+  console.log(`${ffmpegStatus.padEnd(8)} ffmpeg GIF${renderer.ffmpegVersion ? `  ${renderer.ffmpegVersion}` : '  not found; install FFmpeg to enable GIF rendering'}`);
   if (failedRequired) process.exitCode = 1;
 });
 
@@ -196,7 +212,35 @@ program.command('run')
     }
   });
 
-program.command('validate').description('Validate DemoWeave project and M2 metadata').argument('[path]', 'project path', '.').action(async (input) => {
+program.command('render')
+  .description('Render terminal Evidence to a polished media asset')
+  .argument('<evidence-id-or-path>', 'terminal Evidence id from Manifest v1 or a TerminalTrack v1 JSON path')
+  .requiredOption('--format <format>', 'output format: png or gif', renderFormat)
+  .option('--project <path>', 'project root', '.')
+  .option('--out <path>', 'project-relative output path')
+  .action(async (reference, options) => {
+    try {
+      const result = await renderEvidence(reference, {
+        projectRoot: options.project,
+        format: options.format,
+        ...(options.out ? { outputPath: options.out } : {}),
+      });
+      console.log(`Rendered: ${result.evidenceId ?? reference}`);
+      if (result.sourceEvidenceId) console.log(`Derived from: ${result.sourceEvidenceId}`);
+      console.log(`Format: ${result.format.toUpperCase()}`);
+      console.log(`Dimensions: ${result.width}x${result.height}`);
+      if (result.durationMs !== undefined) console.log(`Duration: ${(result.durationMs / 1_000).toFixed(2)}s`);
+      if (result.frameCount !== undefined) console.log(`Frames: ${result.frameCount}`);
+      console.log(`Size: ${formatBytes(result.sizeBytes)}`);
+      console.log(`Output: ${repoRelative(process.cwd(), result.outputPath)}`);
+    } catch (error) {
+      const code = error instanceof RendererError ? error.code : 'RENDER_FAILED';
+      console.error(`${code}: ${error instanceof Error ? error.message : String(error)}`);
+      process.exitCode = 1;
+    }
+  });
+
+program.command('validate').description('Validate DemoWeave project metadata and evidence bindings').argument('[path]', 'project path', '.').action(async (input) => {
   const root = path.resolve(input);
   const projectPath = path.join(root, '.demoweave', 'project.json');
   let failed = false;
