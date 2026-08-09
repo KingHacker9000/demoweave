@@ -50,6 +50,7 @@
             "declared-failed",
             "artifact-missing",
             "artifact-changed",
+            "artifact-baseline-unavailable",
             "source-missing",
             "source-changed",
             "source-baseline-unavailable",
