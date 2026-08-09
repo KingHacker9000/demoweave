@@ -55,10 +55,10 @@ export async function snapshotFlowEvidence(projectRoot: string, flowId: string):
   const flowPath = resolveInside(root, reference.path);
   const flowBytes = await fs.readFile(flowPath);
   const flow = FlowSchema.parse(JSON.parse(flowBytes.toString('utf8')));
-  const sources = await Promise.all((flow.sources ?? []).map(async (dependency) => ({
-    ...dependency,
-    ...(await hashFile(resolveInside(root, dependency.path)) ? { hash: await hashFile(resolveInside(root, dependency.path)) } : {}),
-  })));
+  const sources = await Promise.all((flow.sources ?? []).map(async (dependency) => {
+    const dependencyHash = await hashFile(resolveInside(root, dependency.path));
+    return { ...dependency, ...(dependencyHash ? { hash: dependencyHash } : {}) };
+  }));
 
   const updated: Evidence[] = [];
   const evidence = await Promise.all(manifest.evidence.map(async (item) => {
