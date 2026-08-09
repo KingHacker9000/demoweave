@@ -162,3 +162,8 @@ export type {
   FreshnessState,
   RegenerationAction,
 } from './freshness.js';
+
+export {
+  snapshotEvidenceArtifact,
+  snapshotFlowEvidence,
+} from './fingerprint.js';
