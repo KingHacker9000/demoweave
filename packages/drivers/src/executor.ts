@@ -11,10 +11,13 @@ import {
 } from '@demoweave/core';
 import type { DriverContext, DriverError, DriverStepResult, SurfaceDriver } from './index.js';
 import { TerminalDriver } from './terminal-driver.js';
+import { WebDriver } from './web-driver.js';
 
 export interface FlowExecutionOptions {
   projectRoot?: string;
   commandTimeoutMs?: number;
+  baseUrl?: string;
+  headless?: boolean;
   drivers?: SurfaceDriver[];
 }
 
@@ -83,7 +86,7 @@ export async function executeFlow(
   project: ProjectProfile,
   flow: Flow,
   flowPath: string,
-  options: Pick<FlowExecutionOptions, 'commandTimeoutMs' | 'drivers'> = {},
+  options: Pick<FlowExecutionOptions, 'commandTimeoutMs' | 'baseUrl' | 'headless' | 'drivers'> = {},
 ): Promise<FlowExecutionResult> {
   const surface = project.surfaces.find((candidate) => candidate.id === flow.surfaceId);
   if (!surface) {
@@ -98,10 +101,20 @@ export async function executeFlow(
     };
   }
 
-  const drivers = options.drivers ?? [new TerminalDriver({
-    commandTimeoutMs: options.commandTimeoutMs,
-    flowPath: repoRelative(projectRoot, flowPath),
-  })];
+  const relativeFlowPath = repoRelative(projectRoot, flowPath);
+  const drivers = options.drivers ?? [
+    new TerminalDriver({
+      commandTimeoutMs: options.commandTimeoutMs,
+      flowPath: relativeFlowPath,
+    }),
+    new WebDriver({
+      baseUrl: options.baseUrl,
+      headless: options.headless,
+      actionTimeoutMs: options.commandTimeoutMs,
+      navigationTimeoutMs: options.commandTimeoutMs,
+      flowPath: relativeFlowPath,
+    }),
+  ];
   const driver = drivers.find((candidate) => candidate.supports(surface));
   if (!driver) {
     return {
