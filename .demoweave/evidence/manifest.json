@@ -27,7 +27,7 @@
         "flowId": "inspect-project",
         "stepId": "capture-terminal",
         "surfaceId": "terminal-demoweave-cli",
-        "gitCommit": "a62818f61d945cb701ff83fef3d6cd75d337ec31",
+        "gitCommit": "1b54f8c5c42c5a22b70e8ad48f4674dfb7db6cbb",
         "sources": [
           {
             "path": "packages/cli/src/index.ts",

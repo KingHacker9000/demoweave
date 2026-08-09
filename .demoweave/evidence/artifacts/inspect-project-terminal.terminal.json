@@ -14,7 +14,7 @@
       ],
       "cwd": ".",
       "startedAt": 0,
-      "durationMs": 272,
+      "durationMs": 274,
       "status": "completed",
       "exitCode": 0
     }
@@ -29,14 +29,14 @@
     },
     {
       "sequence": 1,
-      "t": 261,
+      "t": 262,
       "stepId": "run-inspect",
       "stream": "stdout",
       "data": "DemoWeave inspected demoweave-workspace\n"
     },
     {
       "sequence": 2,
-      "t": 261,
+      "t": 262,
       "stepId": "run-inspect",
       "stream": "stdout",
       "data": "Languages: TypeScript (19), Go (2), JavaScript (2), Python (2), Rust (2)\nDetected surfaces:\n  - library    @demoweave/core\n  - library    @demoweave/drivers\n  - library    @demoweave/renderer\n  - terminal   demoweave\nWrote .demoweave/project.json\n"
@@ -44,5 +44,5 @@
   ],
   "status": "completed",
   "exitCode": 0,
-  "durationMs": 272
+  "durationMs": 274
 }
