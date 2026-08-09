@@ -21,13 +21,14 @@ Use DemoWeave when the user asks to create, improve, update, or validate documen
 5. When a workflow needs to be demonstrated, create a JSON Flow v1 file under `.demoweave/flows/`.
 6. Set `surfaceId` to an existing stable surface ID from `.demoweave/project.json`.
 7. Use semantic Flow actions such as `run`, `navigate`, `activate`, `input`, `press`, `scroll`, `wait`, `assert`, and `capture`. Do not embed Playwright, Appium, shell-recorder, or renderer-specific instructions in the Flow.
-8. Every `capture` step references an `evidenceId`. Index that Evidence in `.demoweave/evidence/manifest.json` and keep its kind consistent with the capture step.
-9. Record useful provenance on Evidence: Flow/step/surface when applicable, source dependencies, and Git commit when known.
-10. Run `demoweave validate .` after editing DemoWeave metadata. Fix schema and cross-reference errors before relying on the Flow/manifest.
+8. Run a terminal Flow with `demoweave run <flow-id-or-path>`. Use `--project <path>` when the project root is not the current directory.
+9. A successful terminal `capture` writes `.demoweave/evidence/artifacts/<evidence-id>.terminal.json` and updates `.demoweave/evidence/manifest.json` with driver and Git provenance.
+10. Record real source dependencies on planned Evidence when they are known; execution preserves them. Do not invent dependencies just to populate provenance.
+11. Run `demoweave validate .` after editing or executing DemoWeave metadata. Fix schema and cross-reference errors before relying on the Flow/manifest.
 
-## M2 boundaries
+## M3 terminal execution boundaries
 
-M2 defines contracts only. The repository does not yet contain runtime PTY, browser, desktop, mobile, or media rendering drivers. A valid Flow describes what should happen; it does not imply that the current build can execute every step yet.
+M3 executes non-interactive terminal Flows through a process/pipe session. It supports `run`, duration/process-exit/file-exists waits, output/exit-code/file-exists assertions, and terminal capture. A `run` expects exit code `0` unless its optional `expectedExitCodes` declares another accepted integer result. Unsupported terminal actions fail explicitly. Interactive PTY input, browser/desktop/mobile drivers, and media rendering are not available yet.
 
 Current metadata layout:
 
@@ -39,6 +40,8 @@ Current metadata layout:
     <flow>.json
   evidence/
     manifest.json
+    artifacts/
+      <evidence-id>.terminal.json
 ```
 
 Published contracts live under `schemas/`:
@@ -47,5 +50,6 @@ Published contracts live under `schemas/`:
 - `flow.schema.json`
 - `evidence.schema.json`
 - `manifest.schema.json`
+- `terminal-track.schema.json`
 
-As later milestones land, this same skill will direct execution, capture, Markdown planning/patching, stale detection, and tutorial rendering without changing the core agent-vs-tool boundary.
+As later milestones land, this same skill will direct rendering, Markdown planning/patching, stale detection, and tutorial composition without changing the core agent-vs-tool boundary.

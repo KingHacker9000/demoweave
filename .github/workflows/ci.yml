@@ -7,7 +7,12 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    name: Test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -21,7 +26,7 @@ jobs:
       - run: pnpm build
       - run: pnpm test
       - run: pnpm typecheck
-      - name: Smoke test built CLI and M2 metadata
+      - name: Smoke test built CLI and M3 terminal execution
         run: |
           node packages/cli/dist/index.js --help
           node packages/cli/dist/index.js doctor
@@ -29,3 +34,4 @@ jobs:
           node packages/cli/dist/index.js inspect .
           node packages/cli/dist/index.js status .
           node packages/cli/dist/index.js validate .
+          node packages/cli/dist/index.js run inspect-project
