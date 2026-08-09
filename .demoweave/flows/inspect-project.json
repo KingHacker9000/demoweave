@@ -4,6 +4,16 @@
   "title": "Inspect DemoWeave with DemoWeave",
   "description": "Runs the built DemoWeave CLI against its own repository and captures terminal evidence.",
   "surfaceId": "terminal-demoweave-cli",
+  "sources": [
+    {
+      "path": "packages/cli/src/index.ts",
+      "role": "implementation"
+    },
+    {
+      "path": "packages/core/src/analyzer.ts",
+      "role": "implementation"
+    }
+  ],
   "steps": [
     {
       "id": "run-inspect",

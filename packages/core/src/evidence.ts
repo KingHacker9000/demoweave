@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import { EvidenceKindSchema } from './flow.js';
 
+export const ContentHashSchema = z.string().regex(/^sha256:[0-9a-f]{64}$/);
+
 export const EvidenceFormatSchema = z.enum([
   'png',
   'jpeg',
@@ -37,6 +39,7 @@ export const SourceDependencyRoleSchema = z.enum([
 export const SourceDependencySchema = z.object({
   path: z.string().min(1),
   role: SourceDependencyRoleSchema.optional(),
+  hash: ContentHashSchema.optional(),
 }).strict();
 
 export const ProducerSchema = z.object({
@@ -50,6 +53,7 @@ export const ProvenanceSchema = z.object({
   stepId: z.string().min(1).optional(),
   surfaceId: z.string().min(1).optional(),
   gitCommit: z.string().min(1).optional(),
+  flowHash: ContentHashSchema.optional(),
   sources: z.array(SourceDependencySchema),
 }).strict().superRefine((value, ctx) => {
   if (value.stepId && !value.flowId) {
@@ -69,6 +73,7 @@ export const EvidenceSchema = z.object({
   label: z.string().min(1).optional(),
   format: EvidenceFormatSchema.optional(),
   path: z.string().min(1).optional(),
+  artifactHash: ContentHashSchema.optional(),
   mimeType: z.string().min(1).optional(),
   producer: ProducerSchema.optional(),
   provenance: ProvenanceSchema,
@@ -81,6 +86,13 @@ export const EvidenceSchema = z.object({
       message: `${evidence.status} evidence requires a path`,
     });
   }
+  if (evidence.artifactHash && !evidence.path) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['artifactHash'],
+      message: 'artifactHash requires an artifact path',
+    });
+  }
   if (evidence.derivedFrom?.includes(evidence.id)) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
@@ -90,6 +102,7 @@ export const EvidenceSchema = z.object({
   }
 });
 
+export type ContentHash = z.infer<typeof ContentHashSchema>;
 export type EvidenceFormat = z.infer<typeof EvidenceFormatSchema>;
 export type EvidenceStatus = z.infer<typeof EvidenceStatusSchema>;
 export type SourceDependencyRole = z.infer<typeof SourceDependencyRoleSchema>;
