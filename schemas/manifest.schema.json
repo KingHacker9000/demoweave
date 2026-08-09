@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://demoweave.dev/schemas/manifest.schema.json",
+  "title": "DemoWeave Manifest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "projectProfileVersion", "flows", "evidence"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "projectProfileVersion": { "const": 1 },
+    "flows": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "path", "surfaceId"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "path": { "type": "string", "minLength": 1 },
+          "surfaceId": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "evidence": {
+      "type": "array",
+      "items": { "$ref": "https://demoweave.dev/schemas/evidence.schema.json" }
+    }
+  }
+}
