@@ -25,12 +25,12 @@ async function writePlan(root: string, source: string, name = 'readme.json'): Pr
   const plan = {
     schemaVersion: 1,
     id: 'improve-readme',
-    target: 'README.md',
-    baseHash: inspectMarkdown(source, 'README.md').contentHash,
+    targetPath: 'README.md',
+    baseHash: inspectMarkdown(source, 'README.md').baseHash,
     operations: [{
       id: 'edit-demo',
       type: 'edit',
-      sectionId: 'section:demo',
+      selector: { sectionId: 'section:demo' },
       markdown: '\nNew body.\n',
     }],
   };
@@ -50,10 +50,10 @@ test('docs inspect provides concise human output and structured agent JSON', asy
   const json = run(['docs', 'inspect', 'README.md', '--project', root, '--json']);
   assert.equal(json.status, 0, json.stderr);
   const parsed = JSON.parse(json.stdout);
-  assert.equal(parsed.target, 'README.md');
+  assert.equal(parsed.targetPath, 'README.md');
   assert.equal(parsed.sections[1].heading, 'Demo');
   assert.equal(parsed.sections[1].directBodyRange.start.line, 4);
-  assert.equal(String(parsed.contentHash).startsWith('sha256:'), true);
+  assert.equal(String(parsed.baseHash).startsWith('sha256:'), true);
   assert.equal(JSON.stringify(parsed).includes(root), false);
 });
 
@@ -72,12 +72,15 @@ test('docs preview is deterministic and non-mutating, apply requires its exact t
   assert.match(first.stdout, /-Old body\./);
   assert.match(first.stdout, /\+New body\./);
   assert.equal(await fs.readFile(path.join(root, 'README.md'), 'utf8'), source);
-  const token = first.stdout.match(/Review token:\s*(sha256:[a-f0-9]{64})/)?.[1];
+  const token = first.stdout.match(/Review token:\s*(review-v1:[a-f0-9]{64})/)?.[1];
   assert.ok(token);
 
-  const wrong = run(['docs', 'apply', planPath, '--project', root, '--review', 'sha256:bad']);
+  const candidate = run(['docs', 'preview', planPath, '--project', root, '--candidate']);
+  assert.match(candidate.stdout, /Candidate:\n# Demo\n\nNew body\./);
+
+  const wrong = run(['docs', 'apply', planPath, '--project', root, '--review', 'review-v1:bad']);
   assert.equal(wrong.status, 1);
-  assert.match(wrong.stderr, /REVIEW_TOKEN_MISMATCH:/);
+  assert.match(wrong.stderr, /REVIEW_MISMATCH:/);
   assert.equal(await fs.readFile(path.join(root, 'README.md'), 'utf8'), source);
 
   const applied = run(['docs', 'apply', planPath, '--project', root, '--review', token]);
@@ -101,13 +104,13 @@ test('docs apply refuses stale documents and changed plans after preview', async
   await fs.writeFile(planFile, `${JSON.stringify(changedPlan, null, 2)}\n`);
   const planMismatch = run(['docs', 'apply', planPath, '--project', root, '--review', token]);
   assert.equal(planMismatch.status, 1);
-  assert.match(planMismatch.stderr, /REVIEW_TOKEN_MISMATCH:/);
+  assert.match(planMismatch.stderr, /REVIEW_MISMATCH:/);
 
   await writePlan(root, source);
   await fs.writeFile(path.join(root, 'README.md'), `${source}Changed externally.\n`);
   const stale = run(['docs', 'apply', planPath, '--project', root, '--review', token]);
   assert.equal(stale.status, 1);
-  assert.match(stale.stderr, /STALE_DOCUMENT_PLAN:/);
+  assert.match(stale.stderr, /STALE_BASE:/);
 });
 
 test('docs discard deletes only the plan and traversal errors are non-zero', async (context) => {

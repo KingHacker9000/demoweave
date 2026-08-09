@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "id": "m5-self-dogfood",
+  "targetPath": "docs/M5_DOGFOOD.md",
+  "baseHash": "sha256:e9c43f6fff1fdc388df338065f4a3c7b6f64e7d4fecbd427f1c2a93ffc597400",
+  "operations": [
+    {
+      "id": "edit-review-state",
+      "type": "edit",
+      "selector": {
+        "sectionId": "section:m5-dogfood/review-state"
+      },
+      "markdown": "\nThe reviewed patch was applied successfully in the disposable CI working tree.\n"
+    }
+  ]
+}

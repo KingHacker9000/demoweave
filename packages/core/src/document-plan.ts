@@ -9,57 +9,69 @@ import { z } from 'zod';
 const HashSchema = z.string().regex(/^sha256:[a-f0-9]{64}$/, 'Expected a sha256:<hex> content hash');
 const IdentifierSchema = z.string().trim().min(1);
 
-export const DocumentAnchorSchema = z.discriminatedUnion('kind', [
-  z.object({ kind: z.enum(['before', 'after']), sectionId: z.string().min(1) }).strict(),
+export const SectionSelectorSchema = z.object({ sectionId: z.string().min(1) }).strict();
+
+export const DocumentAnchorSchema = z.union([
+  SectionSelectorSchema,
   z.object({ kind: z.enum(['document-start', 'document-end']) }).strict(),
 ]);
 
-const PreserveOperationSchema = z.object({
+export const PreserveDocumentOperationSchema = z.object({
   id: IdentifierSchema,
   type: z.literal('preserve'),
-  sectionId: z.string().min(1),
+  selector: SectionSelectorSchema,
 }).strict();
 
-const EditOperationSchema = z.object({
+export const EditDocumentOperationSchema = z.object({
   id: IdentifierSchema,
   type: z.literal('edit'),
-  sectionId: z.string().min(1),
+  selector: SectionSelectorSchema,
   markdown: z.string(),
 }).strict();
 
-const ReplaceOperationSchema = z.object({
+export const ReplaceDocumentOperationSchema = z.object({
   id: IdentifierSchema,
   type: z.literal('replace'),
-  sectionId: z.string().min(1),
+  selector: SectionSelectorSchema,
   markdown: z.string().min(1),
 }).strict();
 
-const CreateOperationSchema = z.object({
+const SectionCreateOperationSchema = z.object({
   id: IdentifierSchema,
   type: z.literal('create'),
-  anchor: DocumentAnchorSchema,
+  anchor: SectionSelectorSchema,
+  position: z.enum(['before', 'after']),
   markdown: z.string().min(1),
 }).strict();
 
-const RemoveOperationSchema = z.object({
+const BoundaryCreateOperationSchema = z.object({
+  id: IdentifierSchema,
+  type: z.literal('create'),
+  anchor: z.object({ kind: z.enum(['document-start', 'document-end']) }).strict(),
+  markdown: z.string().min(1),
+}).strict();
+
+export const CreateDocumentOperationSchema = z.union([SectionCreateOperationSchema, BoundaryCreateOperationSchema]);
+
+export const RemoveDocumentOperationSchema = z.object({
   id: IdentifierSchema,
   type: z.literal('remove'),
-  sectionId: z.string().min(1),
+  selector: SectionSelectorSchema,
   reason: z.string().trim().min(1),
 }).strict();
 
-export const DocumentOperationSchema = z.discriminatedUnion('type', [
-  PreserveOperationSchema,
-  EditOperationSchema,
-  ReplaceOperationSchema,
-  CreateOperationSchema,
-  RemoveOperationSchema,
+export const DocumentOperationSchema = z.union([
+  PreserveDocumentOperationSchema,
+  EditDocumentOperationSchema,
+  ReplaceDocumentOperationSchema,
+  CreateDocumentOperationSchema,
+  RemoveDocumentOperationSchema,
 ]);
 
 export const DocumentPlanSchema = z.object({
   schemaVersion: z.literal(1),
   id: IdentifierSchema,
-  target: z.string().min(1),
+  targetPath: z.string().min(1),
   baseHash: HashSchema,
   operations: z.array(DocumentOperationSchema).min(1),
 }).strict().superRefine((plan, context) => {
@@ -74,17 +86,18 @@ export const DocumentPlanSchema = z.object({
     }
     ids.add(operation.id);
   }
-  const unsafe = projectRelativePathIssue(plan.target);
+  const unsafe = projectRelativePathIssue(plan.targetPath);
   if (unsafe) {
     context.addIssue({
       code: z.ZodIssueCode.custom,
-      path: ['target'],
+      path: ['targetPath'],
       message: unsafe,
     });
   }
 });
 
 export type DocumentAnchor = z.infer<typeof DocumentAnchorSchema>;
+export type SectionSelector = z.infer<typeof SectionSelectorSchema>;
 export type DocumentOperation = z.infer<typeof DocumentOperationSchema>;
 export type DocumentPlan = z.infer<typeof DocumentPlanSchema>;
 
@@ -99,6 +112,45 @@ export type SourceRange = {
   end: SourcePoint;
 };
 
+export const DocumentNewlineSchema = z.enum(['lf', 'crlf', 'cr', 'mixed', 'none']);
+
+const SourcePointSchema = z.object({
+  offset: z.number().int().nonnegative(),
+  line: z.number().int().positive(),
+  column: z.number().int().positive(),
+}).strict();
+
+const SourceRangeSchema = z.object({ start: SourcePointSchema, end: SourcePointSchema }).strict();
+
+export const DocumentSectionSchema = z.object({
+  id: z.string().min(1),
+  kind: z.enum(['preamble', 'section']),
+  level: z.number().int().min(0).max(6),
+  heading: z.string().nullable(),
+  headingPath: z.array(z.string()),
+  parentId: z.string().nullable(),
+  headingRange: SourceRangeSchema.nullable(),
+  directBodyRange: SourceRangeSchema,
+  subtreeRange: SourceRangeSchema,
+  occurrence: z.number().int().positive(),
+  start: z.number().int().nonnegative(),
+  end: z.number().int().nonnegative(),
+  headingStart: z.number().int().nonnegative().nullable(),
+  headingEnd: z.number().int().nonnegative().nullable(),
+  bodyStart: z.number().int().nonnegative(),
+  directBodyEnd: z.number().int().nonnegative(),
+}).strict();
+
+export const MarkdownDocumentInspectionSchema = z.object({
+  schemaVersion: z.literal(1),
+  targetPath: z.string().min(1),
+  baseHash: HashSchema,
+  newline: DocumentNewlineSchema,
+  trailingNewline: z.boolean(),
+  length: z.number().int().nonnegative(),
+  sections: z.array(DocumentSectionSchema).min(1),
+}).strict();
+
 export type MarkdownSection = {
   id: string;
   kind: 'preamble' | 'section';
@@ -109,16 +161,27 @@ export type MarkdownSection = {
   headingRange: SourceRange | null;
   directBodyRange: SourceRange;
   subtreeRange: SourceRange;
+  occurrence: number;
+  start: number;
+  end: number;
+  headingStart: number | null;
+  headingEnd: number | null;
+  bodyStart: number;
+  directBodyEnd: number;
 };
 
 export type MarkdownInspection = {
   schemaVersion: 1;
-  target: string;
-  contentHash: string;
-  newlineStyle: 'lf' | 'crlf' | 'mixed' | 'none';
+  targetPath: string;
+  baseHash: string;
+  newline: 'lf' | 'crlf' | 'cr' | 'mixed' | 'none';
   trailingNewline: boolean;
+  length: number;
   sections: MarkdownSection[];
 };
+export type MarkdownDocumentInspection = MarkdownInspection;
+export type DocumentSection = MarkdownSection;
+export type DocumentNewline = z.infer<typeof DocumentNewlineSchema>;
 
 export type DocumentOperationSummary = {
   id: string;
@@ -159,6 +222,8 @@ export class DocumentPlanError extends Error {
   }
 }
 
+export const DocumentPatchError = DocumentPlanError;
+
 type HeadingNode = {
   type: 'heading';
   depth: number;
@@ -179,6 +244,7 @@ type HeadingRecord = {
   id: string;
   parentId: string | null;
   headingPath: string[];
+  occurrence: number;
 };
 
 type Patch = {
@@ -190,6 +256,10 @@ type Patch = {
 
 function sha256(value: string | Uint8Array): string {
   return `sha256:${createHash('sha256').update(value).digest('hex')}`;
+}
+
+export function hashDocumentSource(source: string): string {
+  return sha256(source);
 }
 
 function projectRelativePathIssue(input: string): string | undefined {
@@ -213,7 +283,7 @@ export function normalizeProjectRelativePath(input: string): string {
 function normalizeParsedPlan(plan: DocumentPlan): DocumentPlan {
   return {
     ...plan,
-    target: normalizeProjectRelativePath(plan.target),
+    targetPath: normalizeProjectRelativePath(plan.targetPath),
     operations: plan.operations.map((operation) => ({ ...operation })) as DocumentOperation[],
   };
 }
@@ -233,7 +303,7 @@ export function parseDocumentPlan(input: unknown): DocumentPlan {
   return normalizeParsedPlan(result.data);
 }
 
-function newlineStyle(source: string): MarkdownInspection['newlineStyle'] {
+function newlineStyle(source: string): MarkdownInspection['newline'] {
   let lf = 0;
   let crlf = 0;
   let loneCr = 0;
@@ -252,6 +322,7 @@ function newlineStyle(source: string): MarkdownInspection['newlineStyle'] {
   if (!lf && !crlf && !loneCr) return 'none';
   if (crlf && !lf && !loneCr) return 'crlf';
   if (lf && !crlf && !loneCr) return 'lf';
+  if (loneCr && !crlf && !lf) return 'cr';
   return 'mixed';
 }
 
@@ -316,6 +387,7 @@ export function inspectMarkdown(source: string, target: string): MarkdownInspect
       id: '',
       parentId: null,
       headingPath: [],
+      occurrence: 1,
     };
   });
 
@@ -332,6 +404,7 @@ export function inspectMarkdown(source: string, target: string): MarkdownInspect
     record.id = `section:${[...(parent?.id.slice('section:'.length).split('/') ?? []), segment].filter(Boolean).join('/')}`;
     record.parentId = parent?.id ?? null;
     record.headingPath = [...(parent?.headingPath ?? []), record.text];
+    record.occurrence = occurrence;
     stack.push(record);
   }
 
@@ -362,6 +435,13 @@ export function inspectMarkdown(source: string, target: string): MarkdownInspect
     headingRange: null,
     directBodyRange: rangeAt(starts, 0, firstHeadingStart),
     subtreeRange: rangeAt(starts, 0, firstHeadingStart),
+    occurrence: 1,
+    start: 0,
+    end: firstHeadingStart,
+    headingStart: null,
+    headingEnd: null,
+    bodyStart: 0,
+    directBodyEnd: firstHeadingStart,
   }];
   for (const record of records) {
     sections.push({
@@ -374,21 +454,33 @@ export function inspectMarkdown(source: string, target: string): MarkdownInspect
       headingRange: rangeAt(starts, record.start, record.headingEnd),
       directBodyRange: rangeAt(starts, record.bodyStart, record.directBodyEnd),
       subtreeRange: rangeAt(starts, record.start, record.subtreeEnd),
+      occurrence: record.occurrence,
+      start: record.start,
+      end: record.subtreeEnd,
+      headingStart: record.start,
+      headingEnd: record.headingEnd,
+      bodyStart: record.bodyStart,
+      directBodyEnd: record.directBodyEnd,
     });
   }
 
   return {
     schemaVersion: 1,
-    target: normalizedTarget,
-    contentHash: sha256(source),
-    newlineStyle: newlineStyle(source),
+    targetPath: normalizedTarget,
+    baseHash: sha256(source),
+    newline: newlineStyle(source),
     trailingNewline: source.endsWith('\n') || source.endsWith('\r'),
+    length: source.length,
     sections,
   };
 }
 
+export function inspectMarkdownSource(targetPath: string, source: string): MarkdownInspection {
+  return inspectMarkdown(source, targetPath);
+}
+
 function preferredNewline(inspection: MarkdownInspection): '\n' | '\r\n' {
-  return inspection.newlineStyle === 'crlf' ? '\r\n' : '\n';
+  return inspection.newline === 'crlf' ? '\r\n' : '\n';
 }
 
 function normalizeInsertedMarkdown(markdown: string, inspection: MarkdownInspection): string {
@@ -425,23 +517,23 @@ export function canonicalDocumentPlan(plan: DocumentPlan): string {
 
 function operationDescription(operation: DocumentOperation, section?: MarkdownSection): string {
   if (operation.type === 'create') {
-    if (operation.anchor.kind === 'document-start') return 'create at document start';
-    if (operation.anchor.kind === 'document-end') return 'create at document end';
-    return `create ${operation.anchor.kind} ${'sectionId' in operation.anchor ? operation.anchor.sectionId : ''}`;
+    if ('kind' in operation.anchor) return `create at ${operation.anchor.kind.replace('-', ' ')}`;
+    return `create ${'position' in operation ? operation.position : ''} ${operation.anchor.sectionId}`;
   }
-  const label = section?.heading ?? section?.id ?? operation.sectionId;
-  return `${operation.type} ${label} (${operation.sectionId})`;
+  const sectionId = operation.selector.sectionId;
+  const label = section?.heading ?? section?.id ?? sectionId;
+  return `${operation.type} ${label} (${sectionId})`;
 }
 
 function planCandidate(plan: DocumentPlan, source: string, inspection: MarkdownInspection): {
   candidate: string;
   operations: DocumentOperationSummary[];
 } {
-  if (plan.baseHash !== inspection.contentHash) {
-    throw new DocumentPlanError('STALE_DOCUMENT_PLAN', `Target hash ${inspection.contentHash} does not match plan baseHash ${plan.baseHash}`);
+  if (plan.baseHash !== inspection.baseHash) {
+    throw new DocumentPlanError('STALE_BASE', `Target hash ${inspection.baseHash} does not match plan baseHash ${plan.baseHash}`);
   }
-  if (plan.target !== inspection.target) {
-    throw new DocumentPlanError('DOCUMENT_PLAN_TARGET_MISMATCH', `Plan target ${plan.target} does not match inspected target ${inspection.target}`);
+  if (plan.targetPath !== inspection.targetPath) {
+    throw new DocumentPlanError('DOCUMENT_PLAN_TARGET_MISMATCH', `Plan target ${plan.targetPath} does not match inspected target ${inspection.targetPath}`);
   }
 
   const sections = new Map(inspection.sections.map((section) => [section.id, section]));
@@ -452,8 +544,8 @@ function planCandidate(plan: DocumentPlan, source: string, inspection: MarkdownI
   for (const operation of plan.operations) {
     if (operation.type === 'create') {
       let offset: number;
-      if (operation.anchor.kind === 'document-start') offset = 0;
-      else if (operation.anchor.kind === 'document-end') offset = source.length;
+      if ('kind' in operation.anchor && operation.anchor.kind === 'document-start') offset = 0;
+      else if ('kind' in operation.anchor && operation.anchor.kind === 'document-end') offset = source.length;
       else {
         const sectionId = 'sectionId' in operation.anchor ? operation.anchor.sectionId : '';
         const anchor = sections.get(sectionId);
@@ -463,18 +555,19 @@ function planCandidate(plan: DocumentPlan, source: string, inspection: MarkdownI
             message: `Unknown section ${sectionId}`,
           }]);
         }
-        offset = operation.anchor.kind === 'before' ? anchor.subtreeRange.start.offset : anchor.subtreeRange.end.offset;
+        offset = 'position' in operation && operation.position === 'before' ? anchor.subtreeRange.start.offset : anchor.subtreeRange.end.offset;
       }
       patches.push({ start: offset, end: offset, text: normalizeInsertedMarkdown(operation.markdown, inspection), operation });
       descriptions.set(operation.id, operationDescription(operation));
       continue;
     }
 
-    const section = sections.get(operation.sectionId);
+    const sectionId = operation.selector.sectionId;
+    const section = sections.get(sectionId);
     if (!section) {
-      throw new DocumentPlanError('UNKNOWN_DOCUMENT_SECTION', `Unknown document section: ${operation.sectionId}`, [{
+      throw new DocumentPlanError('UNKNOWN_DOCUMENT_SECTION', `Unknown document section: ${sectionId}`, [{
         operationId: operation.id,
-        message: `Unknown section ${operation.sectionId}`,
+        message: `Unknown section ${sectionId}`,
       }]);
     }
     descriptions.set(operation.id, operationDescription(operation, section));
@@ -536,17 +629,17 @@ function reviewToken(plan: DocumentPlan, candidateHash: string): string {
     canonicalDocumentPlan(plan),
     candidateHash,
   ].join('\n');
-  return sha256(binding);
+  return `review-v1:${createHash('sha256').update(binding).digest('hex')}`;
 }
 
 export function previewDocument(planInput: DocumentPlan | unknown, source: string, target?: string): DocumentPreview {
   const plan = parseDocumentPlan(planInput);
-  const inspection = inspectMarkdown(source, target ?? plan.target);
+  const inspection = inspectMarkdown(source, target ?? plan.targetPath);
   const result = planCandidate(plan, source, inspection);
   const candidateHash = sha256(result.candidate);
   const unifiedDiff = result.candidate === source
     ? '(no changes)\n'
-    : createTwoFilesPatch(`a/${plan.target}`, `b/${plan.target}`, source, result.candidate, '', '', { context: 3 });
+    : createTwoFilesPatch(`a/${plan.targetPath}`, `b/${plan.targetPath}`, source, result.candidate, '', '', { context: 3 });
   return {
     plan,
     inspection,
@@ -556,6 +649,12 @@ export function previewDocument(planInput: DocumentPlan | unknown, source: strin
     unifiedDiff,
     reviewToken: reviewToken(plan, candidateHash),
   };
+}
+
+export function createUnifiedDiff(targetPath: string, beforeSource: string, afterSource: string): string {
+  return beforeSource === afterSource
+    ? '(no changes)\n'
+    : createTwoFilesPatch(`a/${targetPath}`, `b/${targetPath}`, beforeSource, afterSource, '', '', { context: 3 });
 }
 
 type ResolvedProjectFile = {
@@ -633,7 +732,14 @@ async function readPlanFile(projectRoot: string, planPath: string): Promise<{ fi
   return { file, plan: parseDocumentPlan(input) };
 }
 
+function requireMarkdownPath(targetPath: string): void {
+  if (!/\.(?:md|markdown)$/i.test(targetPath)) {
+    throw new DocumentPlanError('NOT_MARKDOWN', `Markdown target must end in .md or .markdown: ${targetPath}`);
+  }
+}
+
 export async function inspectMarkdownFile(projectRoot: string, targetPath: string): Promise<MarkdownInspection> {
+  requireMarkdownPath(targetPath);
   const file = await resolveExistingProjectFile(projectRoot, targetPath, 'target');
   const source = await readUtf8(file.realPath, 'INVALID_MARKDOWN_ENCODING');
   return inspectMarkdown(source, file.relativePath);
@@ -641,7 +747,8 @@ export async function inspectMarkdownFile(projectRoot: string, targetPath: strin
 
 export async function previewDocumentPlanFile(projectRoot: string, planPath: string): Promise<DocumentPreview> {
   const { file: planFile, plan } = await readPlanFile(projectRoot, planPath);
-  const targetFile = await resolveExistingProjectFile(planFile.projectRoot, plan.target, 'target');
+  requireMarkdownPath(plan.targetPath);
+  const targetFile = await resolveExistingProjectFile(planFile.projectRoot, plan.targetPath, 'target');
   if (targetFile.realPath === planFile.realPath) {
     throw new DocumentPlanError('DOCUMENT_PLAN_TARGET_MISMATCH', 'A DocumentPlan cannot target its own plan file');
   }
@@ -676,21 +783,23 @@ async function atomicWrite(file: string, content: string, mode: number): Promise
 }
 
 export async function applyDocumentPlanFile(projectRoot: string, planPath: string, suppliedReviewToken: string): Promise<DocumentApplyResult> {
+  if (!suppliedReviewToken) throw new DocumentPlanError('REVIEW_REQUIRED', 'Apply requires the review token emitted by preview');
   const { file: planFile, plan } = await readPlanFile(projectRoot, planPath);
-  const targetFile = await resolveExistingProjectFile(planFile.projectRoot, plan.target, 'target');
+  requireMarkdownPath(plan.targetPath);
+  const targetFile = await resolveExistingProjectFile(planFile.projectRoot, plan.targetPath, 'target');
   const source = await readUtf8(targetFile.realPath, 'INVALID_MARKDOWN_ENCODING');
   const preview = previewDocument(plan, source, targetFile.relativePath);
   if (!matchesReviewToken(preview.reviewToken, suppliedReviewToken)) {
-    throw new DocumentPlanError('REVIEW_TOKEN_MISMATCH', 'Supplied review token does not match the current plan and candidate');
+    throw new DocumentPlanError('REVIEW_MISMATCH', 'Supplied review token does not match the current plan and candidate');
   }
 
   const planAgain = await readPlanFile(planFile.projectRoot, planFile.relativePath);
   if (canonicalDocumentPlan(planAgain.plan) !== canonicalDocumentPlan(plan)) {
-    throw new DocumentPlanError('REVIEW_TOKEN_MISMATCH', 'DocumentPlan changed while apply was in progress');
+    throw new DocumentPlanError('REVIEW_MISMATCH', 'DocumentPlan changed while apply was in progress');
   }
   const sourceAgain = await readUtf8(targetFile.realPath, 'INVALID_MARKDOWN_ENCODING');
   if (sha256(sourceAgain) !== plan.baseHash) {
-    throw new DocumentPlanError('STALE_DOCUMENT_PLAN', 'Target changed while apply was in progress');
+    throw new DocumentPlanError('STALE_BASE', 'Target changed while apply was in progress');
   }
 
   const changed = preview.candidate !== source;
@@ -706,4 +815,24 @@ export async function discardDocumentPlanFile(projectRoot: string, planPath: str
   const file = await resolveExistingProjectFile(projectRoot, planPath, 'plan');
   await fs.unlink(file.lexicalPath);
   return file.relativePath;
+}
+
+export async function previewDocumentPlan(projectRoot: string, planPath: string): Promise<DocumentPreview> {
+  return previewDocumentPlanFile(projectRoot, planPath);
+}
+
+export async function applyDocumentPlan(projectRoot: string, planPath: string, reviewTokenValue: string): Promise<DocumentApplyResult> {
+  return applyDocumentPlanFile(projectRoot, planPath, reviewTokenValue);
+}
+
+export async function discardDocumentPlan(projectRoot: string, planPath: string): Promise<void> {
+  await discardDocumentPlanFile(projectRoot, planPath);
+}
+
+export async function validateDocumentPlanFile(projectRoot: string, planPath: string): Promise<DocumentPlan> {
+  return (await readPlanFile(projectRoot, planPath)).plan;
+}
+
+export async function resolveProjectFile(projectRoot: string, relativePath: string): Promise<string> {
+  return (await resolveExistingProjectFile(projectRoot, relativePath, 'target')).realPath;
 }

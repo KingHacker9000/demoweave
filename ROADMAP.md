@@ -14,10 +14,10 @@ DemoWeave is **multi-surface by design**. A repository may expose web, CLI, desk
 | M3 — Terminal driver | ✅ Complete | Cross-platform Flow execution + `TerminalTrack v1` |
 | M4 — Media renderer | ✅ Complete | TerminalTrack → polished PNG/GIF + derived Evidence |
 | P0 — DemoWeave documents itself | ✅ Complete | First public-quality dogfood README using real DemoWeave evidence |
-| **M5 — Safe Markdown patching** | **🚧 Current** | Section-aware plan → preview/review token → atomic apply |
-| M6 — Incremental stale tracking | Next | Explain and selectively regenerate stale evidence/docs |
+| M5 — Safe Markdown patching | ✅ Complete | Section-aware plan → preview/review token → atomic apply |
+| **M6 — Incremental stale tracking** | **🚧 Current** | Explain and selectively regenerate stale evidence/docs |
 
-M0/M1 landed in PR #1, M2 in PR #2, M3 in PR #3, M4 in PR #4, and Pilot P0 in PR #5.
+M0/M1 landed in PR #1, M2 in PR #2, M3 in PR #3, M4 in PR #4, Pilot P0 in PR #5, and M5 in PR #6.
 
 ## Product principles
 
@@ -51,10 +51,12 @@ Renderer
   ↓
 PNG / GIF
   ↓
-README / docs
+DocumentPlan v1
+  ↓
+reviewed Markdown patch
 ```
 
-P0 proved this with DemoWeave itself: Codex followed the checked-in shared skill, inspected the repository, ran the committed terminal Flow, refreshed structured evidence, rendered the GIF, and rewrote the README without claiming unimplemented features.
+P0 proved the evidence path with DemoWeave itself. M5 added the corresponding reviewed document-editing path: agents author Markdown, while DemoWeave deterministically inspects source positions, previews exact source splices, fingerprints the reviewed candidate, and atomically applies only that candidate.
 
 ## Established contracts
 
@@ -73,6 +75,10 @@ Evidence records lifecycle, artifact metadata, producer, provenance, and derivat
 ### TerminalTrack v1
 
 Renderer-independent terminal capture with dimensions, portable command/cwd metadata, ordered input/stdout/stderr events, ANSI-preserving output, process lifecycle, exit code/signal, and duration.
+
+### DocumentPlan v1
+
+Agent-authored, deterministic Markdown change plans bound to an exact target content hash. Plans select inspected sections and declare `preserve`, `edit`, `replace`, `create`, or reasoned `remove` operations. Preview produces the complete candidate, unified diff, and review token; apply requires that exact reviewed token and refuses stale targets or changed plans.
 
 ---
 
@@ -138,17 +144,13 @@ Pilot result:
 - README commands/links/assets were audited.
 - Hosted Ubuntu + Windows CI passed on the P0 head.
 
-This proves the agent-native workflow before automating document patching itself.
+This proved the agent-native evidence workflow before automating document patching itself.
 
----
+## M5 — Document planning + safe Markdown patching ✅
 
-# Current milestone
+**Goal achieved:** agents can inspect arbitrary Markdown, declare intentional section-level changes, preview the exact candidate and diff, obtain a deterministic review fingerprint, and atomically apply only the reviewed patch without rewriting untouched content.
 
-## M5 — Document planning + safe Markdown patching 🚧
-
-**Goal:** give agents a deterministic way to inspect arbitrary Markdown, declare intentional section-level changes, preview the exact diff, obtain a review fingerprint, and apply only the reviewed patch without rewriting untouched content.
-
-The reasoning stays in Claude Code/Codex. DemoWeave should not decide what prose to write.
+The reasoning stays in Claude Code/Codex. DemoWeave does not decide what prose to write.
 
 ```text
 Markdown file
@@ -168,128 +170,52 @@ review / refine / discard
 atomic apply only if base + review token still match
 ```
 
-### M5 architecture boundaries
+Delivered:
 
-- **Preserve original source bytes outside edited ranges.** Do not parse and reserialize the entire Markdown file.
-- Use a real Markdown parser/position model rather than brittle regex-only heading matching.
-- Markdown parsing may locate section ranges; patching should splice the original source.
-- Support arbitrary project-relative Markdown targets, not only `README.md` or `/docs`.
-- Never allow target paths to escape the repository.
-- Reject stale plans if the target changed since the plan's base hash was computed.
-- Preview must not mutate the target.
-- Apply must be atomic.
-- A reviewed patch must not silently change between preview and apply.
-- Keep agent prose/content out of DemoWeave's deterministic core; the plan carries agent-authored Markdown.
-- Do not implement M6 stale/provenance tracking inside M5.
+- deterministic source-position section inspection with preamble support, nested paths, duplicate-safe IDs, ATX heading handling, and fenced-code awareness
+- SHA-256 target base hashes plus LF/CRLF/trailing-newline facts
+- DocumentPlan v1 runtime validation + published JSON Schema
+- `preserve`, body-only `edit`, whole-section `replace`, anchored `create`, and reasoned `remove`
+- exact source splicing rather than Markdown reserialization
+- overlapping operation, preserve, selector, create-anchor, path traversal, and symlink safety checks
+- complete in-memory candidate + unified diff preview
+- deterministic `review-v1` fingerprint bound to base target + normalized plan + candidate
+- apply rejection for missing/wrong review tokens, stale targets, or changed plans/candidates
+- same-directory temporary file + atomic rename apply
+- safe discard that can remove even malformed plans without touching their target
+- `demoweave docs inspect|preview|apply|discard`
+- `.demoweave/plans/` initialization + validation
+- shared Claude/Codex skill updated to use inspect → plan → preview → approval → apply
+- README and non-README tests covering duplicate/nested/Unicode/empty/fenced sections, newline behavior, no headings, conflicts, stale state, traversal, symlinks, and discard safety
+- committed small M5 dogfood document/plan; CI previews and applies it in a disposable working tree, verifies stale re-apply rejection, then restores the document
+- hosted Ubuntu + Windows build/test/typecheck and dogfood smoke green
 
-### Document section model
+M5 intentionally does not implement automatic document authorship, stale detection, web capture, or tutorial composition.
 
-M5 should expose stable, human/agent-readable section information derived from Markdown headings and source positions. It must handle duplicate heading text without ambiguous selection.
+---
 
-A useful selector may include a heading path plus occurrence/stable section ID. Exact schema should be chosen during implementation, but selection must remain deterministic after inspection.
+# Current milestone
 
-The tool also needs a way to target the document preamble/body region where appropriate.
+## M6 — Incremental stale/update tracking 🚧
 
-### DocumentPlan v1
+**Goal:** use Manifest/document provenance to explain exactly why generated evidence or reviewed documentation is stale, and selectively regenerate only affected artifacts instead of rerunning the entire documentation pipeline.
 
-The agent should be able to express intentional operations such as:
+The next design step is to define the smallest deterministic freshness contract that connects source dependencies, Flow/Evidence provenance, rendered derivations, and document outputs without adding fuzzy agent judgments to the core.
 
-- `preserve` — explicitly record that an existing section should remain untouched.
-- `edit` — replace a section body while preserving its heading identity.
-- `replace` — replace an entire selected section when heading/content structure changes.
-- `create` — insert a new section before/after a deterministic anchor.
-- `remove` — remove an existing section; must include a non-empty reason.
+M6 should answer questions such as:
 
-Plans should include at minimum:
+- Which source change made this Evidence stale?
+- Which rendered assets derive from that Evidence?
+- Which documents reference or depend on those assets/results?
+- What is the minimal regeneration set?
+- Can DemoWeave explain the stale chain before changing anything?
+- Can a no-change run avoid unnecessary artifact/document churn?
 
-- schema version
-- plan ID
-- project-relative target path
-- target base SHA-256/content hash
-- ordered operations with stable operation IDs
-
-Do not add speculative fields unrelated to safe patching.
-
-### Review token
-
-`preview` should compute the complete candidate output and emit a deterministic review token/fingerprint derived from the base target + normalized plan + resulting candidate content.
-
-`apply` should require the matching review token (or an equivalently strong reviewed-state mechanism) and refuse when:
-
-- the target hash changed
-- the plan changed
-- the candidate diff changed
-
-This makes the apply step explicitly tied to what was reviewed.
-
-### CLI shape
-
-Prefer one coherent command group, conceptually:
-
-```bash
-demoweave docs inspect README.md
-demoweave docs preview .demoweave/plans/readme.json
-demoweave docs apply .demoweave/plans/readme.json --review <token>
-demoweave docs discard .demoweave/plans/readme.json
-```
-
-Exact naming may change if a cleaner implementation emerges, but avoid many overlapping commands.
-
-`inspect` should provide enough section IDs/paths and the target hash for an agent to author a plan. `preview` should show a concise operation summary and unified diff. `apply` should report exactly what changed. `discard` must never touch the target document.
-
-### Safety / preservation requirements
-
-M5 must correctly handle or safely reject cases involving:
-
-- ATX headings (`#` through `######`)
-- fenced code blocks containing heading-like text
-- duplicate headings
-- nested headings
-- CRLF vs LF
-- no trailing newline
-- empty sections
-- files with no headings
-- Unicode headings/content
-- invalid/missing selectors
-- overlapping operations
-- conflicting create anchors
-- stale base hashes
-- target/plan path traversal
-- symlink escape where relevant to Node filesystem behavior
-
-Untouched sections and whitespace should remain byte-for-byte unchanged wherever possible.
-
-### M5 exit criteria
-
-M5 is complete when:
-
-1. A Markdown target can be inspected into a deterministic section map + SHA-256 base hash.
-2. DocumentPlan v1 has runtime validation and a published JSON Schema.
-3. `preserve`, `edit`, `replace`, `create`, and reasoned `remove` are implemented with documented semantics.
-4. Duplicate headings can be selected unambiguously.
-5. Code-fence heading-like text is not misidentified as a document section.
-6. Preview produces the full candidate output and a readable unified diff without mutating the target.
-7. Preview emits a deterministic review token.
-8. Apply refuses without the matching reviewed token.
-9. Apply refuses if target or plan changed after preview.
-10. Apply writes atomically and preserves untouched source ranges.
-11. Discard removes/invalidates the plan without touching the target.
-12. Project-root path safety is enforced.
-13. README and non-README Markdown fixtures are both covered.
-14. Windows and Linux/WSL newline/path behavior are tested.
-15. The shared DemoWeave skill uses the real inspect → plan → preview → approval → apply workflow.
-16. Hosted Ubuntu + Windows CI is green.
-17. DemoWeave dogfoods M5 on a small real Markdown refinement without creating README churn.
-
-M5 does not implement automatic document authorship, stale detection, web capture, or tutorial composition.
+Do not conflate M6 with the M7 browser driver. Staleness and selective regeneration should work for the terminal/evidence/document pipeline already implemented.
 
 ---
 
 # Later milestones
-
-## M6 — Incremental stale/update tracking
-
-Use Manifest/document provenance to explain why evidence/docs are stale and selectively regenerate only affected artifacts.
 
 ## M7 — Web driver (Playwright)
 
@@ -347,8 +273,8 @@ DemoWeave 1.0 should provide stable agent workflows and contracts, multi-surface
 | 4 | ✅ M3 — terminal driver | DemoWeave runs itself |
 | 5 | ✅ M4 — GIF renderer | first visual artifact |
 | 6 | ✅ P0 — self-document README | first public-quality dogfood demo |
-| 7 | **🚧 M5 — safe Markdown patching** | reliable reviewed document edits |
-| 8 | M6 — stale tracking | living documentation |
+| 7 | ✅ M5 — safe Markdown patching | reliable reviewed document edits |
+| 8 | **🚧 M6 — stale tracking** | living documentation |
 | 9 | M7 — web driver | website support |
 | 10 | P1 — web fixture | second-surface proof |
 | 11 | M8 — compositor | split-screen scenes |
@@ -363,8 +289,6 @@ DemoWeave 1.0 should provide stable agent workflows and contracts, multi-surface
 
 # Current next step
 
-## NOW: M5 — section-aware Markdown patching
+## NOW: M6 — deterministic stale/update tracking
 
-Build the first deterministic document-editing contract and CLI around arbitrary Markdown. The agent must be able to inspect section IDs and a base hash, author a plan, preview the exact patch, show it for review, refine without touching the file, and apply only the reviewed candidate atomically.
-
-The dogfood target for M5 should be deliberately small: use the new mechanism to make one justified README or documentation refinement while proving that unrelated sections remain byte-identical.
+Define and implement the freshness model over the provenance that already exists. Start with terminal Evidence → rendered Evidence → document dependencies, make `status` explain *why* something is stale, compute a minimal regeneration set, and prove that an unchanged rerun creates no unnecessary churn.

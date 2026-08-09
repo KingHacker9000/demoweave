@@ -5,6 +5,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import {
   DocumentPlanError,
+  DocumentPlanSchema,
   analyzeProject,
   applyDocumentPlanFile,
   discardDocumentPlanFile,
@@ -274,9 +275,9 @@ docs.command('inspect')
         console.log(JSON.stringify(inspection, null, 2));
         return;
       }
-      console.log(`Document: ${inspection.target}`);
-      console.log(`Content hash: ${inspection.contentHash}`);
-      console.log(`Newlines: ${inspection.newlineStyle.toUpperCase()}; trailing newline: ${inspection.trailingNewline ? 'yes' : 'no'}`);
+      console.log(`Document: ${inspection.targetPath}`);
+      console.log(`Content hash: ${inspection.baseHash}`);
+      console.log(`Newlines: ${inspection.newline.toUpperCase()}; trailing newline: ${inspection.trailingNewline ? 'yes' : 'no'}`);
       console.log('Sections:');
       for (const section of inspection.sections) {
         const label = section.kind === 'preamble' ? '[preamble]' : `${'#'.repeat(section.level)} ${section.heading}`;
@@ -292,6 +293,7 @@ docs.command('preview')
   .argument('<plan-path>', 'project-relative DocumentPlan v1 JSON path')
   .option('--project <path>', 'project root', '.')
   .option('--json', 'print structured JSON')
+  .option('--candidate', 'print the complete candidate document after the diff')
   .action(async (planPath, options) => {
     try {
       const preview = await previewDocumentPlanFile(options.project, planPath);
@@ -300,11 +302,19 @@ docs.command('preview')
         return;
       }
       console.log(`Document plan: ${preview.plan.id}`);
-      console.log(`Target: ${preview.plan.target}\n`);
+      console.log(`Target: ${preview.plan.targetPath}\n`);
+      console.log(`Base hash: ${preview.inspection.baseHash}`);
+      console.log(`Candidate hash: ${preview.candidateHash}\n`);
       console.log('Operations:');
       const markers = { preserve: '=', edit: '~', replace: '~', create: '+', remove: '-' } as const;
       for (const operation of preview.operations) console.log(`  ${markers[operation.type]} ${operation.description} [${operation.id}]`);
       console.log(`\n${preview.unifiedDiff.trimEnd()}\n`);
+      if (options.candidate) {
+        console.log('Candidate:');
+        process.stdout.write(preview.candidate);
+        if (!preview.candidate.endsWith('\n') && !preview.candidate.endsWith('\r')) process.stdout.write('\n');
+        console.log();
+      }
       console.log('Review token:');
       console.log(preview.reviewToken);
     } catch (error) {
@@ -326,7 +336,7 @@ docs.command('apply')
         return;
       }
       console.log(`Applied document plan: ${result.plan.id}`);
-      console.log(`Target: ${result.plan.target}`);
+      console.log(`Target: ${result.plan.targetPath}`);
       console.log(`Changed: ${result.changed ? 'yes' : 'no'}`);
       console.log('Operations:');
       for (const operation of result.operations) {
@@ -353,7 +363,7 @@ docs.command('discard')
     }
   });
 
-program.command('validate').description('Validate DemoWeave project metadata and evidence bindings').argument('[path]', 'project path', '.').action(async (input) => {
+program.command('validate').description('Validate DemoWeave project metadata, document plans, and evidence bindings').argument('[path]', 'project path', '.').action(async (input) => {
   const root = path.resolve(input);
   const projectPath = path.join(root, '.demoweave', 'project.json');
   let failed = false;
@@ -388,6 +398,25 @@ program.command('validate').description('Validate DemoWeave project metadata and
         }
       } else {
         flowFiles.push({ path: repoRelative(root, file), flow: parsed.data });
+      }
+    } catch (error) {
+      failed = true;
+      console.error(`${repoRelative(root, file)}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  const planDirectory = path.join(root, '.demoweave', 'plans');
+  let planCount = 0;
+  for (const file of await listJsonFiles(planDirectory)) {
+    try {
+      const parsed = DocumentPlanSchema.safeParse(JSON.parse(await fs.readFile(file, 'utf8')));
+      if (!parsed.success) {
+        failed = true;
+        for (const issue of parsed.error.issues) {
+          console.error(`${repoRelative(root, file)}:${issue.path.join('.')}: ${issue.message}`);
+        }
+      } else {
+        planCount += 1;
       }
     } catch (error) {
       failed = true;
@@ -432,8 +461,9 @@ program.command('validate').description('Validate DemoWeave project metadata and
 
   console.log('ProjectProfile v1 is valid.');
   console.log(`Flow v1 files valid: ${flowFiles.length}.`);
+  console.log(`DocumentPlan v1 files valid: ${planCount}.`);
   console.log(`Manifest v1: ${manifest ? 'valid' : 'not present'}.`);
-  console.log('M2 metadata bindings are valid.');
+  console.log('Metadata bindings are valid.');
 });
 
 await program.parseAsync(process.argv);

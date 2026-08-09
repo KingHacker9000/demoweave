@@ -22,8 +22,8 @@ function planFor(source: string, operations: DocumentOperation[], target = 'READ
   return parseDocumentPlan({
     schemaVersion: 1,
     id: 'document-test',
-    target,
-    baseHash: inspectMarkdown(source, target).contentHash,
+    targetPath: target,
+    baseHash: inspectMarkdown(source, target).baseHash,
     operations,
   });
 }
@@ -76,8 +76,8 @@ test('inspection produces deterministic hierarchy-based ids and ignores fenced p
   ].join('\n');
   const inspection = inspectMarkdown(source, 'docs/guide.md');
 
-  assert.equal(inspection.target, 'docs/guide.md');
-  assert.equal(inspection.newlineStyle, 'lf');
+  assert.equal(inspection.targetPath, 'docs/guide.md');
+  assert.equal(inspection.newline, 'lf');
   assert.equal(inspection.trailingNewline, true);
   assert.deepEqual(inspection.sections.map((section) => section.id), [
     'preamble',
@@ -106,10 +106,10 @@ test('inspection covers ATX levels, empty sections, Unicode, no headings, CRLF, 
   assert.equal(noHeadings.sections.length, 1);
   assert.equal(noHeadings.sections[0]?.id, 'preamble');
   assert.equal(noHeadings.sections[0]?.subtreeRange.end.offset, 'Unicode only: مرحبا 世界'.length);
-  assert.equal(noHeadings.newlineStyle, 'none');
+  assert.equal(noHeadings.newline, 'none');
 
   const crlf = inspectMarkdown('# A\r\n\r\nBody\r\n', 'README.md');
-  assert.equal(crlf.newlineStyle, 'crlf');
+  assert.equal(crlf.newline, 'crlf');
   assert.equal(crlf.trailingNewline, true);
 });
 
@@ -119,7 +119,7 @@ test('edit replaces only direct body and preserves nested section bytes', () => 
   const plan = planFor(source, [{
     id: 'edit-install-intro',
     type: 'edit',
-    sectionId: 'section:guide/install',
+    selector: { sectionId: 'section:guide/install' },
     markdown: '\nNew intro.\n\n',
   }]);
   const preview = previewDocument(plan, source);
@@ -135,7 +135,7 @@ test('replace changes the full subtree while remove requires a reason', () => {
   const replaced = previewDocument(planFor(source, [{
     id: 'replace-old',
     type: 'replace',
-    sectionId: 'section:guide/old',
+    selector: { sectionId: 'section:guide/old' },
     markdown: '## New\n\nReplacement\n\n',
   }]), source).candidate;
   assert.equal(replaced, '# Guide\n\n## New\n\nReplacement\n\n## Keep\n\nExact\n');
@@ -143,24 +143,24 @@ test('replace changes the full subtree while remove requires a reason', () => {
   const removed = previewDocument(planFor(source, [{
     id: 'remove-old',
     type: 'remove',
-    sectionId: 'section:guide/old',
+    selector: { sectionId: 'section:guide/old' },
     reason: 'Obsolete section',
   }]), source).candidate;
   assert.equal(removed, '# Guide\n\n## Keep\n\nExact\n');
   assert.equal(DocumentPlanSchema.safeParse({
     schemaVersion: 1,
     id: 'bad-remove',
-    target: 'README.md',
-    baseHash: inspectMarkdown(source, 'README.md').contentHash,
-    operations: [{ id: 'remove', type: 'remove', sectionId: 'section:guide/old', reason: '   ' }],
+    targetPath: 'README.md',
+    baseHash: inspectMarkdown(source, 'README.md').baseHash,
+    operations: [{ id: 'remove', type: 'remove', selector: { sectionId: 'section:guide/old' }, reason: '   ' }],
   }).success, false);
 });
 
 test('create supports before, after, document start, and document end anchors', () => {
   const source = '# A\n\nA body.\n\n# B\n\nB body.\n';
   const cases: Array<[DocumentOperation, string]> = [
-    [{ id: 'before', type: 'create', anchor: { kind: 'before', sectionId: 'section:b' }, markdown: '# X\n\n' }, '# A\n\nA body.\n\n# X\n\n# B\n\nB body.\n'],
-    [{ id: 'after', type: 'create', anchor: { kind: 'after', sectionId: 'section:a' }, markdown: '# X\n\n' }, '# A\n\nA body.\n\n# X\n\n# B\n\nB body.\n'],
+    [{ id: 'before', type: 'create', anchor: { sectionId: 'section:b' }, position: 'before', markdown: '# X\n\n' }, '# A\n\nA body.\n\n# X\n\n# B\n\nB body.\n'],
+    [{ id: 'after', type: 'create', anchor: { sectionId: 'section:a' }, position: 'after', markdown: '# X\n\n' }, '# A\n\nA body.\n\n# X\n\n# B\n\nB body.\n'],
     [{ id: 'start', type: 'create', anchor: { kind: 'document-start' }, markdown: 'Intro\n\n' }, 'Intro\n\n# A\n\nA body.\n\n# B\n\nB body.\n'],
     [{ id: 'end', type: 'create', anchor: { kind: 'document-end' }, markdown: '\n# C\n' }, '# A\n\nA body.\n\n# B\n\nB body.\n\n# C\n'],
   ];
@@ -174,36 +174,37 @@ test('plans reject duplicate ids, unknown selectors, destructive overlap, preser
   assert.equal(DocumentPlanSchema.safeParse({
     schemaVersion: 1,
     id: 'duplicates',
-    target: 'README.md',
-    baseHash: inspectMarkdown(source, 'README.md').contentHash,
+    targetPath: 'README.md',
+    baseHash: inspectMarkdown(source, 'README.md').baseHash,
     operations: [
-      { id: 'same', type: 'preserve', sectionId: 'section:guide' },
-      { id: 'same', type: 'preserve', sectionId: 'section:guide/child' },
+      { id: 'same', type: 'preserve', selector: { sectionId: 'section:guide' } },
+      { id: 'same', type: 'preserve', selector: { sectionId: 'section:guide/child' } },
     ],
   }).success, false);
   assert.equal(DocumentPlanSchema.safeParse({
     schemaVersion: 1,
     id: 'missing-selector',
-    target: 'README.md',
-    baseHash: inspectMarkdown(source, 'README.md').contentHash,
+    targetPath: 'README.md',
+    baseHash: inspectMarkdown(source, 'README.md').baseHash,
     operations: [{ id: 'edit', type: 'edit', markdown: 'Changed' }],
   }).success, false);
   assert.throws(() => parseDocumentPlan({ schemaVersion: 2 }), expectCode('UNSUPPORTED_DOCUMENT_PLAN_VERSION'));
 
-  assert.throws(() => previewDocument(planFor(source, [{ id: 'missing', type: 'edit', sectionId: 'section:nope', markdown: '' }]), source), expectCode('UNKNOWN_DOCUMENT_SECTION'));
+  assert.throws(() => previewDocument(planFor(source, [{ id: 'missing', type: 'edit', selector: { sectionId: 'section:nope' }, markdown: '' }]), source), expectCode('UNKNOWN_DOCUMENT_SECTION'));
   assert.throws(() => previewDocument(planFor(source, [{
     id: 'bad-anchor',
     type: 'create',
-    anchor: { kind: 'after', sectionId: 'section:nope' },
+    anchor: { sectionId: 'section:nope' },
+    position: 'after',
     markdown: '# New\n',
   }]), source), expectCode('UNKNOWN_DOCUMENT_SECTION'));
   assert.throws(() => previewDocument(planFor(source, [
-    { id: 'replace-parent', type: 'replace', sectionId: 'section:guide', markdown: '# New\n' },
-    { id: 'remove-child', type: 'remove', sectionId: 'section:guide/child', reason: 'Covered' },
+    { id: 'replace-parent', type: 'replace', selector: { sectionId: 'section:guide' }, markdown: '# New\n' },
+    { id: 'remove-child', type: 'remove', selector: { sectionId: 'section:guide/child' }, reason: 'Covered' },
   ]), source), expectCode('DOCUMENT_PLAN_CONFLICT'));
   assert.throws(() => previewDocument(planFor(source, [
-    { id: 'keep-guide', type: 'preserve', sectionId: 'section:guide' },
-    { id: 'edit-child', type: 'edit', sectionId: 'section:guide/child', markdown: '\nChanged\n' },
+    { id: 'keep-guide', type: 'preserve', selector: { sectionId: 'section:guide' } },
+    { id: 'edit-child', type: 'edit', selector: { sectionId: 'section:guide/child' }, markdown: '\nChanged\n' },
   ]), source), expectCode('PRESERVED_SECTION_CONFLICT'));
   assert.throws(() => previewDocument(planFor(source, [
     { id: 'one', type: 'create', anchor: { kind: 'document-end' }, markdown: '\nOne' },
@@ -213,7 +214,7 @@ test('plans reject duplicate ids, unknown selectors, destructive overlap, preser
   const preserved = previewDocument(planFor(source, [{
     id: 'keep-guide',
     type: 'preserve',
-    sectionId: 'section:guide',
+    selector: { sectionId: 'section:guide' },
   }]), source);
   assert.equal(preserved.candidate, source);
   assert.equal(preserved.operations[0]?.changed, false);
@@ -226,10 +227,10 @@ test('CRLF insertion is normalized while untouched bytes and trailing-newline st
   const preview = previewDocument(planFor(source, [{
     id: 'edit-a',
     type: 'edit',
-    sectionId: 'section:a',
+    selector: { sectionId: 'section:a' },
     markdown: '\nNew\n\n',
   }]), source);
-  assert.equal(preview.inspection.newlineStyle, 'crlf');
+  assert.equal(preview.inspection.newline, 'crlf');
   assert.equal(preview.candidate.includes('\n') && !preview.candidate.includes('\r\n'), false);
   assert.equal(preview.candidate.slice(preview.candidate.indexOf('# B')), untouched);
   assert.equal(preview.candidate.endsWith('\n'), false);
@@ -237,11 +238,11 @@ test('CRLF insertion is normalized while untouched bytes and trailing-newline st
 
 test('review tokens bind canonical semantic plan and candidate, not JSON property order', () => {
   const source = '# Demo\n\nOld\n';
-  const first = planFor(source, [{ id: 'edit', type: 'edit', sectionId: 'section:demo', markdown: '\nNew\n' }]);
+  const first = planFor(source, [{ id: 'edit', type: 'edit', selector: { sectionId: 'section:demo' }, markdown: '\nNew\n' }]);
   const reordered = parseDocumentPlan({
-    operations: [{ markdown: '\nNew\n', sectionId: 'section:demo', type: 'edit', id: 'edit' }],
+    operations: [{ markdown: '\nNew\n', selector: { sectionId: 'section:demo' }, type: 'edit', id: 'edit' }],
     baseHash: first.baseHash,
-    target: first.target,
+    targetPath: first.targetPath,
     id: first.id,
     schemaVersion: 1,
   });
@@ -257,12 +258,12 @@ test('filesystem preview is non-mutating, apply requires the token, writes atomi
   const target = path.join(root, 'README.md');
   if (process.platform !== 'win32') await fs.chmod(target, 0o640);
   const initialMode = (await fs.stat(target)).mode & 0o777;
-  const plan = planFor(source, [{ id: 'edit', type: 'edit', sectionId: 'section:demo', markdown: '\nNew body.\n' }]);
+  const plan = planFor(source, [{ id: 'edit', type: 'edit', selector: { sectionId: 'section:demo' }, markdown: '\nNew body.\n' }]);
   const planPath = await writePlan(root, plan);
 
   const preview = await previewDocumentPlanFile(root, planPath);
   assert.equal(await fs.readFile(target, 'utf8'), source);
-  await assert.rejects(applyDocumentPlanFile(root, planPath, 'sha256:wrong'), expectCode('REVIEW_TOKEN_MISMATCH'));
+  await assert.rejects(applyDocumentPlanFile(root, planPath, 'review-v1:wrong'), expectCode('REVIEW_MISMATCH'));
   const applied = await applyDocumentPlanFile(root, planPath, preview.reviewToken);
   assert.equal(applied.changed, true);
   assert.equal(await fs.readFile(target, 'utf8'), '# Demo\n\nNew body.\n');
@@ -270,14 +271,14 @@ test('filesystem preview is non-mutating, apply requires the token, writes atomi
   assert.equal((await fs.readdir(root)).some((name) => name.includes('.tmp')), false);
 
   await fs.writeFile(target, `${source}changed`);
-  await assert.rejects(previewDocumentPlanFile(root, planPath), expectCode('STALE_DOCUMENT_PLAN'));
-  await assert.rejects(applyDocumentPlanFile(root, planPath, preview.reviewToken), expectCode('STALE_DOCUMENT_PLAN'));
+  await assert.rejects(previewDocumentPlanFile(root, planPath), expectCode('STALE_BASE'));
+  await assert.rejects(applyDocumentPlanFile(root, planPath, preview.reviewToken), expectCode('STALE_BASE'));
 });
 
 test('discard removes only the plan and fails clearly when it is missing', async (context) => {
   const source = '# Demo\n\nOld body.\n';
   const root = await projectFixture(context, source);
-  const planPath = await writePlan(root, planFor(source, [{ id: 'keep', type: 'preserve', sectionId: 'section:demo' }]));
+  const planPath = await writePlan(root, planFor(source, [{ id: 'keep', type: 'preserve', selector: { sectionId: 'section:demo' } }]));
   const target = path.join(root, 'README.md');
   const before = await fs.readFile(target);
   assert.equal(await discardDocumentPlanFile(root, planPath), planPath);
@@ -321,7 +322,7 @@ test('published DocumentPlan schema mirrors the runtime operation contract', asy
   assert.equal(published.properties.schemaVersion.const, 1);
   assert.equal(published.properties.baseHash.pattern, '^sha256:[a-f0-9]{64}$');
   assert.deepEqual(published.$defs.operation.oneOf.map((branch: any) => branch.properties.type.const), [
-    'preserve', 'edit', 'replace', 'create', 'remove',
+    'preserve', 'edit', 'replace', 'create', 'create', 'remove',
   ]);
   assert.equal(published.$defs.operation.oneOf.at(-1).properties.reason.pattern, '\\S');
 });
