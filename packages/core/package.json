@@ -19,6 +19,7 @@
   },
   "dependencies": {
     "fast-glob": "^3.3.3",
+    "smol-toml": "1.7.0",
     "zod": "^3.24.1"
   },
   "devDependencies": {

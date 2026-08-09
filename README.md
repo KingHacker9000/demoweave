@@ -41,3 +41,7 @@ demoweave validate
 ```
 
 No external LLM API is required for the core analyzer. Claude Code/Codex will be the intelligence layer; DemoWeave provides deterministic project inspection, execution, evidence capture, rendering, validation, and provenance tooling.
+
+### M1 component discovery boundary
+
+ProjectProfile v1 records supported manifests anywhere in the repository as components. To avoid presenting fixtures and examples as user-facing surfaces, automatic surface detection is currently limited to repository-root components and members of a workspace declared at the repository root. Other nested components remain visible as deterministic facts and can gain explicit surface-selection semantics in a later milestone without changing the component model.

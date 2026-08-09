@@ -1,0 +1,9 @@
+[project]
+name = "fixture-python-library"
+version = "1.0.0"
+
+[project.scripts]
+fixture-python = "fixture_python.cli:main"
+
+[tool.uv]
+package = true

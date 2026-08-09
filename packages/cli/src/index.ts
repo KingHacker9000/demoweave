@@ -70,7 +70,7 @@ program.command('inspect').description('Analyze a repository and write .demoweav
   console.log('Detected surfaces:');
   if (!profile.surfaces.length) console.log('  - none detected');
   for (const surface of profile.surfaces) {
-    const detail = surface.command ?? surface.framework ?? surface.packageName ?? surface.root;
+    const detail = surface.command ?? surface.framework ?? surface.label ?? surface.root;
     console.log(`  - ${surface.type.padEnd(10)} ${detail}`);
   }
   console.log(`Wrote ${path.relative(process.cwd(), output) || output}`);

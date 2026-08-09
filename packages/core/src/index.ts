@@ -1,9 +1,22 @@
 export { analyzeProject } from './analyzer.js';
 export {
-  PackageSchema,
+  ComponentSchema,
+  EcosystemSchema,
+  EntrypointSchema,
+  ManifestKindSchema,
+  ManifestSchema,
   ProjectProfileSchema,
   SurfaceSchema,
   SurfaceTypeSchema,
   WorkspaceSchema,
 } from './types.js';
-export type { Package, ProjectProfile, Surface, SurfaceType, Workspace } from './types.js';
+export type {
+  Component,
+  Ecosystem,
+  Entrypoint,
+  Manifest,
+  ProjectProfile,
+  Surface,
+  SurfaceType,
+  Workspace,
+} from './types.js';
