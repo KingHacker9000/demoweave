@@ -79,7 +79,7 @@
             "id": { "type": "string", "minLength": 1 },
             "type": { "const": "remove" },
             "selector": { "$ref": "#/$defs/selector" },
-            "reason": { "type": "string", "minLength": 1 }
+            "reason": { "type": "string", "minLength": 1, "pattern": "\\S" }
           }
         }
       ]
