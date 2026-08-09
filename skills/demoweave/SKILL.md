@@ -13,6 +13,7 @@ Use DemoWeave when the user asks to create, improve, update, or validate documen
 - DemoWeave does not write the prose for you. The agent authors Markdown; DemoWeave deterministically inspects, previews, reviews, and applies it.
 - Treat `unknown` freshness as unresolved information, not permission to regenerate. Never invent a baseline or silently classify it as fresh/stale.
 - Prefer the minimal regeneration plan from DemoWeave over manually rerunning the whole evidence pipeline.
+- Keep runtime/browser configuration out of Flow v1. Do not embed Playwright selectors, scripts, browser launch settings, Appium instructions, shell-recorder commands, or renderer-specific details in a Flow.
 - Do not invent DemoWeave commands or Flow actions. Check `demoweave --help` and the published schemas before using them.
 
 ## Repository and evidence workflow
@@ -20,15 +21,119 @@ Use DemoWeave when the user asks to create, improve, update, or validate documen
 1. Run `demoweave doctor` when environment readiness matters.
 2. Run `demoweave init .` if DemoWeave metadata has not been initialized.
 3. Run `demoweave inspect .` to produce the generated `.demoweave/project.json` ProjectProfile.
-4. Read ProjectProfile together with the repository itself. ProjectProfile contains facts; use your repository tools to reason about which workflows actually matter to users.
+4. Read ProjectProfile together with the repository itself. ProjectProfile contains facts; use repository tools to reason about which workflows actually matter to users.
 5. When a workflow needs to be demonstrated, create a JSON Flow v1 file under `.demoweave/flows/`.
 6. Set `surfaceId` to an existing stable surface ID from `.demoweave/project.json`.
 7. Declare project-relative `sources` on the Flow when specific implementation/config/fixture/data/asset files materially determine the captured result. Do not invent broad source lists just to populate provenance.
-8. Use semantic Flow actions such as `run`, `navigate`, `activate`, `input`, `press`, `scroll`, `wait`, `assert`, and `capture`. Do not embed Playwright, Appium, shell-recorder, or renderer-specific instructions in the Flow.
-9. Run a terminal Flow with `demoweave run <flow-id-or-path>`. Use `--project <path>` when the project root is not the current directory.
-10. A successful terminal `capture` writes `.demoweave/evidence/artifacts/<evidence-id>.terminal.json`, updates `.demoweave/evidence/manifest.json`, and fingerprints the Flow, declared Flow sources, and produced artifact for later freshness checks. Existing Evidence-level source provenance is preserved.
-11. Render terminal Evidence with `demoweave render <evidence-id-or-path> --format png` or `demoweave render <evidence-id-or-path> --format gif`. PNG rendering is built in; GIF rendering additionally requires FFmpeg reported by `demoweave doctor`. CLI rendering fingerprints the derived artifact.
-12. Run `demoweave validate .` after editing, executing, rendering, or adding DemoWeave metadata. Fix schema and cross-reference errors before relying on it.
+8. Use semantic Flow actions such as `run`, `navigate`, `activate`, `input`, `press`, `scroll`, `wait`, `assert`, and `capture` as appropriate for the selected surface.
+9. Execute the Flow with the surface-specific runtime guidance below.
+10. A successful capture updates `.demoweave/evidence/manifest.json` and fingerprints the Flow, declared sources, and produced artifact for later freshness checks. Existing Evidence-level source provenance is preserved.
+11. Run `demoweave validate .` after editing, executing, rendering, or adding DemoWeave metadata. Fix schema and cross-reference errors before relying on the output.
+
+## Terminal Flow workflow
+
+Run a terminal Flow with:
+
+```bash
+demoweave run <flow-id-or-path>
+demoweave run <flow-id-or-path> --project <path>
+```
+
+The current terminal driver executes non-interactive process/pipe workflows. It supports `run`, duration/process-exit/file-exists waits, output/exit-code/file-exists assertions, and terminal capture. A `run` expects exit code `0` unless its optional `expectedExitCodes` declares another accepted integer result. Unsupported terminal actions fail explicitly.
+
+A successful terminal `capture` writes:
+
+```text
+.demoweave/evidence/artifacts/<evidence-id>.terminal.json
+```
+
+Render terminal Evidence with:
+
+```bash
+demoweave render <evidence-id-or-path> --format png
+demoweave render <evidence-id-or-path> --format gif
+```
+
+PNG rendering is built in. GIF rendering additionally requires FFmpeg reported by `demoweave doctor`. CLI rendering fingerprints the derived artifact.
+
+## Web Flow workflow
+
+M7 implements Flow v1 against `web` surfaces with Playwright Chromium.
+
+### 1. Check browser readiness
+
+```bash
+demoweave doctor
+```
+
+If Chromium is not installed in a source checkout:
+
+```bash
+pnpm --filter @demoweave/drivers exec playwright install chromium
+```
+
+On Linux systems that also need Playwright's browser system dependencies, use the supported Playwright installation form with `--with-deps chromium`.
+
+### 2. Start the application separately
+
+The web driver does not guess how to start an arbitrary repository or choose a port. Start the web application with its real project command, wait until it is reachable, and keep that process alive while DemoWeave executes the Flow.
+
+Do not put the application startup command, localhost origin, or Playwright launch configuration into Flow v1 merely to make a browser run work.
+
+### 3. Run the semantic Flow
+
+Relative `navigate` destinations require an explicit runtime base URL:
+
+```bash
+demoweave run <flow-id-or-path> --base-url http://127.0.0.1:3000
+```
+
+Use `--project <path>` when needed. For local debugging only, `--headed` shows Chromium:
+
+```bash
+demoweave run <flow-id-or-path> --base-url http://127.0.0.1:3000 --headed
+```
+
+Absolute HTTP/HTTPS `navigate` destinations do not require `--base-url`. Do not guess an origin if the Flow uses relative navigation and none was provided.
+
+### 4. Use semantic browser actions and targets
+
+Current web-driver actions:
+
+- `navigate`
+- `activate`
+- `input`
+- `press`
+- `scroll`
+- supported `wait`
+- supported `assert`
+- `capture` with `kind: "screenshot"`
+
+Current target strategies are translated by the driver:
+
+- `text`
+- `label`
+- `role`
+- `name`
+- `testId`
+- `accessibilityId`
+- `automationId`
+
+Prefer stable semantic targets (`role`, `label`, test/automation IDs) over brittle visible text when the repository already exposes them. Playwright strictness is intentional: ambiguous interactions should fail rather than silently choosing an arbitrary element.
+
+Current web waits cover duration, visible, hidden, and text conditions. Current web assertions cover visible, hidden, and text-contains checks. Terminal-only wait/assertion kinds fail explicitly on a web surface.
+
+### 5. Capture screenshot Evidence
+
+A successful web screenshot capture writes:
+
+```text
+.demoweave/evidence/artifacts/<evidence-id>.png
+```
+
+The manifest records `driver/web` provenance. The normal post-Flow snapshot fingerprints the producing Flow, declared sources, and PNG bytes, so `status` and document-impact analysis use the same M6 freshness model as terminal Evidence.
+
+M7 does **not** implement browser interaction GIF/video recording. Do not claim or fabricate animated browser Evidence. That remains later roadmap work.
 
 ## Freshness and selective update workflow
 
@@ -59,9 +164,11 @@ demoweave update .
 demoweave update . --json
 ```
 
-`update` is a dry run unless `--apply` is supplied. Review the computed actions before execution. Current M6 planning deduplicates stale source Evidence into one producing Flow run per Flow, then schedules only affected PNG/GIF derivations.
+`update` is a dry run unless `--apply` is supplied. Review the computed actions before execution. Current planning deduplicates stale source Evidence into one producing Flow run per Flow, then schedules supported derived renders.
 
 If an item is `unknown`, resolve the missing baseline/dependency information first or make an explicit human/agent decision. DemoWeave deliberately does not auto-regenerate unknown state.
+
+For a web Flow that requires runtime context such as a base URL or a separately running application, ensure that context exists before applying any plan that would rerun it. Do not invent the runtime origin.
 
 ### 3. Apply only when wanted
 
@@ -168,9 +275,16 @@ demoweave docs discard .demoweave/plans/readme-quickstart.json
 
 Discard deletes the plan only. It never changes the target Markdown document.
 
-## Current terminal execution and rendering boundaries
+## Current execution and rendering boundaries
 
-DemoWeave executes non-interactive terminal Flows through a process/pipe session. It supports `run`, duration/process-exit/file-exists waits, output/exit-code/file-exists assertions, and terminal capture. A `run` expects exit code `0` unless its optional `expectedExitCodes` declares another accepted integer result. Unsupported terminal actions fail explicitly. The renderer turns TerminalTrack v1 into PNG or GIF without a browser runtime; GIF encoding requires optional FFmpeg. Interactive PTY input and browser/desktop/mobile capture are not available yet. M7 is the next browser-driver milestone.
+DemoWeave currently has two executable surface drivers:
+
+- **terminal** — non-interactive process/pipe execution and renderer-independent TerminalTrack capture;
+- **web** — Playwright Chromium semantic interaction and PNG screenshot capture against an already-running/reachable web application.
+
+The terminal renderer turns TerminalTrack v1 into PNG or GIF without a browser runtime; GIF encoding requires optional FFmpeg. Browser screenshots are already PNG Evidence and are not sent through the terminal renderer.
+
+Interactive PTY input, browser video/GIF recording, desktop capture, native mobile capture, research/notebook drivers, and composed tutorial output are not available yet.
 
 Current metadata layout:
 
@@ -186,9 +300,10 @@ Current metadata layout:
     manifest.json
     artifacts/
       <evidence-id>.terminal.json
-docs-media/                  # or configured mediaDir
-  <evidence-id>.png
-  <evidence-id>.gif
+      <evidence-id>.png
+docs-media/                  # configured rendered-media directory
+  <terminal-evidence-id>.png
+  <terminal-evidence-id>.gif
 ```
 
 Published contracts live under `schemas/`:
