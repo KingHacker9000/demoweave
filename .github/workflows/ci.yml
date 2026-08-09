@@ -31,13 +31,20 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Install Playwright Chromium (Ubuntu)
+        if: runner.os == 'Linux'
+        run: pnpm --filter @demoweave/drivers exec playwright install --with-deps chromium
+      - name: Install Playwright Chromium (Windows)
+        if: runner.os == 'Windows'
+        run: pnpm --filter @demoweave/drivers exec playwright install chromium
       - run: pnpm build
       - run: pnpm test
       - run: pnpm typecheck
-      - name: Smoke test built CLI, M6 freshness, terminal/rendering, and M5 Markdown review
+      - name: Smoke test built CLI, web driver, freshness, terminal rendering, and Markdown review
         run: |
           node packages/cli/dist/index.js --help
           node packages/cli/dist/index.js doctor
+          node scripts/m7-web-smoke.mjs
           node packages/cli/dist/index.js init .
           node packages/cli/dist/index.js inspect .
           node packages/cli/dist/index.js status .
