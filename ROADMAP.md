@@ -1,6 +1,6 @@
 # DemoWeave Roadmap
 
-DemoWeave is an agent-native documentation studio for software repositories. Claude Code or Codex supplies the reasoning; DemoWeave supplies deterministic project inspection, workflow execution, evidence capture, rendering, document patching, validation, and provenance.
+DemoWeave is an agent-native documentation studio for software repositories. Claude Code or Codex supplies the reasoning; DemoWeave supplies deterministic project inspection, workflow execution, evidence capture, rendering, freshness analysis, document patching, validation, and provenance.
 
 DemoWeave is **multi-surface by design**. A repository may expose web, CLI, desktop, mobile, libraries/SDKs, notebooks, research pipelines, services, and generated artifacts at the same time.
 
@@ -15,9 +15,10 @@ DemoWeave is **multi-surface by design**. A repository may expose web, CLI, desk
 | M4 — Media renderer | ✅ Complete | TerminalTrack → polished PNG/GIF + derived Evidence |
 | P0 — DemoWeave documents itself | ✅ Complete | First public-quality dogfood README using real DemoWeave evidence |
 | M5 — Safe Markdown patching | ✅ Complete | Section-aware plan → preview/review token → atomic apply |
-| **M6 — Incremental stale tracking** | **🚧 Current** | Explain and selectively regenerate stale evidence/docs |
+| M6 — Incremental stale tracking | ✅ Complete | Explainable freshness → minimal selective regeneration → no-change/no-churn |
+| **M7 — Web driver (Playwright)** | **🚧 Current** | Implement Flow v1 against browser surfaces |
 
-M0/M1 landed in PR #1, M2 in PR #2, M3 in PR #3, M4 in PR #4, Pilot P0 in PR #5, and M5 in PR #6.
+M0/M1 landed in PR #1, M2 in PR #2, M3 in PR #3, M4 in PR #4, Pilot P0 in PR #5, M5 in PR #6, and M6 in PR #7.
 
 ## Product principles
 
@@ -29,6 +30,7 @@ M0/M1 landed in PR #1, M2 in PR #2, M3 in PR #3, M4 in PR #4, Pilot P0 in PR #5,
 - **No OBS requirement.** Capture the smallest useful surface directly and compose later.
 - **One source of truth for demos.** Structured Flows feed evidence, GIFs, docs, and later tutorials.
 - **Incremental by default.** Provenance should make stale evidence selectively regenerable.
+- **Unknown is not stale.** When a deterministic baseline is unavailable, report uncertainty instead of inventing a conclusion.
 - **Claude Code and Codex share the same workflow contracts.**
 - Keep the core lightweight; platform-specific drivers/renderers stay isolated.
 
@@ -41,22 +43,26 @@ ProjectProfile v1
   ↓
 Agent reasoning
   ↓
-Flow v1
+Flow v1 + declared sources
   ↓
 SurfaceDriver v1
   ↓
-Evidence v1 + Manifest v1
+Evidence v1 + Manifest v1 + fingerprints
   ↓
 Renderer
   ↓
 PNG / GIF
+  ↓
+FreshnessReport v1
+  ↓
+minimal selective update
   ↓
 DocumentPlan v1
   ↓
 reviewed Markdown patch
 ```
 
-P0 proved the evidence path with DemoWeave itself. M5 added the corresponding reviewed document-editing path: agents author Markdown, while DemoWeave deterministically inspects source positions, previews exact source splices, fingerprints the reviewed candidate, and atomically applies only that candidate.
+P0 proved the evidence path with DemoWeave itself. M5 added the reviewed document-editing path. M6 closes the loop for living documentation: current Flow/source/artifact bytes are compared with deterministic provenance fingerprints, stale state propagates through derived Evidence, impacted Markdown is identified, and only the necessary Flow/render actions are proposed.
 
 ## Established contracts
 
@@ -66,11 +72,11 @@ Deterministic repository facts: components, ecosystems, manifests, workspaces, e
 
 ### Flow v1
 
-Platform-neutral semantic steps such as `run`, `navigate`, `activate`, `input`, `press`, `scroll`, `wait`, `assert`, and `capture`. Terminal run steps may declare `expectedExitCodes`; omission means `[0]`.
+Platform-neutral semantic steps such as `run`, `navigate`, `activate`, `input`, `press`, `scroll`, `wait`, `assert`, and `capture`. Terminal run steps may declare `expectedExitCodes`; omission means `[0]`. Flows may also declare project-relative source dependencies that materially determine their captured result.
 
 ### Evidence v1 / Manifest v1
 
-Evidence records lifecycle, artifact metadata, producer, provenance, and derivation. Manifest v1 indexes Flows and Evidence and preserves source/derived relationships.
+Evidence records lifecycle, artifact metadata, producer, provenance, optional SHA-256 source/Flow/artifact fingerprints, and derivation. Manifest v1 indexes Flows and Evidence and preserves source/derived relationships.
 
 ### TerminalTrack v1
 
@@ -79,6 +85,10 @@ Renderer-independent terminal capture with dimensions, portable command/cwd meta
 ### DocumentPlan v1
 
 Agent-authored, deterministic Markdown change plans bound to an exact target content hash. Plans select inspected sections and declare `preserve`, `edit`, `replace`, `create`, or reasoned `remove` operations. Preview produces the complete candidate, unified diff, and review token; apply requires that exact reviewed token and refuses stale targets or changed plans.
+
+### FreshnessReport v1
+
+Deterministic freshness output for Evidence and document impact. Evidence is classified as `fresh`, `stale`, `missing`, or `unknown` with explicit reason codes. The report also contains impacted Markdown and the currently supported minimal regeneration plan.
 
 ---
 
@@ -132,43 +142,17 @@ Agent-authored, deterministic Markdown change plans bound to an exact target con
 
 ## P0 — DemoWeave documents DemoWeave ✅
 
-Pilot result:
-
-- Codex followed `skills/demoweave/SKILL.md` without a DemoWeave-specific hidden workflow.
+- Codex followed `skills/demoweave/SKILL.md` without a hidden DemoWeave-specific workflow.
 - The repo was inspected and validated using the real built CLI.
 - The committed self Flow executed successfully and refreshed TerminalTrack provenance.
 - PNG/GIF were regenerated from evidence; same-input rendering was byte-stable.
 - The README embeds the real generated GIF near the top with accurate context.
 - Current vs planned features are clearly separated.
-- No public npm/plugin installation was invented.
-- README commands/links/assets were audited.
 - Hosted Ubuntu + Windows CI passed on the P0 head.
-
-This proved the agent-native evidence workflow before automating document patching itself.
 
 ## M5 — Document planning + safe Markdown patching ✅
 
-**Goal achieved:** agents can inspect arbitrary Markdown, declare intentional section-level changes, preview the exact candidate and diff, obtain a deterministic review fingerprint, and atomically apply only the reviewed patch without rewriting untouched content.
-
-The reasoning stays in Claude Code/Codex. DemoWeave does not decide what prose to write.
-
-```text
-Markdown file
-   ↓
-section map + base hash
-   ↓
-agent-authored DocumentPlan v1
-   ↓
-validate selectors / operations
-   ↓
-preview patch in memory
-   ↓
-unified diff + review token
-   ↓
-review / refine / discard
-   ↓
-atomic apply only if base + review token still match
-```
+Agents can inspect arbitrary Markdown, declare intentional section-level changes, preview the exact candidate and diff, obtain a deterministic review fingerprint, and atomically apply only the reviewed patch without rewriting untouched content.
 
 Delivered:
 
@@ -177,53 +161,70 @@ Delivered:
 - DocumentPlan v1 runtime validation + published JSON Schema
 - `preserve`, body-only `edit`, whole-section `replace`, anchored `create`, and reasoned `remove`
 - exact source splicing rather than Markdown reserialization
-- overlapping operation, preserve, selector, create-anchor, path traversal, and symlink safety checks
-- complete in-memory candidate + unified diff preview
-- deterministic `review-v1` fingerprint bound to base target + normalized plan + candidate
-- apply rejection for missing/wrong review tokens, stale targets, or changed plans/candidates
+- overlap/preserve/selector/create-anchor/path/symlink safety checks
+- complete candidate + unified diff + deterministic `review-v1` token
+- stale target/changed plan/candidate rejection
 - same-directory temporary file + atomic rename apply
-- safe discard that can remove even malformed plans without touching their target
+- safe plan discard
 - `demoweave docs inspect|preview|apply|discard`
-- `.demoweave/plans/` initialization + validation
-- shared Claude/Codex skill updated to use inspect → plan → preview → approval → apply
-- README and non-README tests covering duplicate/nested/Unicode/empty/fenced sections, newline behavior, no headings, conflicts, stale state, traversal, symlinks, and discard safety
-- committed small M5 dogfood document/plan; CI previews and applies it in a disposable working tree, verifies stale re-apply rejection, then restores the document
-- hosted Ubuntu + Windows build/test/typecheck and dogfood smoke green
+- shared Claude/Codex skill using inspect → plan → preview → approval → apply
+- Ubuntu + Windows M5 dogfood proving reviewed apply and stale re-apply rejection
 
-M5 intentionally does not implement automatic document authorship, stale detection, web capture, or tutorial composition.
+## M6 — Incremental stale/update tracking ✅
+
+**Goal achieved:** DemoWeave can explain why existing Evidence is fresh/stale/missing/unknown, trace that state through rendered derivations into Markdown references, and compute a minimal deterministic regeneration plan before changing anything.
+
+Delivered:
+
+- optional explicit `sources` on Flow v1 with roles for implementation/config/fixture/data/asset/other
+- SHA-256 fingerprints for producing Flow definitions, declared source dependencies, source Evidence artifacts, and CLI-rendered derived artifacts
+- backward-compatible preservation of pre-existing Evidence-level source provenance
+- git-commit fallback for older Evidence that predates fingerprints
+- `unknown` state when an old baseline cannot be reached, rather than guessed freshness
+- explicit reason codes for changed/missing artifacts, source dependencies, Flow definitions, declared lifecycle state, and upstream propagation
+- recursive stale/missing/unknown propagation through `derivedFrom`
+- local Markdown link/image resolution to identify documents impacted by affected Evidence
+- `FreshnessReport v1` runtime validation + published JSON Schema
+- `demoweave status [path] [--json]` freshness explanations
+- `demoweave update [path] [--json]` dry-run minimal regeneration plan
+- `demoweave update [path] --apply` selective execution
+- one producing Flow run per affected Flow, followed only by required PNG/GIF renders
+- unknown Evidence excluded from automatic regeneration
+- full-history CI so legacy git baselines can be validated
+- self-dogfood that begins from stale committed evidence, explains the source → Evidence → PNG/GIF → README chain, applies exactly one Flow + two renders, reaches fully fresh state, then runs update again with **zero actions and zero tracked byte churn**
+- hosted Ubuntu + Windows build/test/typecheck and M6 dogfood coverage
+
+M6 deliberately does not infer undocumented source dependencies, rewrite impacted prose automatically, or implement browser capture.
 
 ---
 
 # Current milestone
 
-## M6 — Incremental stale/update tracking 🚧
+## M7 — Web driver (Playwright) 🚧
 
-**Goal:** use Manifest/document provenance to explain exactly why generated evidence or reviewed documentation is stale, and selectively regenerate only affected artifacts instead of rerunning the entire documentation pipeline.
+**Goal:** implement Flow v1 against browser surfaces without changing the platform-neutral Flow/Evidence contracts.
 
-The next design step is to define the smallest deterministic freshness contract that connects source dependencies, Flow/Evidence provenance, rendered derivations, and document outputs without adding fuzzy agent judgments to the core.
+Initial scope:
 
-M6 should answer questions such as:
+- launch/connect to a web surface deterministically
+- `navigate`
+- semantic target resolution for existing interaction target strategies
+- `activate`, `input`, `press`, and `scroll`
+- supported waits/assertions
+- screenshots and bounded viewport recordings as Evidence
+- browser/viewport metadata and useful failure diagnostics
+- deterministic cleanup and path safety
+- provenance/freshness integration using the M6 contracts rather than a separate web-specific stale system
 
-- Which source change made this Evidence stale?
-- Which rendered assets derive from that Evidence?
-- Which documents reference or depend on those assets/results?
-- What is the minimal regeneration set?
-- Can DemoWeave explain the stale chain before changing anything?
-- Can a no-change run avoid unnecessary artifact/document churn?
+Do not embed raw Playwright selectors or scripts into Flow v1. Browser implementation details belong in the web driver.
 
-Do not conflate M6 with the M7 browser driver. Staleness and selective regeneration should work for the terminal/evidence/document pipeline already implemented.
+### P1 — Web fixture
+
+After the driver is stable, generate a hero screenshot, interaction GIF, short video, and example documentation from a controlled web fixture without changing the Flow/Evidence contracts.
 
 ---
 
 # Later milestones
-
-## M7 — Web driver (Playwright)
-
-Implement Flow v1 against browser surfaces: launch/wait, navigate, semantic interaction, assertions, screenshots, viewport recordings, and element bounds.
-
-### P1 — Web fixture
-
-Generate a hero screenshot, interaction GIF, short video, and example documentation from the controlled web fixture without changing the Flow/Evidence contracts.
 
 ## M8 — Timeline compositor
 
@@ -274,8 +275,8 @@ DemoWeave 1.0 should provide stable agent workflows and contracts, multi-surface
 | 5 | ✅ M4 — GIF renderer | first visual artifact |
 | 6 | ✅ P0 — self-document README | first public-quality dogfood demo |
 | 7 | ✅ M5 — safe Markdown patching | reliable reviewed document edits |
-| 8 | **🚧 M6 — stale tracking** | living documentation |
-| 9 | M7 — web driver | website support |
+| 8 | ✅ M6 — stale tracking | living documentation |
+| 9 | **🚧 M7 — web driver** | website support |
 | 10 | P1 — web fixture | second-surface proof |
 | 11 | M8 — compositor | split-screen scenes |
 | 12 | M9/M10 — tutorial + QA | YouTube-ready output |
@@ -289,6 +290,6 @@ DemoWeave 1.0 should provide stable agent workflows and contracts, multi-surface
 
 # Current next step
 
-## NOW: M6 — deterministic stale/update tracking
+## NOW: M7 — Playwright web driver
 
-Define and implement the freshness model over the provenance that already exists. Start with terminal Evidence → rendered Evidence → document dependencies, make `status` explain *why* something is stale, compute a minimal regeneration set, and prove that an unchanged rerun creates no unnecessary churn.
+Implement the first browser-backed `SurfaceDriver v1` while keeping Flow v1 semantic and platform-neutral. Start with a controlled fixture and deterministic screenshot evidence; then add interaction/assertion coverage and short viewport recording before Pilot P1.

@@ -14,6 +14,7 @@ import {
   ManifestSchema,
   previewDocumentPlanFile,
   ProjectProfileSchema,
+  snapshotEvidenceArtifact,
   validateMetadataBindings,
   type FlowFile,
 } from '@demoweave/core';
@@ -23,6 +24,7 @@ import {
   renderEvidence,
   RendererError,
 } from '@demoweave/renderer';
+import { registerUpdateCommand, showFreshness } from './freshness.js';
 
 const program = new Command();
 program.name('demoweave').description('Agent-native documentation tooling for software repositories').version('0.0.1');
@@ -171,35 +173,47 @@ program.command('inspect').description('Analyze a repository and write .demoweav
   console.log(`Wrote ${repoRelative(process.cwd(), output)}`);
 });
 
-program.command('status').description('Show current DemoWeave metadata status').argument('[path]', 'project path', '.').action(async (input) => {
-  const root = path.resolve(input);
-  const projectPath = path.join(root, '.demoweave', 'project.json');
-  try {
-    const parsed = ProjectProfileSchema.parse(JSON.parse(await fs.readFile(projectPath, 'utf8')));
-    console.log(`Project profile: current file present (schema v${parsed.schemaVersion})`);
-    console.log(`Surfaces: ${parsed.surfaces.length}`);
-  } catch {
-    console.error('Project profile unavailable or invalid. Run: demoweave inspect .');
-    process.exitCode = 1;
-    return;
-  }
+program.command('status')
+  .description('Show metadata status and explain evidence freshness')
+  .argument('[path]', 'project path', '.')
+  .option('--json', 'print freshness as JSON')
+  .action(async (input, options) => {
+    const root = path.resolve(input);
+    const projectPath = path.join(root, '.demoweave', 'project.json');
+    try {
+      const parsed = ProjectProfileSchema.parse(JSON.parse(await fs.readFile(projectPath, 'utf8')));
+      if (!options.json) {
+        console.log(`Project profile: current file present (schema v${parsed.schemaVersion})`);
+        console.log(`Surfaces: ${parsed.surfaces.length}`);
+      }
+    } catch {
+      console.error('Project profile unavailable or invalid. Run: demoweave inspect .');
+      process.exitCode = 1;
+      return;
+    }
 
-  const manifestPath = path.join(root, '.demoweave', 'evidence', 'manifest.json');
-  if (await exists(manifestPath)) {
+    const manifestPath = path.join(root, '.demoweave', 'evidence', 'manifest.json');
+    if (!(await exists(manifestPath))) {
+      console.log('Evidence manifest: not initialized');
+      return;
+    }
     const result = ManifestSchema.safeParse(JSON.parse(await fs.readFile(manifestPath, 'utf8')));
-    if (result.success) {
+    if (!result.success) {
+      console.log('Evidence manifest: invalid (run demoweave validate .)');
+      process.exitCode = 1;
+      return;
+    }
+    if (!options.json) {
       console.log(`Flows indexed: ${result.data.flows.length}`);
       console.log(`Evidence indexed: ${result.data.evidence.length}`);
-      const stale = result.data.evidence.filter((item) => item.status === 'stale').length;
-      console.log(`Evidence stale: ${stale}`);
-    } else {
-      console.log('Evidence manifest: invalid (run demoweave validate .)');
     }
-  } else {
-    console.log('Evidence manifest: not initialized');
-  }
-  console.log('Automatic staleness detection: not available until M6');
-});
+    try {
+      await showFreshness(root, Boolean(options.json));
+    } catch (error) {
+      console.error(`FRESHNESS_FAILED: ${error instanceof Error ? error.message : String(error)}`);
+      process.exitCode = 1;
+    }
+  });
 
 program.command('run')
   .description('Execute a DemoWeave Flow with a compatible surface driver')
@@ -246,6 +260,7 @@ program.command('render')
         format: options.format,
         ...(options.out ? { outputPath: options.out } : {}),
       });
+      if (result.evidenceId) await snapshotEvidenceArtifact(options.project, result.evidenceId);
       console.log(`Rendered: ${result.evidenceId ?? reference}`);
       if (result.sourceEvidenceId) console.log(`Derived from: ${result.sourceEvidenceId}`);
       console.log(`Format: ${result.format.toUpperCase()}`);
@@ -362,6 +377,7 @@ docs.command('discard')
       reportDocumentError(error);
     }
   });
+registerUpdateCommand(program);
 
 program.command('validate').description('Validate DemoWeave project metadata, document plans, and evidence bindings').argument('[path]', 'project path', '.').action(async (input) => {
   const root = path.resolve(input);

@@ -30,6 +30,20 @@ export const EvidenceKindSchema = z.enum([
   'comparison',
 ]);
 
+export const FlowSourceDependencyRoleSchema = z.enum([
+  'implementation',
+  'config',
+  'fixture',
+  'data',
+  'asset',
+  'other',
+]);
+
+export const FlowSourceDependencySchema = z.object({
+  path: z.string().min(1),
+  role: FlowSourceDependencyRoleSchema.optional(),
+}).strict();
+
 const StepBaseSchema = z.object({
   id: z.string().min(1),
   label: z.string().min(1).optional(),
@@ -135,6 +149,7 @@ export const FlowSchema = z.object({
   title: z.string().min(1).optional(),
   description: z.string().min(1).optional(),
   surfaceId: z.string().min(1),
+  sources: z.array(FlowSourceDependencySchema).optional(),
   steps: z.array(FlowStepSchema).min(1),
 }).strict().superRefine((flow, ctx) => {
   const seen = new Set<string>();
@@ -149,11 +164,25 @@ export const FlowSchema = z.object({
     }
     seen.add(id);
   }
+  const sourcePaths = new Set<string>();
+  for (let index = 0; index < (flow.sources?.length ?? 0); index += 1) {
+    const sourcePath = flow.sources![index]!.path;
+    if (sourcePaths.has(sourcePath)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['sources', index, 'path'],
+        message: `Duplicate Flow source path: ${sourcePath}`,
+      });
+    }
+    sourcePaths.add(sourcePath);
+  }
 });
 
 export type TargetStrategy = z.infer<typeof TargetStrategySchema>;
 export type InteractionTarget = z.infer<typeof InteractionTargetSchema>;
 export type EvidenceKind = z.infer<typeof EvidenceKindSchema>;
+export type FlowSourceDependencyRole = z.infer<typeof FlowSourceDependencyRoleSchema>;
+export type FlowSourceDependency = z.infer<typeof FlowSourceDependencySchema>;
 export type WaitCondition = z.infer<typeof WaitConditionSchema>;
 export type Assertion = z.infer<typeof AssertionSchema>;
 export type FlowStep = z.infer<typeof FlowStepSchema>;

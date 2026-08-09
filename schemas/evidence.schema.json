@@ -15,6 +15,7 @@
     "label": { "type": "string", "minLength": 1 },
     "format": { "enum": ["png", "jpeg", "webp", "gif", "webm", "mp4", "svg", "json", "csv", "txt", "md", "ansi", "html"] },
     "path": { "type": "string", "minLength": 1 },
+    "artifactHash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
     "mimeType": { "type": "string", "minLength": 1 },
     "producer": {
       "type": "object",
@@ -35,6 +36,7 @@
         "stepId": { "type": "string", "minLength": 1 },
         "surfaceId": { "type": "string", "minLength": 1 },
         "gitCommit": { "type": "string", "minLength": 1 },
+        "flowHash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
         "sources": {
           "type": "array",
           "items": {
@@ -43,7 +45,8 @@
             "required": ["path"],
             "properties": {
               "path": { "type": "string", "minLength": 1 },
-              "role": { "enum": ["implementation", "config", "fixture", "data", "asset", "other"] }
+              "role": { "enum": ["implementation", "config", "fixture", "data", "asset", "other"] },
+              "hash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
             }
           }
         }
@@ -66,6 +69,10 @@
         "properties": { "status": { "enum": ["available", "stale"] } },
         "required": ["status"]
       },
+      "then": { "required": ["path"] }
+    },
+    {
+      "if": { "required": ["artifactHash"] },
       "then": { "required": ["path"] }
     }
   ]

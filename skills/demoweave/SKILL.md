@@ -5,12 +5,14 @@ Use DemoWeave when the user asks to create, improve, update, or validate documen
 ## Principles
 
 - Treat the repository as potentially multi-surface: web, CLI, desktop, mobile, library/SDK, notebook, research, service, or combinations of these.
-- Use DemoWeave for deterministic inspection, execution, evidence capture, rendering, Markdown patch review, validation, and provenance.
+- Use DemoWeave for deterministic inspection, execution, evidence capture, rendering, freshness analysis, Markdown patch review, validation, and provenance.
 - Use your own repository tools to understand intent, architecture, and which workflows actually matter.
 - Do not generate visual media merely to decorate a document. Capture evidence only when it improves comprehension.
 - Preserve useful existing documentation. Prefer intentional section-level edits over rewriting files wholesale.
 - Never assume `/docs` is the only output. README.md and arbitrary Markdown files are first-class targets.
 - DemoWeave does not write the prose for you. The agent authors Markdown; DemoWeave deterministically inspects, previews, reviews, and applies it.
+- Treat `unknown` freshness as unresolved information, not permission to regenerate. Never invent a baseline or silently classify it as fresh/stale.
+- Prefer the minimal regeneration plan from DemoWeave over manually rerunning the whole evidence pipeline.
 - Do not invent DemoWeave commands or Flow actions. Check `demoweave --help` and the published schemas before using them.
 
 ## Repository and evidence workflow
@@ -21,12 +23,55 @@ Use DemoWeave when the user asks to create, improve, update, or validate documen
 4. Read ProjectProfile together with the repository itself. ProjectProfile contains facts; use your repository tools to reason about which workflows actually matter to users.
 5. When a workflow needs to be demonstrated, create a JSON Flow v1 file under `.demoweave/flows/`.
 6. Set `surfaceId` to an existing stable surface ID from `.demoweave/project.json`.
-7. Use semantic Flow actions such as `run`, `navigate`, `activate`, `input`, `press`, `scroll`, `wait`, `assert`, and `capture`. Do not embed Playwright, Appium, shell-recorder, or renderer-specific instructions in the Flow.
-8. Run a terminal Flow with `demoweave run <flow-id-or-path>`. Use `--project <path>` when the project root is not the current directory.
-9. A successful terminal `capture` writes `.demoweave/evidence/artifacts/<evidence-id>.terminal.json` and updates `.demoweave/evidence/manifest.json` with driver and Git provenance.
-10. Record real source dependencies on planned Evidence when they are known; execution preserves them. Do not invent dependencies just to populate provenance.
-11. Render terminal Evidence with `demoweave render <evidence-id-or-path> --format png` or `demoweave render <evidence-id-or-path> --format gif`. PNG rendering is built in; GIF rendering additionally requires FFmpeg reported by `demoweave doctor`.
+7. Declare project-relative `sources` on the Flow when specific implementation/config/fixture/data/asset files materially determine the captured result. Do not invent broad source lists just to populate provenance.
+8. Use semantic Flow actions such as `run`, `navigate`, `activate`, `input`, `press`, `scroll`, `wait`, `assert`, and `capture`. Do not embed Playwright, Appium, shell-recorder, or renderer-specific instructions in the Flow.
+9. Run a terminal Flow with `demoweave run <flow-id-or-path>`. Use `--project <path>` when the project root is not the current directory.
+10. A successful terminal `capture` writes `.demoweave/evidence/artifacts/<evidence-id>.terminal.json`, updates `.demoweave/evidence/manifest.json`, and fingerprints the Flow, declared Flow sources, and produced artifact for later freshness checks. Existing Evidence-level source provenance is preserved.
+11. Render terminal Evidence with `demoweave render <evidence-id-or-path> --format png` or `demoweave render <evidence-id-or-path> --format gif`. PNG rendering is built in; GIF rendering additionally requires FFmpeg reported by `demoweave doctor`. CLI rendering fingerprints the derived artifact.
 12. Run `demoweave validate .` after editing, executing, rendering, or adding DemoWeave metadata. Fix schema and cross-reference errors before relying on it.
+
+## Freshness and selective update workflow
+
+Use M6 before manually regenerating existing Evidence or media.
+
+### 1. Explain current freshness
+
+```bash
+demoweave status .
+demoweave status . --json
+```
+
+Evidence is classified as:
+
+- `fresh` — current bytes match available provenance fingerprints/baselines;
+- `stale` — a concrete dependency, Flow, artifact, or upstream Evidence changed;
+- `missing` — a required artifact/dependency is absent;
+- `unknown` — DemoWeave lacks enough baseline information to decide safely.
+
+Read the reason chain. Derived Evidence propagates upstream stale/missing/unknown state. DemoWeave also reports Markdown files that link to affected Evidence paths.
+
+Do not mutate anything merely because a document is listed as impacted. An impacted document may only need its referenced asset regenerated, not prose changes.
+
+### 2. Preview the minimal regeneration plan
+
+```bash
+demoweave update .
+demoweave update . --json
+```
+
+`update` is a dry run unless `--apply` is supplied. Review the computed actions before execution. Current M6 planning deduplicates stale source Evidence into one producing Flow run per Flow, then schedules only affected PNG/GIF derivations.
+
+If an item is `unknown`, resolve the missing baseline/dependency information first or make an explicit human/agent decision. DemoWeave deliberately does not auto-regenerate unknown state.
+
+### 3. Apply only when wanted
+
+```bash
+demoweave update . --apply
+```
+
+After apply, DemoWeave re-analyzes freshness. Check the result rather than assuming regeneration succeeded.
+
+If a dry run reports zero actions, do not manually rerun the Flow/render pipeline. A no-change `update --apply` should also execute zero actions and create no artifact/document churn.
 
 ## Safe Markdown workflow
 
@@ -125,7 +170,7 @@ Discard deletes the plan only. It never changes the target Markdown document.
 
 ## Current terminal execution and rendering boundaries
 
-DemoWeave executes non-interactive terminal Flows through a process/pipe session. It supports `run`, duration/process-exit/file-exists waits, output/exit-code/file-exists assertions, and terminal capture. A `run` expects exit code `0` unless its optional `expectedExitCodes` declares another accepted integer result. Unsupported terminal actions fail explicitly. The renderer turns TerminalTrack v1 into PNG or GIF without a browser runtime; GIF encoding requires optional FFmpeg. Interactive PTY input and browser/desktop/mobile capture are not available yet.
+DemoWeave executes non-interactive terminal Flows through a process/pipe session. It supports `run`, duration/process-exit/file-exists waits, output/exit-code/file-exists assertions, and terminal capture. A `run` expects exit code `0` unless its optional `expectedExitCodes` declares another accepted integer result. Unsupported terminal actions fail explicitly. The renderer turns TerminalTrack v1 into PNG or GIF without a browser runtime; GIF encoding requires optional FFmpeg. Interactive PTY input and browser/desktop/mobile capture are not available yet. M7 is the next browser-driver milestone.
 
 Current metadata layout:
 
@@ -154,5 +199,4 @@ Published contracts live under `schemas/`:
 - `manifest.schema.json`
 - `terminal-track.schema.json`
 - `document-plan.schema.json`
-
-M6 will add stale/provenance tracking. Do not pretend M5 already performs automatic stale-evidence regeneration.
+- `freshness-report.schema.json`
