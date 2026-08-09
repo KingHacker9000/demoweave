@@ -17,6 +17,7 @@ export const FreshnessReasonCodeSchema = z.enum([
   'declared-failed',
   'artifact-missing',
   'artifact-changed',
+  'artifact-baseline-unavailable',
   'source-missing',
   'source-changed',
   'source-baseline-unavailable',
@@ -130,6 +131,7 @@ async function readManifest(root: string): Promise<Manifest> {
 
 const UNKNOWN_REASON_CODES = new Set<FreshnessReason['code']>([
   'declared-planned',
+  'artifact-baseline-unavailable',
   'source-baseline-unavailable',
   'flow-baseline-unavailable',
   'upstream-unknown',
@@ -154,14 +156,24 @@ async function inspectDirectEvidence(root: string, manifest: Manifest, evidence:
     const actualHash = artifact ? await hashFile(artifact) : undefined;
     if (!actualHash) {
       reasons.push({ code: 'artifact-missing', path: evidence.path, message: `Artifact is missing: ${evidence.path}` });
-    } else if (evidence.artifactHash && evidence.artifactHash !== actualHash) {
-      reasons.push({
-        code: 'artifact-changed',
-        path: evidence.path,
-        expectedHash: evidence.artifactHash,
-        actualHash,
-        message: `Artifact bytes changed after capture: ${evidence.path}`,
-      });
+    } else {
+      const expectedHash = evidence.artifactHash ?? baselineHashFromGit(root, evidence.provenance.gitCommit, evidence.path);
+      if (!expectedHash) {
+        reasons.push({
+          code: 'artifact-baseline-unavailable',
+          path: evidence.path,
+          actualHash,
+          message: `No artifact fingerprint or reachable git baseline is available for ${evidence.path}.`,
+        });
+      } else if (expectedHash !== actualHash) {
+        reasons.push({
+          code: 'artifact-changed',
+          path: evidence.path,
+          expectedHash,
+          actualHash,
+          message: `Artifact bytes changed after capture: ${evidence.path}`,
+        });
+      }
     }
   }
 
