@@ -8,6 +8,7 @@ import {
   EvidenceSchema,
   EvidenceStatusSchema,
   FlowSchema,
+  TerminalCommandStatusSchema,
   TerminalTrackSchema,
   type Flow,
 } from './index.js';
@@ -60,6 +61,25 @@ test('Flow v1 rejects duplicate step identifiers', async () => {
     steps: [flow.steps[0], { ...flow.steps[1], id: flow.steps[0]!.id }],
   };
   assert.equal(FlowSchema.safeParse(duplicate).success, false);
+});
+
+test('Flow v1 accepts unique expected exit codes and rejects invalid sets', () => {
+  const run = {
+    id: 'run',
+    type: 'run',
+    command: 'demo',
+  } as const;
+  const flow = (step: unknown) => ({
+    schemaVersion: 1,
+    id: 'expected-exit-codes',
+    surfaceId: 'terminal-demoweave-cli',
+    steps: [step],
+  });
+
+  assert.equal(FlowSchema.safeParse(flow({ ...run, expectedExitCodes: [0, 7] })).success, true);
+  assert.equal(FlowSchema.safeParse(flow({ ...run, expectedExitCodes: [] })).success, false);
+  assert.equal(FlowSchema.safeParse(flow({ ...run, expectedExitCodes: [7, 7] })).success, false);
+  assert.equal(FlowSchema.safeParse(flow({ ...run, expectedExitCodes: [7.5] })).success, false);
 });
 
 test('available and stale Evidence require an artifact path', () => {
@@ -212,7 +232,11 @@ test('published M2 schemas expose the same primary enums as runtime contracts', 
   const manifestSchema = await readJson('schemas/manifest.schema.json') as any;
 
   const captureBranch = flowSchema.$defs.step.oneOf.find((branch: any) => branch.properties.type?.const === 'capture');
+  const runBranch = flowSchema.$defs.step.oneOf.find((branch: any) => branch.properties.type?.const === 'run');
   assert.deepEqual(captureBranch.properties.kind.enum, EvidenceKindSchema.options);
+  assert.equal(runBranch.properties.expectedExitCodes.minItems, 1);
+  assert.equal(runBranch.properties.expectedExitCodes.uniqueItems, true);
+  assert.equal(runBranch.properties.expectedExitCodes.items.type, 'integer');
   assert.deepEqual(evidenceSchema.properties.kind.enum, EvidenceKindSchema.options);
   assert.deepEqual(evidenceSchema.properties.status.enum, EvidenceStatusSchema.options);
   assert.deepEqual(evidenceSchema.properties.format.enum, EvidenceFormatSchema.options);
@@ -236,17 +260,22 @@ test('TerminalTrack v1 validates deterministic ordering and its published schema
       startedAt: 0,
       durationMs: 4,
       status: 'completed',
-      exitCode: 0,
+      exitCode: 7,
     }],
     events: [
       { sequence: 0, t: 0, stepId: 'run', stream: 'input', data: 'demo inspect .\n' },
       { sequence: 1, t: 3, stepId: 'run', stream: 'stdout', data: 'done\n' },
     ],
     status: 'completed',
-    exitCode: 0,
+    exitCode: 7,
     durationMs: 4,
   };
   assert.equal(TerminalTrackSchema.safeParse(track).success, true);
+  assert.equal(TerminalTrackSchema.safeParse({
+    ...track,
+    commands: [{ ...track.commands[0], status: 'failed' }],
+    status: 'failed',
+  }).success, false);
   assert.equal(TerminalTrackSchema.safeParse({
     ...track,
     events: [track.events[1], track.events[0]],
@@ -256,4 +285,6 @@ test('TerminalTrack v1 validates deterministic ordering and its published schema
   assert.equal(published.properties.schemaVersion.const, 1);
   assert.equal(published.properties.mode.const, 'pipe');
   assert.deepEqual(published.properties.events.items.properties.stream.enum, ['input', 'stdout', 'stderr']);
+  assert.deepEqual(published.properties.commands.items.properties.status.enum, TerminalCommandStatusSchema.options);
+  assert.deepEqual(published.properties.status.enum, TerminalCommandStatusSchema.options);
 });

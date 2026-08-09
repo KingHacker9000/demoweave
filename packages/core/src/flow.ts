@@ -41,6 +41,10 @@ export const RunStepSchema = StepBaseSchema.extend({
   args: z.array(z.string()).optional(),
   cwd: z.string().min(1).optional(),
   env: z.record(z.string()).optional(),
+  expectedExitCodes: z.array(z.number().int()).min(1).refine(
+    (codes) => new Set(codes).size === codes.length,
+    { message: 'expectedExitCodes must contain unique values' },
+  ).optional(),
 }).strict();
 
 export const NavigateStepSchema = StepBaseSchema.extend({

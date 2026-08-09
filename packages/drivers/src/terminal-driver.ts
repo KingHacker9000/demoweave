@@ -133,7 +133,8 @@ async function readManifest(projectRoot: string): Promise<Manifest> {
 function commandStatus(result: TerminalSessionResult): TerminalCommand['status'] {
   if (result.spawnError) return 'spawnFailed';
   if (result.timedOut) return 'timedOut';
-  return result.exitCode === 0 ? 'completed' : 'failed';
+  if (result.signal) return 'signaled';
+  return 'completed';
 }
 
 export class TerminalDriver implements SurfaceDriver {
@@ -268,8 +269,18 @@ export class TerminalDriver implements SurfaceDriver {
     if (result.timedOut) {
       return this.failure(step.id, 'COMMAND_TIMEOUT', `Command exceeded ${this.commandTimeoutMs}ms and was terminated`, result);
     }
-    if (result.exitCode !== 0) {
-      return this.failure(step.id, 'NONZERO_EXIT', `Command exited with code ${result.exitCode ?? 'null'}`, result);
+    if (result.signal) {
+      return this.failure(step.id, 'COMMAND_SIGNALED', `Command was terminated by signal ${result.signal}`, result);
+    }
+    const expectedExitCodes = step.expectedExitCodes ?? [0];
+    if (result.exitCode === null || !expectedExitCodes.includes(result.exitCode)) {
+      const code = result.exitCode === 0 ? 'UNEXPECTED_EXIT' : 'NONZERO_EXIT';
+      return this.failure(
+        step.id,
+        code,
+        `Command exited with code ${result.exitCode ?? 'null'}; expected one of [${expectedExitCodes.join(', ')}]`,
+        result,
+      );
     }
     return {
       stepId: step.id,

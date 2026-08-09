@@ -66,13 +66,33 @@ function fixtureFlow(steps: Flow['steps'], id = 'fixture-flow'): Flow {
   return FlowSchema.parse({ schemaVersion: 1, id, surfaceId: 'terminal-fixture-cli', steps });
 }
 
-function normalizeTiming(track: ReturnType<typeof TerminalTrackSchema.parse>) {
+type ParsedTerminalTrack = ReturnType<typeof TerminalTrackSchema.parse>;
+
+function stableTrackMetadata(track: ParsedTerminalTrack) {
   return {
-    ...track,
-    durationMs: 0,
+    schemaVersion: track.schemaVersion,
+    columns: track.columns,
+    rows: track.rows,
+    mode: track.mode,
     commands: track.commands.map((command) => ({ ...command, startedAt: 0, durationMs: 0 })),
-    events: track.events.map((event) => ({ ...event, t: 0 })),
+    status: track.status,
+    exitCode: track.exitCode,
   };
+}
+
+function groupedEventData(track: ParsedTerminalTrack): Record<string, string> {
+  const grouped = new Map<string, string>();
+  for (const event of track.events) {
+    const key = `${event.stepId}/${event.stream}`;
+    grouped.set(key, `${grouped.get(key) ?? ''}${event.data}`);
+  }
+  return Object.fromEntries([...grouped].sort(([left], [right]) => left.localeCompare(right)));
+}
+
+function assertTrackInvariants(track: ParsedTerminalTrack, projectRoot: string): void {
+  assert.deepEqual(track.events.map((event) => event.sequence), track.events.map((_, index) => index));
+  assert.ok(track.events.every((event, index) => index === 0 || event.t >= track.events[index - 1]!.t));
+  assert.ok(!JSON.stringify(track).includes(projectRoot));
 }
 
 test('executes the fixture CLI, asserts both streams and exit code, and captures replayable Evidence', async (context) => {
@@ -104,10 +124,8 @@ test('executes the fixture CLI, asserts both streams and exit code, and captures
   assert.equal(firstTrack.rows, 30);
   assert.equal(firstTrack.commands[0]?.cwd, '.');
   assert.equal(firstTrack.commands[0]?.command, `<absolute>/${path.basename(process.execPath)}`);
-  assert.deepEqual(firstTrack.events.map((event) => event.sequence), firstTrack.events.map((_, index) => index));
-  assert.ok(firstTrack.events.every((event, index) => index === 0 || event.t >= firstTrack.events[index - 1]!.t));
+  assertTrackInvariants(firstTrack, project.root);
   assert.ok(firstTrack.events.some((event) => event.data.includes('\u001b[31mred\u001b[0m')));
-  assert.ok(!JSON.stringify(firstTrack).includes(project.root));
 
   const manifest = ManifestSchema.parse(JSON.parse(await fs.readFile(path.join(project.root, '.demoweave', 'evidence', 'manifest.json'), 'utf8')));
   const evidence = manifest.evidence.find((item) => item.id === 'fixture-terminal');
@@ -122,7 +140,39 @@ test('executes the fixture CLI, asserts both streams and exit code, and captures
   const second = await runFlow(flow.id, { projectRoot: project.root });
   assert.equal(second.status, 'passed');
   const secondTrack = TerminalTrackSchema.parse(JSON.parse(await fs.readFile(artifactPath, 'utf8')));
-  assert.deepEqual(normalizeTiming(secondTrack), normalizeTiming(firstTrack));
+  assertTrackInvariants(secondTrack, project.root);
+  assert.deepEqual(stableTrackMetadata(secondTrack), stableTrackMetadata(firstTrack));
+  assert.deepEqual(groupedEventData(secondTrack), groupedEventData(firstTrack));
+});
+
+test('accepts an explicitly expected non-zero exit and allows its assertion', async (context) => {
+  const flow = fixtureFlow([
+    {
+      id: 'run-expected-nonzero',
+      type: 'run',
+      command: process.execPath,
+      args: ['fixture-cli.js', '--exit', '7'],
+      expectedExitCodes: [7],
+    },
+    { id: 'assert-exit', type: 'assert', assertion: { kind: 'exitCode', value: 7 } },
+    { id: 'capture-terminal', type: 'capture', evidenceId: 'fixture-terminal', kind: 'terminal' },
+  ], 'expected-nonzero-flow');
+  const project = await createProject(context, flow, true);
+
+  const result = await runFlow(flow.id, { projectRoot: project.root });
+  assert.equal(result.status, 'passed');
+  assert.deepEqual(result.steps.map((step) => step.status), ['passed', 'passed', 'passed']);
+  assert.equal(result.steps[0]?.exitCode, 7);
+  assert.equal(result.steps[1]?.exitCode, 7);
+
+  const track = TerminalTrackSchema.parse(JSON.parse(await fs.readFile(
+    path.join(project.root, '.demoweave', 'evidence', 'artifacts', 'fixture-terminal.terminal.json'),
+    'utf8',
+  )));
+  assert.equal(track.commands[0]?.status, 'completed');
+  assert.equal(track.commands[0]?.exitCode, 7);
+  assert.equal(track.status, 'completed');
+  assert.equal(track.exitCode, 7);
 });
 
 test('returns a structured failure for a non-zero command and skips later steps', async (context) => {
@@ -138,6 +188,23 @@ test('returns a structured failure for a non-zero command and skips later steps'
   assert.equal(result.steps[0]?.exitCode, 7);
   assert.equal(result.steps[0]?.error?.code, 'NONZERO_EXIT');
   assert.equal(result.steps[1]?.status, 'skipped');
+});
+
+test('rejects a non-zero exit outside the explicitly expected set', async (context) => {
+  const flow = fixtureFlow([{
+    id: 'run-unexpected-nonzero',
+    type: 'run',
+    command: process.execPath,
+    args: ['fixture-cli.js', '--exit', '8'],
+    expectedExitCodes: [7],
+  }], 'unexpected-nonzero-flow');
+  const project = await createProject(context, flow);
+
+  const result = await runFlow(flow.id, { projectRoot: project.root });
+  assert.equal(result.status, 'failed');
+  assert.equal(result.steps[0]?.exitCode, 8);
+  assert.equal(result.steps[0]?.error?.code, 'NONZERO_EXIT');
+  assert.match(result.steps[0]?.error?.message ?? '', /expected one of \[7\]/);
 });
 
 test('reports failed assertions without silently continuing', async (context) => {

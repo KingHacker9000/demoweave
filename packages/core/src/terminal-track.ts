@@ -12,9 +12,9 @@ export const TerminalEventSchema = z.object({
 
 export const TerminalCommandStatusSchema = z.enum([
   'completed',
-  'failed',
   'timedOut',
   'spawnFailed',
+  'signaled',
 ]);
 
 export const TerminalCommandSchema = z.object({
@@ -28,30 +28,16 @@ export const TerminalCommandSchema = z.object({
   exitCode: z.number().int().nullable(),
   signal: z.string().min(1).optional(),
 }).strict().superRefine((command, ctx) => {
-  if (command.status === 'completed' && command.exitCode !== 0) {
+  if (command.status === 'completed' && command.exitCode === null) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       path: ['exitCode'],
-      message: 'A completed terminal command must have exit code 0',
-    });
-  }
-  if (command.status === 'failed' && command.exitCode === 0) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ['exitCode'],
-      message: 'A failed terminal command cannot have exit code 0',
-    });
-  }
-  if (command.status === 'failed' && command.exitCode === null && !command.signal) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ['signal'],
-      message: 'A failed terminal command without an exit code requires a signal',
+      message: 'A completed terminal command requires a numeric exit code',
     });
   }
 });
 
-export const TerminalTrackStatusSchema = z.enum(['completed', 'failed', 'timedOut', 'spawnFailed']);
+export const TerminalTrackStatusSchema = z.enum(['completed', 'timedOut', 'spawnFailed', 'signaled']);
 
 export const TerminalTrackSchema = z.object({
   schemaVersion: z.literal(1),

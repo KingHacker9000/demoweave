@@ -28,7 +28,7 @@ Use DemoWeave when the user asks to create, improve, update, or validate documen
 
 ## M3 terminal execution boundaries
 
-M3 executes non-interactive terminal Flows through a process/pipe session. It supports `run`, duration/process-exit/file-exists waits, output/exit-code/file-exists assertions, and terminal capture. Unsupported terminal actions fail explicitly. Interactive PTY input, browser/desktop/mobile drivers, and media rendering are not available yet.
+M3 executes non-interactive terminal Flows through a process/pipe session. It supports `run`, duration/process-exit/file-exists waits, output/exit-code/file-exists assertions, and terminal capture. A `run` expects exit code `0` unless its optional `expectedExitCodes` declares another accepted integer result. Unsupported terminal actions fail explicitly. Interactive PTY input, browser/desktop/mobile drivers, and media rendering are not available yet.
 
 Current metadata layout:
 
