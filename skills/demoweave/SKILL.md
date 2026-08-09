@@ -24,11 +24,13 @@ Use DemoWeave when the user asks to create, improve, update, or validate documen
 8. Run a terminal Flow with `demoweave run <flow-id-or-path>`. Use `--project <path>` when the project root is not the current directory.
 9. A successful terminal `capture` writes `.demoweave/evidence/artifacts/<evidence-id>.terminal.json` and updates `.demoweave/evidence/manifest.json` with driver and Git provenance.
 10. Record real source dependencies on planned Evidence when they are known; execution preserves them. Do not invent dependencies just to populate provenance.
-11. Run `demoweave validate .` after editing or executing DemoWeave metadata. Fix schema and cross-reference errors before relying on the Flow/manifest.
+11. Render terminal Evidence with `demoweave render <evidence-id-or-path> --format png` or `demoweave render <evidence-id-or-path> --format gif`. Use `--project <path>` when needed. PNG rendering is built in; GIF rendering additionally requires FFmpeg reported by `demoweave doctor`.
+12. Rendered Evidence uses the configured `.demoweave/config.json` `mediaDir`, derives from the source terminal Evidence, and is indexed in Manifest v1. A direct TerminalTrack path can also be rendered, but only indexed source Evidence produces a derived manifest entry.
+13. Run `demoweave validate .` after editing, executing, or rendering DemoWeave metadata. Fix schema and cross-reference errors before relying on the Flow/manifest.
 
-## M3 terminal execution boundaries
+## Current terminal execution and rendering boundaries
 
-M3 executes non-interactive terminal Flows through a process/pipe session. It supports `run`, duration/process-exit/file-exists waits, output/exit-code/file-exists assertions, and terminal capture. A `run` expects exit code `0` unless its optional `expectedExitCodes` declares another accepted integer result. Unsupported terminal actions fail explicitly. Interactive PTY input, browser/desktop/mobile drivers, and media rendering are not available yet.
+DemoWeave executes non-interactive terminal Flows through a process/pipe session. It supports `run`, duration/process-exit/file-exists waits, output/exit-code/file-exists assertions, and terminal capture. A `run` expects exit code `0` unless its optional `expectedExitCodes` declares another accepted integer result. Unsupported terminal actions fail explicitly. The M4 renderer turns TerminalTrack v1 into PNG or GIF without a browser runtime; GIF encoding requires optional FFmpeg. Interactive PTY input and browser/desktop/mobile capture are not available yet.
 
 Current metadata layout:
 
@@ -42,6 +44,9 @@ Current metadata layout:
     manifest.json
     artifacts/
       <evidence-id>.terminal.json
+docs-media/                  # or configured mediaDir
+  <evidence-id>.png
+  <evidence-id>.gif
 ```
 
 Published contracts live under `schemas/`:
@@ -52,4 +57,4 @@ Published contracts live under `schemas/`:
 - `manifest.schema.json`
 - `terminal-track.schema.json`
 
-As later milestones land, this same skill will direct rendering, Markdown planning/patching, stale detection, and tutorial composition without changing the core agent-vs-tool boundary.
+As later milestones land, this same skill will direct Markdown planning/patching, stale detection, and tutorial composition without changing the core agent-vs-tool boundary.

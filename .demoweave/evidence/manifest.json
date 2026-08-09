@@ -39,6 +39,74 @@
           }
         ]
       }
+    },
+    {
+      "schemaVersion": 1,
+      "id": "inspect-project-terminal-gif",
+      "kind": "recording",
+      "status": "available",
+      "label": "DemoWeave self-inspection terminal session (GIF)",
+      "format": "gif",
+      "path": "docs-media/inspect-project-terminal.gif",
+      "mimeType": "image/gif",
+      "producer": {
+        "kind": "renderer",
+        "id": "terminal",
+        "version": "0.0.1"
+      },
+      "provenance": {
+        "flowId": "inspect-project",
+        "stepId": "capture-terminal",
+        "surfaceId": "terminal-demoweave-cli",
+        "gitCommit": "1b54f8c5c42c5a22b70e8ad48f4674dfb7db6cbb",
+        "sources": [
+          {
+            "path": "packages/cli/src/index.ts",
+            "role": "implementation"
+          },
+          {
+            "path": "packages/core/src/analyzer.ts",
+            "role": "implementation"
+          }
+        ]
+      },
+      "derivedFrom": [
+        "inspect-project-terminal"
+      ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "inspect-project-terminal-png",
+      "kind": "image",
+      "status": "available",
+      "label": "DemoWeave self-inspection terminal session (PNG)",
+      "format": "png",
+      "path": "docs-media/inspect-project-terminal.png",
+      "mimeType": "image/png",
+      "producer": {
+        "kind": "renderer",
+        "id": "terminal",
+        "version": "0.0.1"
+      },
+      "provenance": {
+        "flowId": "inspect-project",
+        "stepId": "capture-terminal",
+        "surfaceId": "terminal-demoweave-cli",
+        "gitCommit": "1b54f8c5c42c5a22b70e8ad48f4674dfb7db6cbb",
+        "sources": [
+          {
+            "path": "packages/cli/src/index.ts",
+            "role": "implementation"
+          },
+          {
+            "path": "packages/core/src/analyzer.ts",
+            "role": "implementation"
+          }
+        ]
+      },
+      "derivedFrom": [
+        "inspect-project-terminal"
+      ]
     }
   ]
 }

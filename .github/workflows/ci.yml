@@ -15,6 +15,12 @@ jobs:
         os: [ubuntu-latest, windows-latest]
     steps:
       - uses: actions/checkout@v4
+      - name: Install FFmpeg (Ubuntu)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - name: Install FFmpeg (Windows)
+        if: runner.os == 'Windows'
+        run: choco install ffmpeg -y --no-progress
       - uses: pnpm/action-setup@v4
         with:
           version: 10
@@ -26,7 +32,7 @@ jobs:
       - run: pnpm build
       - run: pnpm test
       - run: pnpm typecheck
-      - name: Smoke test built CLI and M3 terminal execution
+      - name: Smoke test built CLI, terminal execution, and M4 rendering
         run: |
           node packages/cli/dist/index.js --help
           node packages/cli/dist/index.js doctor
@@ -35,3 +41,6 @@ jobs:
           node packages/cli/dist/index.js status .
           node packages/cli/dist/index.js validate .
           node packages/cli/dist/index.js run inspect-project
+          node packages/cli/dist/index.js render inspect-project-terminal --format png
+          node packages/cli/dist/index.js render inspect-project-terminal --format gif
+          node packages/cli/dist/index.js validate .
