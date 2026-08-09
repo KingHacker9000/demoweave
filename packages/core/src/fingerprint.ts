@@ -47,29 +47,23 @@ async function writeManifest(target: string, manifest: Manifest): Promise<void> 
   }
 }
 
-function mergeSourceDependencies(existing: SourceDependency[], declared: Array<{ path: string; role?: SourceDependency['role'] }>): SourceDependency[] {
-  const merged = new Map<string, SourceDependency>();
-  for (const dependency of existing) merged.set(dependency.path, { ...dependency });
+async function snapshotSources(
+  root: string,
+  existing: SourceDependency[],
+  declared: Array<{ path: string; role?: SourceDependency['role'] }>,
+): Promise<SourceDependency[]> {
+  const merged = new Map(existing.map((dependency) => [dependency.path, { ...dependency }]));
   for (const dependency of declared) {
     const previous = merged.get(dependency.path);
+    const dependencyHash = await hashFile(resolveInside(root, dependency.path));
+    const role = dependency.role ?? previous?.role;
     merged.set(dependency.path, {
       path: dependency.path,
-      ...(dependency.role ?? previous?.role ? { role: dependency.role ?? previous!.role } : {}),
-      ...(previous?.hash ? { hash: previous.hash } : {}),
+      ...(role ? { role } : {}),
+      ...(dependencyHash ? { hash: dependencyHash } : previous?.hash ? { hash: previous.hash } : {}),
     });
   }
   return [...merged.values()].sort((a, b) => a.path.localeCompare(b.path));
-}
-
-async function snapshotSources(root: string, dependencies: SourceDependency[]): Promise<SourceDependency[]> {
-  return Promise.all(dependencies.map(async (dependency) => {
-    const dependencyHash = await hashFile(resolveInside(root, dependency.path));
-    return {
-      path: dependency.path,
-      ...(dependency.role ? { role: dependency.role } : {}),
-      ...(dependencyHash ? { hash: dependencyHash } : {}),
-    };
-  }));
 }
 
 export async function snapshotFlowEvidence(projectRoot: string, flowId: string): Promise<Evidence[]> {
@@ -85,7 +79,7 @@ export async function snapshotFlowEvidence(projectRoot: string, flowId: string):
   const evidence = await Promise.all(manifest.evidence.map(async (item) => {
     if (item.provenance.flowId !== flowId || item.derivedFrom?.length) return item;
     const artifactHash = item.path ? await hashFile(resolveInside(root, item.path)) : undefined;
-    const sources = await snapshotSources(root, mergeSourceDependencies(item.provenance.sources, flow.sources ?? []));
+    const sources = await snapshotSources(root, item.provenance.sources, flow.sources ?? []);
     const next: Evidence = {
       ...item,
       ...(artifactHash ? { artifactHash } : {}),
