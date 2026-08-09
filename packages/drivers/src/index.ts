@@ -63,6 +63,12 @@ export {
 export type { TerminalDriverOptions } from './terminal-driver.js';
 
 export {
+  WebDriver,
+  webDriverVersion,
+} from './web-driver.js';
+export type { WebDriverOptions } from './web-driver.js';
+
+export {
   executeFlow,
   FlowExecutionError,
   runFlow,
