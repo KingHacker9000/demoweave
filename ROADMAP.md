@@ -1,84 +1,97 @@
 # DemoWeave Roadmap
 
-DemoWeave is an agent-native documentation studio for software repositories.
+DemoWeave is an agent-native documentation studio for software repositories. Claude Code or Codex supplies the reasoning; DemoWeave supplies deterministic project inspection, workflow execution, evidence capture, rendering, validation, and provenance.
 
-The goal is simple: give Claude Code or Codex a repository, let the agent understand and run the project, collect real evidence from the surfaces users interact with, and generate clean written + visual documentation that stays in sync with the codebase.
-
-DemoWeave is **not** web-only. A single repository may expose several surfaces at once: web, CLI, desktop, mobile, libraries/SDKs, notebooks, research pipelines, and generated artifacts.
+DemoWeave is **multi-surface by design**. A repository may expose web, CLI, desktop, mobile, libraries/SDKs, notebooks, research pipelines, services, and generated artifacts at the same time.
 
 ## Current checkpoint
 
 | Milestone | Status | Result |
 |---|---|---|
 | M0 — Repository bootstrap | ✅ Complete | TypeScript/pnpm monorepo, CLI, package boundaries, CI |
-| M1 — Project analyzer | ✅ Complete | Frozen `ProjectProfile v1`; Node, Python, Rust, Go baseline; 15 analyzer tests |
-| **M2 — Flow IR + Evidence + Manifest** | **🚧 Current** | Freeze platform-neutral workflow/evidence/provenance contracts |
-| M3 — Terminal driver | Next | First runtime evidence driver |
-| M4 — Media renderer | Later | PNG/GIF/WebM/MP4 via lightweight rendering |
-| P0 — DemoWeave documents itself | Target | First public-quality dogfood demo |
+| M1 — Project analyzer | ✅ Complete | Frozen `ProjectProfile v1`; Node, Python, Rust, Go baseline |
+| M2 — Flow / Evidence / Manifest | ✅ Complete | Frozen platform-neutral contracts + `SurfaceDriver v1` |
+| **M3 — Terminal driver** | **🚧 Current** | Execute and capture terminal Flows deterministically |
+| M4 — Media renderer | Next | Render terminal evidence to PNG/GIF/WebM/MP4 |
+| **P0 — DemoWeave documents itself** | Target | First public-quality dogfood demo |
 
-M0/M1 landed through PR #1. `ProjectProfile v1` is now the compatibility baseline for subsequent milestones.
+M0/M1 landed in PR #1. M2 landed in PR #2. `ProjectProfile v1`, `Flow v1`, `Evidence v1`, `Manifest v1`, and `SurfaceDriver v1` are now compatibility baselines for runtime-driver work.
 
 ## Product principles
 
 - **Agent supplies intelligence; DemoWeave supplies deterministic tooling.**
-- **Multi-surface by design.** Never reduce a repository to one `projectType`.
-- **Evidence over decoration.** Screenshots, GIFs, plots, terminal captures, and videos must prove or explain something useful.
+- **Multi-surface by design.** Never collapse a repository into one `projectType`.
+- **Evidence over decoration.** Visuals must explain or prove something useful.
 - **Existing docs are preserved and patched intentionally**, not blindly regenerated.
-- **README.md is first-class**, but arbitrary Markdown targets are equally supported.
-- **No OBS requirement.** Capture the smallest useful surface directly and compose with FFmpeg.
-- **One source of truth for tutorials.** A structured flow should be reusable for screenshots, GIFs, docs, and full videos.
-- **Incremental by default.** Track provenance so stale documentation can be regenerated selectively.
-- **Claude Code and Codex share the same core skill/workflow.**
+- **README.md and arbitrary Markdown are first-class targets.** `/docs` is not special.
+- **No OBS requirement.** Capture the smallest useful surface directly and compose later.
+- **One source of truth for demos.** Structured Flows should feed screenshots, GIFs, docs, and videos.
+- **Incremental by default.** Provenance should make stale evidence selectively regenerable.
+- **Claude Code and Codex share the same workflow contracts.**
 - Keep the core lightweight; platform-specific drivers stay optional.
-
----
 
 ## Core architecture
 
 ```text
 Repository
-   |
-   v
+   ↓
 Project Analyzer
-   |
-   v
-Project Profile
-   |
-   v
-Documentation / Evidence Planner  <-- Claude Code or Codex
-   |
-   v
-Universal Flow IR
-   |
-   +-------------------------------+
-   |               |               |
-   v               v               v
-Surface Drivers  Process/Result   Existing Artifacts
-   |               |               |
-   +---------------+---------------+
-                   |
-                   v
-              Evidence Store
-                   |
-                   v
-              Media Renderer
-                   |
-                   v
-       Markdown / GIF / PNG / MP4
-                   |
-                   v
-          Manifest + stale tracking
+   ↓
+ProjectProfile v1
+   ↓
+Documentation / Evidence Planner  ← Claude Code or Codex
+   ↓
+Flow v1
+   ↓
+SurfaceDriver v1
+   ↓
+Structured execution + Evidence v1
+   ↓
+Manifest v1 / provenance
+   ↓
+Renderer / document composer
+   ↓
+README · docs · PNG · GIF · MP4
 ```
 
-### Core models
+## Frozen contracts
 
-1. **ProjectProfile** — deterministic facts about a repository and all detected surfaces. **v1 frozen at M1.**
-2. **DocPlan** — what documents/sections should exist and what should be preserved, added, or changed.
-3. **Flow** — platform-neutral description of a user/research workflow.
-4. **Evidence** — screenshot, GIF, video, terminal capture, result, plot, table, diagram, etc.
-5. **Timeline** — presentation/composition of evidence tracks for longer tutorials.
-6. **Manifest** — provenance linking docs/assets to flows, source files, and commits.
+### ProjectProfile v1
+
+Deterministic repository facts: components, ecosystems, manifests, workspaces, entrypoints, languages, frameworks, commands, existing docs, and stable user-surface IDs.
+
+Baseline ecosystems:
+
+- Node — `package.json`, pnpm/package.json workspaces
+- Python — `pyproject.toml`
+- Rust — `Cargo.toml`, Cargo workspaces
+- Go — `go.mod`
+
+### Flow v1
+
+A platform-neutral workflow references one stable surface and contains semantic steps:
+
+```text
+run
+navigate
+activate
+input
+press
+scroll
+wait
+assert
+capture
+```
+
+Drivers translate those semantic actions into platform-specific behavior. Flows must not contain Playwright/Appium/VHS-specific implementation code.
+
+### Evidence v1
+
+Evidence can represent screenshots, recordings, structured terminal tracks, images, diagrams, plots, tables, results, code/text, and comparisons. It has lifecycle state, optional artifact metadata, producer metadata, provenance, and derivation links.
+
+### Manifest v1
+
+Repository-level index connecting Flow files and Evidence to stable IDs and `ProjectProfile v1` surfaces. Cross-reference validation checks Flow → surface, capture → Evidence, Evidence → Flow/step/surface, and derivation links.
 
 ---
 
@@ -86,36 +99,16 @@ Surface Drivers  Process/Result   Existing Artifacts
 
 ## M0 — Repository bootstrap ✅
 
-**Goal:** establish the TypeScript monorepo and stable package boundaries.
-
 Delivered:
 
-```text
-packages/
-  cli/
-  core/
-  drivers/
-  renderer/
-skills/
-  demoweave/
-    SKILL.md
-schemas/
-fixtures/
-```
-
 - TypeScript + pnpm workspace
-- CLI binary named `demoweave`
-- build/test/typecheck scripts
-- CI on GitHub Actions
+- `@demoweave/core`, `@demoweave/cli`, `@demoweave/drivers`, `@demoweave/renderer`
+- CLI binary `demoweave`
+- build/test/typecheck + GitHub Actions
 - MIT license
-
-**Exit criteria:** complete.
-
----
+- shared `skills/demoweave/SKILL.md`
 
 ## M1 — Project analyzer ✅
-
-**Goal:** deterministic repository inspection with no LLM API dependency.
 
 Delivered commands:
 
@@ -127,318 +120,193 @@ demoweave status
 demoweave validate
 ```
 
-`ProjectProfile v1` records deterministic facts including:
+Key boundary: nested non-workspace manifests are retained as deterministic component facts but do not automatically become user-facing surfaces.
 
-- package managers/tooling evidence
-- workspace layout
-- ecosystem-neutral components
-- manifests and entrypoints
-- languages/frameworks
-- build/test/run commands when evidenced
-- detected user surfaces
-- existing documentation
+## M2 — Flow IR + Evidence + Manifest ✅
 
-Baseline ecosystems:
+Delivered:
 
-- Node — `package.json`, pnpm/package.json workspaces
-- Python — `pyproject.toml`
-- Rust — `Cargo.toml`, Cargo workspaces
-- Go — `go.mod`
+- `Flow v1`
+- `Evidence v1`
+- `Manifest v1`
+- `SurfaceDriver v1`
+- published JSON Schemas
+- terminal + web Flow examples using the same contract
+- deterministic manifest normalization
+- cross-file metadata validation
+- `.demoweave/flows/`
+- `.demoweave/evidence/manifest.json`
 
-A repository may expose **multiple surfaces simultaneously**.
-
-**Exit criteria:** complete. `ProjectProfile v1` is frozen as the compatibility baseline.
-
-Known M1 boundaries intentionally left for later:
-
-- Detection is manifest/structure based; it does not execute surfaces.
-- Python dynamic metadata and complex Poetry script objects are not fully modeled.
-- Python workspaces and Go `go.work` are not yet modeled.
-- Nested non-workspace manifests are retained as facts but do not automatically emit user-facing surfaces.
+No runtime capture or renderer was added in M2.
 
 ---
 
-## M2 — Flow IR + Evidence model + Manifest 🚧
+## M3 — Terminal driver 🚧
 
-**Goal:** create platform-neutral workflow, evidence, and provenance contracts before capture implementations grow.
+**Goal:** execute a terminal Flow against a real CLI and produce a deterministic, replayable structured terminal track.
 
-The Flow IR must describe **semantic intent**, not Playwright/Appium/VHS implementation calls.
+### Required capabilities
 
-Example:
+- Resolve a `terminal` surface from `ProjectProfile v1`.
+- Implement `SurfaceDriver v1` for terminal-compatible Flow steps.
+- Execute commands without going through the user's personal terminal UI.
+- Capture timestamped terminal events suitable for replay/rendering.
+- Preserve stdout/stderr semantics where possible.
+- Record exit code and command completion.
+- Support terminal dimensions.
+- Preserve ANSI styling when useful.
+- Sanitize obvious machine-specific presentation details where possible.
+- Support terminal assertions from Flow v1.
+- Convert a `capture` step of kind `terminal` into `Evidence v1` plus manifest provenance.
+- Fail with structured errors rather than silently continuing.
 
-```yaml
-schemaVersion: 1
-id: inspect-project
-surface: terminal-demoweave-cli
-steps:
-  - run:
-      command: demoweave inspect .
-  - assert:
-      stdout_contains: "Detected surfaces"
-  - capture:
-      id: inspection-result
+### Terminal track v1
+
+M3 may introduce an internal/public structured artifact for terminal playback. It should be deterministic and renderer-independent, for example conceptually:
+
+```json
+{
+  "schemaVersion": 1,
+  "columns": 100,
+  "rows": 30,
+  "events": [
+    { "t": 0, "stream": "input", "data": "demoweave inspect ." },
+    { "t": 32, "stream": "stdout", "data": "DemoWeave inspected ..." }
+  ],
+  "exitCode": 0
+}
 ```
 
-M2 should create stable models for:
+The exact format should be decided from real PTY/process experiments, not guessed in advance.
+
+### Cross-platform strategy
+
+M3 should establish a clean abstraction before overcommitting to one PTY library:
 
 ```text
-Flow
-FlowStep
-Evidence
-EvidenceRef
-Manifest
-Provenance
-SourceDependency
-Driver contract
+TerminalDriver
+    ↓
+TerminalSession adapter
+    ├── process/pipe mode
+    └── PTY mode when interaction requires it
 ```
 
-Expected repository state:
+A non-interactive command should not require a PTY just to be recordable. PTY should be used where terminal semantics/interactivity genuinely require it.
+
+### M3 dogfood Flow
+
+Primary target:
 
 ```text
-.demoweave/
-  flows/
-  evidence/
-    manifest.json
-schemas/
-  flow.schema.json
-  evidence.schema.json
-  manifest.schema.json
+DemoWeave → demoweave inspect .
 ```
 
-Requirements:
+Expected Flow:
 
-- Every Flow references a real `ProjectProfile` surface by stable surface ID.
-- Actions are semantic and platform-neutral where possible.
-- Capture requests describe desired evidence, not renderer-specific encoding details.
-- Evidence has stable identity, type, path/status, producer metadata, and provenance.
-- Provenance can link evidence to a Flow, source paths, and Git commit.
-- Manifest is deterministic and machine-editable.
-- Missing/stale files can eventually be represented without redesigning the model.
-- Driver API consumes semantic actions and returns structured execution/capture results.
-- Runtime Zod schemas and published JSON Schemas remain synchronized.
+```text
+run demoweave inspect .
+assert output contains "Detected surfaces"
+capture terminal evidence
+```
 
-**Exit criteria**
+### M3 exit criteria
 
-- JSON Schema + runtime validation for Flow, Evidence, and Manifest.
-- Driver API accepts semantic actions rather than Playwright/Appium-specific code.
-- Provenance can associate evidence with a Flow, source files, and a Git commit.
-- Example terminal and web Flows validate against the same Flow contract.
-- Manifest round-trip tests are deterministic.
-- No capture/PTY/Playwright implementation is required to finish M2.
-
----
-
-## M3 — Terminal driver
-
-**Goal:** first real evidence driver and first dogfooding surface.
-
-Capture:
-
-- command input
-- stdout/stderr
-- timestamps
-- exit status
-- terminal dimensions
-- ANSI styling where useful
-
-Prefer a controlled rendered terminal over recording the user's personal terminal window.
-
-**Exit criteria**
-
-- DemoWeave can execute a CLI Flow against itself.
-- Output is replayable deterministically.
-- Captured output is suitable for rendering without leaking local usernames/terminal chrome.
+- Terminal driver executes the DemoWeave self-inspection Flow.
+- CLI fixture also executes through the same driver.
+- Run/output/exit assertions work.
+- A deterministic terminal-track artifact is written to disk.
+- Evidence + manifest are updated with Flow/step/surface/source/Git provenance.
+- Failure cases return structured errors and non-zero CLI exit status.
+- Repeated runs produce structurally equivalent tracks apart from explicitly nondeterministic timing fields.
+- Tests run on Linux CI.
+- Real local validation is performed on the development Windows/WSL environment before merge.
+- **No GIF rendering in M3.** Rendering belongs to M4.
 
 ---
 
 ## M4 — Lightweight media renderer
 
-**Goal:** render first visual evidence assets without OBS.
+**Goal:** turn structured evidence into polished visual assets without OBS.
 
 Default substantial media dependency: **FFmpeg**.
 
-Initial output formats:
+Initial outputs:
 
 - PNG
 - GIF
 - WebM
 - MP4
 
-For Markdown GIFs, optimize for short duration, readable text, sane dimensions, and palette-based encoding.
+First target: render M3 terminal tracks into a clean controlled terminal presentation, independent of the user's actual shell theme/window chrome.
 
-**Exit criteria**
+### M4 exit criteria
 
-- Terminal capture can become a clean PNG and GIF.
-- GIF generation is deterministic and bounded by basic size/duration rules.
-- `demoweave doctor` clearly reports media capability/FFmpeg availability.
+- Terminal track → clean PNG.
+- Terminal track → optimized Markdown GIF.
+- Reasonable duration/dimension/file-size limits.
+- Deterministic render settings.
+- `demoweave doctor` reports renderer/FFmpeg capability clearly.
 
 ---
 
 # Pilot P0 — DemoWeave documents DemoWeave
 
-This is the first major proof of the architecture.
-
-**Goal:** Claude Code or Codex uses DemoWeave to improve DemoWeave's own README with real evidence.
-
-Expected workflow:
+**Goal:** Claude Code or Codex uses DemoWeave to improve DemoWeave's own README using real runtime evidence.
 
 ```text
 agent understands repo
-      -> demoweave inspect .
-      -> chooses a useful CLI workflow
-      -> writes Flow
-      -> DemoWeave executes Flow
-      -> DemoWeave renders GIF
-      -> agent patches README.md
-      -> DemoWeave validates assets/links
+  → demoweave inspect .
+  → chooses useful CLI workflow
+  → writes Flow
+  → DemoWeave executes Flow
+  → terminal Evidence
+  → renderer creates GIF
+  → agent patches README
+  → DemoWeave validates references/provenance
 ```
 
-### P0 acceptance criteria
+### Acceptance criteria
 
-1. Fresh clone installs with the normal workspace command.
+1. Fresh clone installs normally.
 2. `demoweave doctor` succeeds.
-3. `demoweave inspect .` recognizes DemoWeave correctly.
-4. Claude Code can follow `skills/demoweave/SKILL.md`.
-5. Codex can follow the same underlying skill/workflow.
-6. Agent identifies a genuinely useful CLI workflow as evidence worth showing.
-7. Agent creates a valid Flow.
-8. DemoWeave executes the Flow.
-9. DemoWeave records a clean terminal track.
-10. Renderer produces a Markdown-appropriate GIF.
-11. Agent updates `README.md` and embeds the generated asset.
-12. Existing manually useful sections are preserved.
-13. `demoweave validate` verifies generated assets and Markdown references.
-14. A second run with no source changes does not unnecessarily rewrite documentation/assets.
-15. Changing a source file associated with the Flow marks the relevant evidence/documentation stale.
-
-**P0 is the first public-quality demo target.**
+3. DemoWeave profiles itself correctly.
+4. Claude Code can follow the shared DemoWeave skill.
+5. Codex can follow the same workflow.
+6. Agent creates a valid useful Flow.
+7. DemoWeave executes the Flow.
+8. A clean terminal track is captured.
+9. Renderer creates a Markdown-appropriate GIF.
+10. README embeds it intentionally.
+11. Useful existing manual sections survive.
+12. `demoweave validate` verifies metadata/assets/references.
+13. No-change rerun avoids unnecessary churn.
+14. Relevant source changes can eventually mark evidence stale.
 
 ---
 
 ## M5 — Document planning + safe Markdown patching
 
-**Goal:** arbitrary Markdown targets with section-aware preservation.
-
-Targets include:
-
-```text
-README.md
-CONTRIBUTING.md
-ARCHITECTURE.md
-docs/*.md
-any other Markdown target selected by the agent/user
-```
-
-Plans should explicitly mark sections as preserve, edit, replace, create, or justified removal.
-
-Add a review workflow inspired by strong diff/refine tools:
-
-```text
-proposed docs/assets
-      -> diff/review
-      -> accept | refine | discard
-```
-
-**Exit criteria**
-
-- Existing sections can be intentionally preserved.
-- Agent can attach evidence to planned sections.
-- Proposed text/media changes can be reviewed before save.
-
----
+Arbitrary Markdown targets with section-aware `preserve`, `edit`, `replace`, `create`, and justified `remove` operations. Add diff/review/refine/discard UX before saving changes.
 
 ## M6 — Incremental stale/update tracking
 
-**Goal:** living documentation rather than one-shot generation.
-
-Commands:
-
-```bash
-demoweave status
-demoweave validate
-```
-
-Future convenience command:
-
-```bash
-demoweave update
-```
-
-**Exit criteria**
-
-- Source changes can mark related evidence stale.
-- Manifest explains why an artifact is stale.
-- Unrelated docs/assets remain current.
-- Regeneration can be selective.
-
----
+Use Manifest provenance to explain why evidence/docs are stale and selectively regenerate only affected artifacts.
 
 ## M7 — Web driver (Playwright)
 
-**Goal:** browser evidence without making the product web-specific.
+Implement Flow v1 against browser surfaces: launch/wait, navigate, semantic interaction, assertions, screenshots, viewport recordings, and element bounds.
 
-Capabilities:
+### Pilot P1 — Web fixture
 
-- launch/wait for app
-- navigate
-- click/input/hover/scroll
-- semantic assertions
-- screenshots
-- viewport recordings
-- element bounds for focus/zoom/callouts
-
-**Exit criteria**
-
-- Web fixture flow runs end to end.
-- Screenshot and short GIF are generated.
-- Same Flow/Evidence contracts used by the terminal driver remain valid.
-
----
-
-# Pilot P1 — Web fixture
-
-Use `fixtures/web` as a controlled integration specimen.
-
-Generate:
-
-- hero screenshot
-- interaction GIF
-- short 30–60 second MP4
-- `docs/examples/web.md`
-
-**Success condition:** CLI and web pilots work without changing the core Flow/Evidence abstractions.
-
----
+Generate a hero screenshot, interaction GIF, short MP4, and example documentation from the controlled web fixture without changing the Flow/Evidence contracts.
 
 ## M8 — Timeline compositor
 
-**Goal:** compose independent surface recordings into polished scenes without OBS.
-
-Initial support:
-
-- single source
-- split screen
-- crop/scale
-- simple focus/zoom
-- text/title overlays
-- simple transitions
-- audio track
-
-Example:
-
-```text
-terminal recording + browser recording
-                 ->
-          polished split-screen tutorial
-```
-
----
+Compose independent source recordings/tracks into polished single-source, split-screen, crop/scale, zoom, title, transition, and audio scenes without OBS.
 
 ## M9 — Full tutorial output
 
-**Goal:** generate YouTube-ready tutorials from structured beats/timeline.
-
-Outputs:
+Generate YouTube-ready:
 
 ```text
 tutorial.mp4
@@ -450,133 +318,44 @@ youtube-title.txt
 youtube-description.md
 ```
 
-Narration/TTS is an adapter, never a hard core dependency.
-
-Possible modes:
-
-- none
-- local TTS
-- provider adapter
-- user-supplied audio
-
----
+Narration/TTS remains an optional adapter.
 
 ## M10 — Visual QA
 
-**Goal:** automatically review generated assets before publishing.
-
-Checks should include:
-
-- readable text
-- no obvious secret exposure
-- no clipped content
-- no broken/loading states
-- important action visible
-- no excessive dead time
-- narration/visual alignment where applicable
-
-Structured tutorial beats should allow re-recording only the failed beat.
-
----
+Agent-review sampled frames for readability, secret exposure, clipping, broken/loading states, dead time, and narration/visual mismatch. Structured beats should allow partial re-recording.
 
 ## M11 — Research / notebook driver
 
-**Goal:** support scientific and ML/CV repositories as first-class projects.
-
-Detect/use:
-
-- notebooks
-- training/inference/evaluation scripts
-- benchmark outputs
-- plots/tables
-- generated images/videos
-- comparison grids
-
-Prefer actual generated artifacts over screenshots of notebook UI.
-
-Evidence types expand to include plots, tables, structured results, comparisons, and animations.
-
----
+Use real notebook/script outputs, plots, benchmark tables, generated images/videos, comparison grids, and experiment artifacts rather than screenshots of notebook UI when possible.
 
 ## M12 — Desktop drivers
 
-**Goal:** native/Electron desktop apps without OBS.
-
-Planned adapters:
-
-```text
-electron
-windows
-macos
-linux
-```
-
-Capture priority:
+Planned adapters: Electron, Windows, macOS, Linux. Capture priority:
 
 1. semantic/application-native capture
 2. window-specific OS capture
 3. region capture
 4. display capture
 
----
+No OBS requirement.
 
 ## M13 — Mobile drivers
 
-**Goal:** Android/iOS support through adapters while preserving the same semantic Flow actions.
-
-Typical actions:
-
-- click/tap
-- input
-- swipe
-- wait
-- assert
-- screenshot
-- record
-
----
+Android/iOS adapters implementing the same semantic actions: activate/tap, input, swipe/scroll, wait, assert, capture.
 
 ## M14 — Plugin/driver SDK
 
-**Goal:** allow third-party drivers, evidence producers, renderers, publishers, and detectors.
-
----
+Third-party extension points for surface drivers, evidence producers, renderers, publishers, and detectors.
 
 ## M15 — Documentation publishers
 
-DemoWeave should not become another docs-site framework.
-
-Publisher adapters may support:
-
-- plain Markdown / GitHub
-- Fumadocs
-- Mintlify
-- Docusaurus
-- VitePress
-- MkDocs
-
-If a project already uses a documentation stack, integrate rather than replace it.
+Integrate rather than replace existing stacks. Potential adapters: plain Markdown/GitHub, Fumadocs, Mintlify, Docusaurus, VitePress, MkDocs.
 
 ---
 
 # 1.0 target
 
-DemoWeave 1.0 should provide:
-
-- stable schemas and plugin interfaces
-- Claude Code + Codex workflows
-- project analysis
-- multi-surface detection
-- terminal + web + process/library support
-- screenshot/GIF/video evidence
-- README + arbitrary Markdown support
-- safe patch/review workflow
-- incremental stale tracking
-- lightweight FFmpeg composition
-- polished tutorial generation
-- a tested path for optional desktop/mobile/research drivers
-
----
+DemoWeave 1.0 should provide stable contracts, Claude/Codex workflows, multi-surface project analysis, terminal + web + process/library support, screenshot/GIF/video evidence, arbitrary Markdown support, safe patch/review, incremental stale tracking, lightweight FFmpeg composition, polished tutorials, and an extension path for desktop/mobile/research.
 
 # Development order
 
@@ -584,14 +363,14 @@ DemoWeave 1.0 should provide:
 |---|---|---|
 | 1 | ✅ M0 — scaffold | real project skeleton |
 | 2 | ✅ M1 — analyzer | understands repositories |
-| 3 | **🚧 M2 — Flow/Evidence/Manifest** | stable internal contracts |
-| 4 | M3 — terminal driver | DemoWeave runs itself |
+| 3 | ✅ M2 — Flow/Evidence/Manifest | stable internal contracts |
+| 4 | **🚧 M3 — terminal driver** | DemoWeave runs itself |
 | 5 | M4 — GIF renderer | first visual artifact |
 | 6 | **P0 — self-document README** | **first killer demo** |
 | 7 | M5 — safe Markdown patching | reliable docs |
 | 8 | M6 — stale tracking | living documentation |
 | 9 | M7 — web driver | website support |
-| 10 | **P1 — web fixture** | second surface proof |
+| 10 | **P1 — web fixture** | second-surface proof |
 | 11 | M8 — compositor | split-screen scenes |
 | 12 | M9/M10 — tutorial + QA | YouTube-ready output |
 | 13 | M11 — research/notebook | research repos |
@@ -604,21 +383,12 @@ DemoWeave 1.0 should provide:
 
 # Current next step
 
-## NOW: M2 — Flow IR + Evidence + Manifest
+## NOW: M3 — Terminal Driver
 
-Build and freeze the contracts that every runtime driver will consume.
+Implement and locally validate the first real `SurfaceDriver v1` against DemoWeave itself.
 
-Immediate work:
+**Do now:** terminal-session abstraction, command execution, structured terminal track, Flow assertions, terminal Evidence creation, manifest updates, tests, and self-dogfood execution.
 
-1. Define `Flow v1` and semantic step/action schemas.
-2. Define `Evidence v1` with stable IDs, evidence kinds, lifecycle status, output paths, and provenance.
-3. Define `Manifest v1` as the repository-level index of flows/evidence.
-4. Define the first platform-neutral `SurfaceDriver` contract in `@demoweave/drivers`.
-5. Publish synchronized JSON Schemas under `schemas/`.
-6. Add valid/invalid fixtures plus round-trip/determinism tests.
-7. Extend `demoweave validate` to validate M2 metadata when present.
-8. Add example terminal and web Flows proving the IR is not tied to either platform.
+**Do not do yet:** terminal PNG/GIF rendering, FFmpeg composition, Playwright, Markdown rewriting, or stale-detection logic.
 
-**Do not implement PTY capture, Playwright, FFmpeg, or media rendering in M2.**
-
-The immediate goal is to make the M3 terminal driver implement a stable contract rather than forcing us to redesign Flow/Evidence once additional surfaces arrive.
+The immediate goal is simple: **DemoWeave must be able to execute its own `demoweave inspect .` Flow and leave behind a clean, replayable terminal Evidence artifact with correct provenance.**
