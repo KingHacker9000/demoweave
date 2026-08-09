@@ -2,11 +2,11 @@
 
 DemoWeave is an agent-native documentation studio for software repositories.
 
-The long-term goal is to let Claude Code or Codex understand a project, run the surfaces users interact with, collect real evidence, and produce clean written and visual documentation: READMEs, guides, screenshots, GIFs, and full tutorials.
+The goal is to let Claude Code or Codex understand a project, run the surfaces users interact with, collect real runtime evidence, and produce clean written + visual documentation: READMEs, guides, screenshots, GIFs, and full tutorials.
 
 DemoWeave is designed for more than websites. A repository may expose web, CLI, desktop, mobile, library/SDK, notebook, research, and other surfaces at the same time.
 
-> M0–M2 are complete. DemoWeave is currently building M3: the first real terminal runtime driver. See [ROADMAP.md](./ROADMAP.md) for the exact current step and exit criteria.
+> M0–M3 are complete. DemoWeave can now analyze a repository, execute terminal Flows, and capture structured terminal Evidence with provenance. **M4 is building the lightweight renderer that turns that Evidence into the first polished PNG/GIF.** See [ROADMAP.md](./ROADMAP.md).
 
 ## Development
 
@@ -30,27 +30,38 @@ pnpm --filter @demoweave/cli exec demoweave --help
 
 ## Current capabilities
 
-DemoWeave currently provides deterministic project analysis plus platform-neutral workflow/evidence contracts:
-
 ```bash
 demoweave doctor
 demoweave init .
 demoweave inspect .
 demoweave status .
 demoweave validate .
+demoweave run <flow-id-or-path>
 ```
 
-Frozen compatibility baselines now include:
+Current compatibility/runtime contracts include:
 
 - `ProjectProfile v1`
 - `Flow v1`
 - `Evidence v1`
 - `Manifest v1`
 - `SurfaceDriver v1`
+- `TerminalTrack v1`
 
-The analyzer records ecosystem-neutral repository facts and baseline component/workspace information for Node, Python, Rust, and Go projects while allowing one repository to expose multiple surfaces. Flow v1 describes semantic actions without baking in Playwright, Appium, terminal-recorder, or renderer-specific implementation details.
+The analyzer records ecosystem-neutral repository facts for Node, Python, Rust, and Go projects while allowing one repository to expose multiple surfaces. Flow v1 describes semantic actions without baking in Playwright, Appium, terminal-recorder, or renderer-specific implementation details.
 
-No external LLM API is required for the core. Claude Code/Codex are the intelligence layer; DemoWeave provides deterministic project inspection, execution, evidence capture, rendering, validation, and provenance tooling as those milestones land.
+The first real driver is terminal-native. DemoWeave executes non-interactive CLI workflows through lightweight process pipes rather than recording the user's personal terminal window. Captures preserve ordered input/stdout/stderr events and ANSI output in a renderer-independent TerminalTrack, then update Evidence/Manifest provenance atomically.
+
+The repository dogfoods this already:
+
+```bash
+node packages/cli/dist/index.js inspect .
+node packages/cli/dist/index.js run inspect-project
+```
+
+The committed `inspect-project` Flow runs DemoWeave against its own repository, checks the result, and captures `.demoweave/evidence/artifacts/inspect-project-terminal.terminal.json`.
+
+No external LLM API is required for the core. Claude Code/Codex are the intelligence layer; DemoWeave provides deterministic inspection, execution, evidence capture, rendering, validation, and provenance tooling.
 
 ### Component discovery boundary
 
@@ -58,4 +69,8 @@ ProjectProfile v1 records supported manifests anywhere in the repository as comp
 
 ## Current development target
 
-M3 will make DemoWeave execute its own terminal Flow and produce a clean structured terminal Evidence track. Rendering that track to a README GIF belongs to M4, immediately after M3.
+**M4: TerminalTrack → polished PNG/GIF.**
+
+The renderer will consume the already-captured terminal Evidence, replay it into a controlled DemoWeave terminal presentation, generate a clean PNG, encode a Markdown-friendly animated GIF with FFmpeg, and register those outputs as derived Evidence. No OBS and no desktop recording.
+
+README embedding itself is the next checkpoint, **Pilot P0 — DemoWeave documents DemoWeave**.
