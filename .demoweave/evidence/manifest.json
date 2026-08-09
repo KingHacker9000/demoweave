@@ -13,12 +13,21 @@
       "schemaVersion": 1,
       "id": "inspect-project-terminal",
       "kind": "terminal",
-      "status": "planned",
+      "status": "available",
       "label": "DemoWeave self-inspection terminal session",
+      "format": "json",
+      "path": ".demoweave/evidence/artifacts/inspect-project-terminal.terminal.json",
+      "mimeType": "application/vnd.demoweave.terminal+json",
+      "producer": {
+        "kind": "driver",
+        "id": "terminal",
+        "version": "0.0.1"
+      },
       "provenance": {
         "flowId": "inspect-project",
         "stepId": "capture-terminal",
         "surfaceId": "terminal-demoweave-cli",
+        "gitCommit": "a62818f61d945cb701ff83fef3d6cd75d337ec31",
         "sources": [
           {
             "path": "packages/cli/src/index.ts",
