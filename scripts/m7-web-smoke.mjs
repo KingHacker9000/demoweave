@@ -5,7 +5,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
-const repository = path.resolve(new URL('..', import.meta.url).pathname);
+const repository = process.cwd();
 const cli = path.join(repository, 'packages', 'cli', 'dist', 'index.js');
 
 const html = `<!doctype html>
