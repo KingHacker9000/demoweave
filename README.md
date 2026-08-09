@@ -6,7 +6,7 @@ The goal is to let Claude Code or Codex understand a project, run the surfaces u
 
 DemoWeave is designed for more than websites. A repository may expose web, CLI, desktop, mobile, library/SDK, notebook, research, and other surfaces at the same time.
 
-> M0–M3 are complete. DemoWeave can now analyze a repository, execute terminal Flows, and capture structured terminal Evidence with provenance. **M4 is building the lightweight renderer that turns that Evidence into the first polished PNG/GIF.** See [ROADMAP.md](./ROADMAP.md).
+> **M0–M4 are complete.** DemoWeave can analyze a repository, execute terminal Flows, capture structured terminal Evidence, and render that Evidence into polished PNG/GIF assets with provenance. **Pilot P0 is now using DemoWeave to document DemoWeave itself.** See [ROADMAP.md](./ROADMAP.md).
 
 ## Development
 
@@ -14,6 +14,7 @@ Requirements:
 
 - Node.js 20+
 - pnpm
+- FFmpeg only when GIF rendering is needed
 
 ```bash
 pnpm install
@@ -37,6 +38,8 @@ demoweave inspect .
 demoweave status .
 demoweave validate .
 demoweave run <flow-id-or-path>
+demoweave render <evidence-id-or-path> --format png
+demoweave render <evidence-id-or-path> --format gif
 ```
 
 Current compatibility/runtime contracts include:
@@ -50,16 +53,20 @@ Current compatibility/runtime contracts include:
 
 The analyzer records ecosystem-neutral repository facts for Node, Python, Rust, and Go projects while allowing one repository to expose multiple surfaces. Flow v1 describes semantic actions without baking in Playwright, Appium, terminal-recorder, or renderer-specific implementation details.
 
-The first real driver is terminal-native. DemoWeave executes non-interactive CLI workflows through lightweight process pipes rather than recording the user's personal terminal window. Captures preserve ordered input/stdout/stderr events and ANSI output in a renderer-independent TerminalTrack, then update Evidence/Manifest provenance atomically.
+The first runtime driver is terminal-native. DemoWeave executes non-interactive CLI workflows through lightweight process pipes rather than recording the user's personal terminal window. Captures preserve ordered input/stdout/stderr events and ANSI output in a renderer-independent TerminalTrack, then update Evidence/Manifest provenance atomically.
 
-The repository dogfoods this already:
+The renderer consumes those tracks separately from execution. It replays terminal content into a controlled DemoWeave presentation, rasterizes PNGs headlessly, and can use FFmpeg to encode short README-friendly GIFs. No OBS, Electron, Chromium, or desktop recording is required for terminal media.
+
+The repository already dogfoods the full path:
 
 ```bash
 node packages/cli/dist/index.js inspect .
 node packages/cli/dist/index.js run inspect-project
+node packages/cli/dist/index.js render inspect-project-terminal --format png
+node packages/cli/dist/index.js render inspect-project-terminal --format gif
 ```
 
-The committed `inspect-project` Flow runs DemoWeave against its own repository, checks the result, and captures `.demoweave/evidence/artifacts/inspect-project-terminal.terminal.json`.
+Committed pilot artifacts live under `docs-media/`, with source/derived relationships recorded in `.demoweave/evidence/manifest.json`.
 
 No external LLM API is required for the core. Claude Code/Codex are the intelligence layer; DemoWeave provides deterministic inspection, execution, evidence capture, rendering, validation, and provenance tooling.
 
@@ -69,8 +76,6 @@ ProjectProfile v1 records supported manifests anywhere in the repository as comp
 
 ## Current development target
 
-**M4: TerminalTrack → polished PNG/GIF.**
+**Pilot P0 — DemoWeave documents DemoWeave.**
 
-The renderer will consume the already-captured terminal Evidence, replay it into a controlled DemoWeave terminal presentation, generate a clean PNG, encode a Markdown-friendly animated GIF with FFmpeg, and register those outputs as derived Evidence. No OBS and no desktop recording.
-
-README embedding itself is the next checkpoint, **Pilot P0 — DemoWeave documents DemoWeave**.
+The next PR will use the shared DemoWeave skill and the already-generated runtime GIF to turn this bootstrap README into the first concise, public-quality dogfood README. The general section-aware Markdown planning/patching engine remains M5; P0 proves the workflow before automating that layer.
