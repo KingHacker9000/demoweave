@@ -28,6 +28,8 @@ export {
   CaptureStepSchema,
   EvidenceKindSchema,
   FlowSchema,
+  FlowSourceDependencyRoleSchema,
+  FlowSourceDependencySchema,
   FlowStepSchema,
   InputStepSchema,
   InteractionTargetSchema,
@@ -43,6 +45,8 @@ export type {
   Assertion,
   EvidenceKind,
   Flow,
+  FlowSourceDependency,
+  FlowSourceDependencyRole,
   FlowStep,
   InteractionTarget,
   TargetStrategy,
@@ -50,6 +54,7 @@ export type {
 } from './flow.js';
 
 export {
+  ContentHashSchema,
   EvidenceFormatSchema,
   EvidenceSchema,
   EvidenceStatusSchema,
@@ -59,6 +64,7 @@ export {
   SourceDependencySchema,
 } from './evidence.js';
 export type {
+  ContentHash,
   Evidence,
   EvidenceFormat,
   EvidenceStatus,
@@ -137,3 +143,22 @@ export type {
   DocumentPreview,
   SectionSelector,
 } from './document-plan.js';
+
+export {
+  DocumentImpactSchema,
+  EvidenceFreshnessSchema,
+  FreshnessReasonCodeSchema,
+  FreshnessReasonSchema,
+  FreshnessReportSchema,
+  FreshnessStateSchema,
+  RegenerationActionSchema,
+  analyzeFreshness,
+} from './freshness.js';
+export type {
+  DocumentImpact,
+  EvidenceFreshness,
+  FreshnessReason,
+  FreshnessReport,
+  FreshnessState,
+  RegenerationAction,
+} from './freshness.js';
