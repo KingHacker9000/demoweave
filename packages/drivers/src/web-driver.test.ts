@@ -149,7 +149,7 @@ test('drives a semantic web Flow and captures fingerprinted screenshot Evidence'
   const evidence = manifest.evidence.find((item) => item.id === 'web-result');
   assert.equal(evidence?.kind, 'screenshot');
   assert.equal(evidence?.format, 'png');
-  assert.equal(evidence?.producer.id, 'web');
+  assert.equal(evidence?.producer?.id, 'web');
   assert.match(evidence?.artifactHash ?? '', /^sha256:[0-9a-f]{64}$/);
   assert.match(evidence?.provenance.flowHash ?? '', /^sha256:[0-9a-f]{64}$/);
   assert.match(evidence?.provenance.sources[0]?.hash ?? '', /^sha256:[0-9a-f]{64}$/);
