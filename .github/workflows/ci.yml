@@ -16,7 +16,14 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-      - run: pnpm install --no-frozen-lockfile
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
       - run: pnpm build
       - run: pnpm test
       - run: pnpm typecheck
+      - name: Smoke test built CLI
+        run: |
+          node packages/cli/dist/index.js --help
+          node packages/cli/dist/index.js doctor
+          node packages/cli/dist/index.js inspect .
+          node packages/cli/dist/index.js validate .

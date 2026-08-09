@@ -9,7 +9,11 @@ const program = new Command();
 program.name('demoweave').description('Agent-native documentation tooling for software repositories').version('0.0.1');
 
 function commandAvailable(command: string): { ok: boolean; version?: string } {
-  const result = spawnSync(command, ['--version'], { encoding: 'utf8', shell: process.platform === 'win32' });
+  const executable = process.platform === 'win32' ? process.env.ComSpec ?? 'cmd.exe' : command;
+  const args = process.platform === 'win32'
+    ? ['/d', '/s', '/c', `${command} --version`]
+    : ['--version'];
+  const result = spawnSync(executable, args, { encoding: 'utf8' });
   return {
     ok: result.status === 0,
     version: (result.stdout || result.stderr || '').trim().split('\n')[0] || undefined,

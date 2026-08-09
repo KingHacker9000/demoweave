@@ -4,13 +4,45 @@
   "title": "DemoWeave ProjectProfile v1",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "name", "root", "analyzedAt", "packageManagers", "languages", "frameworks", "surfaces", "commands", "existingDocs"],
+  "required": ["schemaVersion", "name", "root", "analyzedAt", "packageManagers", "workspace", "packages", "languages", "frameworks", "surfaces", "commands", "existingDocs"],
   "properties": {
     "schemaVersion": { "const": 1 },
     "name": { "type": "string", "minLength": 1 },
     "root": { "type": "string" },
     "analyzedAt": { "type": "string", "format": "date-time" },
     "packageManagers": { "type": "array", "items": { "type": "string" } },
+    "workspace": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["manifest", "patterns"],
+          "properties": {
+            "manifest": { "type": "string", "minLength": 1 },
+            "patterns": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+          }
+        }
+      ]
+    },
+    "packages": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["root", "private", "workspace", "scripts"],
+        "properties": {
+          "name": { "type": "string", "minLength": 1 },
+          "root": { "type": "string", "minLength": 1 },
+          "private": { "type": "boolean" },
+          "workspace": { "type": "boolean" },
+          "scripts": {
+            "type": "object",
+            "additionalProperties": { "type": "string" }
+          }
+        }
+      }
+    },
     "languages": {
       "type": "array",
       "items": {

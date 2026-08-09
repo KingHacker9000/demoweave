@@ -33,6 +33,11 @@ type PackageManifest = {
   json: Record<string, any>;
 };
 
+type WorkspaceInfo = {
+  manifest: string;
+  patterns: string[];
+};
+
 async function exists(file: string): Promise<boolean> {
   try { await fs.access(file); return true; } catch { return false; }
 }
@@ -58,19 +63,89 @@ async function readPackages(root: string): Promise<PackageManifest[]> {
   return out.sort((a, b) => a.file.localeCompare(b.file));
 }
 
+function stripYamlValue(value: string): string {
+  const withoutComment = value.replace(/\s+#.*$/, '').trim();
+  if ((withoutComment.startsWith('"') && withoutComment.endsWith('"')) ||
+      (withoutComment.startsWith("'") && withoutComment.endsWith("'"))) {
+    return withoutComment.slice(1, -1);
+  }
+  return withoutComment;
+}
+
+async function readWorkspace(root: string, rootPackage?: PackageManifest): Promise<WorkspaceInfo | null> {
+  const pnpmManifest = path.join(root, 'pnpm-workspace.yaml');
+  if (await exists(pnpmManifest)) {
+    const lines = (await fs.readFile(pnpmManifest, 'utf8')).split(/\r?\n/);
+    const patterns: string[] = [];
+    let inPackages = false;
+    for (const line of lines) {
+      if (/^packages\s*:\s*$/.test(line.trim())) {
+        inPackages = true;
+        continue;
+      }
+      if (!inPackages) continue;
+      const item = line.match(/^\s+-\s+(.+)$/);
+      if (item?.[1]) {
+        const pattern = stripYamlValue(item[1]);
+        if (pattern) patterns.push(pattern);
+        continue;
+      }
+      if (line.trim() && !/^\s/.test(line)) break;
+    }
+    return { manifest: 'pnpm-workspace.yaml', patterns };
+  }
+
+  const declared = rootPackage?.json.workspaces;
+  const patterns = Array.isArray(declared)
+    ? declared
+    : Array.isArray(declared?.packages)
+      ? declared.packages
+      : [];
+  if (patterns.length) {
+    return {
+      manifest: 'package.json',
+      patterns: patterns.filter((value: unknown): value is string => typeof value === 'string'),
+    };
+  }
+  return null;
+}
+
+async function workspacePackageFiles(root: string, patterns: string[]): Promise<Set<string>> {
+  const packagePatterns = patterns.map((pattern) => {
+    const negative = pattern.startsWith('!');
+    const value = negative ? pattern.slice(1) : pattern;
+    const packagePattern = `${value.replace(/\/$/, '')}/package.json`;
+    return negative ? `!${packagePattern}` : packagePattern;
+  });
+  if (!packagePatterns.length) return new Set();
+  const files = await fg(packagePatterns, { cwd: root, ignore: IGNORE, onlyFiles: true, unique: true });
+  return new Set(files.map((file) => file.replaceAll(path.sep, '/')));
+}
+
+function declaredPackageManager(rootPackage?: PackageManifest): string | undefined {
+  const value = rootPackage?.json.packageManager;
+  if (typeof value !== 'string') return undefined;
+  const match = value.match(/^([^@\s]+)@/);
+  return match?.[1];
+}
+
 export async function analyzeProject(input = '.'): Promise<ProjectProfile> {
   const root = path.resolve(input);
   const packages = await readPackages(root);
   const rootPackage = packages.find((p) => p.root === '.');
+  const workspace = await readWorkspace(root, rootPackage);
+  const memberFiles = await workspacePackageFiles(root, workspace?.patterns ?? []);
+  const activePackages = packages.filter((pkg) => pkg.root === '.' || memberFiles.has(pkg.file));
 
   const packageManagers: string[] = [];
-  if (await exists(path.join(root, 'pnpm-lock.yaml'))) packageManagers.push('pnpm');
+  if (await exists(path.join(root, 'pnpm-lock.yaml')) || workspace?.manifest === 'pnpm-workspace.yaml') packageManagers.push('pnpm');
   if (await exists(path.join(root, 'yarn.lock'))) packageManagers.push('yarn');
   if (await exists(path.join(root, 'package-lock.json'))) packageManagers.push('npm');
   if (await exists(path.join(root, 'bun.lockb')) || await exists(path.join(root, 'bun.lock'))) packageManagers.push('bun');
   if (await exists(path.join(root, 'uv.lock'))) packageManagers.push('uv');
   if (await exists(path.join(root, 'poetry.lock'))) packageManagers.push('poetry');
-  if (!packageManagers.length && packages.length) packageManagers.push('npm');
+  const declaredManager = declaredPackageManager(rootPackage);
+  if (declaredManager) packageManagers.push(declaredManager);
 
   const sourceFiles = await fg(['**/*.{ts,tsx,js,jsx,py,rs,go,java,kt,swift,c,h,cpp,hpp,cs,rb,php,r,lua,sh,ipynb}'], {
     cwd: root, ignore: IGNORE, onlyFiles: true
@@ -95,7 +170,7 @@ export async function analyzeProject(input = '.'): Promise<ProjectProfile> {
     surfaces.push({ ...surface, id });
   };
 
-  for (const pkg of packages) {
+  for (const pkg of activePackages) {
     const deps = { ...(pkg.json.dependencies ?? {}), ...(pkg.json.devDependencies ?? {}) } as Record<string, string>;
     for (const fw of FRAMEWORKS) {
       if (!deps[fw.dep]) continue;
@@ -114,7 +189,7 @@ export async function analyzeProject(input = '.'): Promise<ProjectProfile> {
       }
     }
 
-    if (!pkg.json.private && (pkg.json.exports || pkg.json.main || pkg.json.module || pkg.json.types)) {
+    if (pkg.json.exports || pkg.json.main || pkg.json.module || pkg.json.types) {
       addSurface({ type: 'library', root: pkg.root, confidence: 0.85, packageName: pkg.json.name, label: pkg.json.name });
     }
   }
@@ -125,17 +200,32 @@ export async function analyzeProject(input = '.'): Promise<ProjectProfile> {
   const researchDirs = await fg(['experiments', 'evaluation', 'eval', 'benchmarks', 'training'], { cwd: root, ignore: IGNORE, onlyDirectories: true, deep: 3 });
   if (researchDirs.length) addSurface({ type: 'research', root: researchDirs[0]!, confidence: 0.7, label: 'Research workflow' });
 
-  const docs = await fg(['README.md', 'CONTRIBUTING.md', 'ARCHITECTURE.md', 'CHANGELOG.md', 'docs/**/*.md'], { cwd: root, ignore: IGNORE, onlyFiles: true, unique: true });
+  const docs = await fg([
+    'README.md',
+    'ROADMAP.md',
+    'CONTRIBUTING.md',
+    'ARCHITECTURE.md',
+    'CHANGELOG.md',
+    'docs/**/*.md',
+  ], { cwd: root, ignore: IGNORE, onlyFiles: true, unique: true });
 
   const scripts = (rootPackage?.json.scripts ?? {}) as Record<string, string>;
-  const pm = packageManagers[0] ?? 'npm';
-  const runScript = (name: string) => pm === 'npm' ? `npm run ${name}` : `${pm} ${name}`;
+  const scriptManager = packageManagers.find((manager) => ['pnpm', 'yarn', 'npm', 'bun'].includes(manager));
+  const runScript = (name: string) => scriptManager === 'npm' ? `npm run ${name}` : `${scriptManager} ${name}`;
+  const installCommand: Record<string, string> = {
+    pnpm: 'pnpm install',
+    yarn: 'yarn install',
+    npm: 'npm install',
+    bun: 'bun install',
+    uv: 'uv sync',
+    poetry: 'poetry install',
+  };
   const commands = {
-    install: packages.length ? [pm === 'npm' ? 'npm install' : `${pm} install`] : [],
-    build: Object.keys(scripts).filter((x) => x === 'build' || x.startsWith('build:')).map(runScript),
-    test: Object.keys(scripts).filter((x) => x === 'test' || x.startsWith('test:')).map(runScript),
+    install: [...new Set(packageManagers)].flatMap((manager) => installCommand[manager] ? [installCommand[manager]] : []),
+    build: scriptManager ? Object.keys(scripts).filter((x) => x === 'build' || x.startsWith('build:')).map(runScript) : [],
+    test: scriptManager ? Object.keys(scripts).filter((x) => x === 'test' || x.startsWith('test:')).map(runScript) : [],
     run: [
-      ...Object.keys(scripts).filter((x) => ['dev', 'start', 'serve'].includes(x)).map(runScript),
+      ...(scriptManager ? Object.keys(scripts).filter((x) => ['dev', 'start', 'serve'].includes(x)).map(runScript) : []),
       ...surfaces.filter((x) => x.type === 'terminal' && x.command).map((x) => x.command!)
     ]
   };
@@ -146,6 +236,18 @@ export async function analyzeProject(input = '.'): Promise<ProjectProfile> {
     root: '.',
     analyzedAt: new Date().toISOString(),
     packageManagers: [...new Set(packageManagers)],
+    workspace,
+    packages: activePackages.map((pkg) => ({
+      ...(typeof pkg.json.name === 'string' && pkg.json.name ? { name: pkg.json.name } : {}),
+      root: pkg.root,
+      private: pkg.json.private === true,
+      workspace: pkg.root !== '.' && memberFiles.has(pkg.file),
+      scripts: Object.fromEntries(
+        Object.entries(pkg.json.scripts ?? {})
+          .filter((entry): entry is [string, string] => typeof entry[1] === 'string')
+          .sort(([a], [b]) => a.localeCompare(b)),
+      ),
+    })),
     languages,
     frameworks: frameworks.sort((a, b) => a.name.localeCompare(b.name) || a.root.localeCompare(b.root)),
     surfaces: surfaces.sort((a, b) => a.type.localeCompare(b.type) || a.id.localeCompare(b.id)),
