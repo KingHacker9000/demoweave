@@ -65,7 +65,7 @@ The repository includes a [shared DemoWeave skill](skills/demoweave/SKILL.md) th
 
 ## Quick start
 
-DemoWeave is currently a private pnpm workspace, not a published npm package. Use it from a repository checkout.
+DemoWeave is currently a source pnpm workspace, not a published npm package. Use it from a repository checkout.
 
 Requirements: Node.js 20+, pnpm, and optionally FFmpeg for GIF rendering.
 
