@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://demoweave.dev/schemas/document-plan.schema.json",
+  "title": "DemoWeave DocumentPlan v1",
+  "description": "A deterministic plan for reviewed, source-preserving Markdown changes. Operation ids must be unique; this is additionally enforced by runtime validation.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "id", "target", "baseHash", "operations"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "id": { "type": "string", "minLength": 1 },
+    "target": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Portable project-relative target path. Runtime validation rejects absolute paths, traversal, and symlink escape."
+    },
+    "baseHash": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "operations": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/operation" }
+    }
+  },
+  "$defs": {
+    "sectionSelector": {
+      "type": "string",
+      "minLength": 1,
+      "description": "A deterministic section id emitted by docs inspect."
+    },
+    "anchor": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "sectionId"],
+          "properties": {
+            "kind": { "enum": ["before", "after"] },
+            "sectionId": { "$ref": "#/$defs/sectionSelector" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind"],
+          "properties": {
+            "kind": { "enum": ["document-start", "document-end"] }
+          }
+        }
+      ]
+    },
+    "operation": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "type", "sectionId"],
+          "properties": {
+            "id": { "type": "string", "minLength": 1 },
+            "type": { "const": "preserve" },
+            "sectionId": { "$ref": "#/$defs/sectionSelector" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "type", "sectionId", "markdown"],
+          "properties": {
+            "id": { "type": "string", "minLength": 1 },
+            "type": { "const": "edit" },
+            "sectionId": { "$ref": "#/$defs/sectionSelector" },
+            "markdown": { "type": "string" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "type", "sectionId", "markdown"],
+          "properties": {
+            "id": { "type": "string", "minLength": 1 },
+            "type": { "const": "replace" },
+            "sectionId": { "$ref": "#/$defs/sectionSelector" },
+            "markdown": { "type": "string", "minLength": 1 }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "type", "anchor", "markdown"],
+          "properties": {
+            "id": { "type": "string", "minLength": 1 },
+            "type": { "const": "create" },
+            "anchor": { "$ref": "#/$defs/anchor" },
+            "markdown": { "type": "string", "minLength": 1 }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "type", "sectionId", "reason"],
+          "properties": {
+            "id": { "type": "string", "minLength": 1 },
+            "type": { "const": "remove" },
+            "sectionId": { "$ref": "#/$defs/sectionSelector" },
+            "reason": { "type": "string", "minLength": 1, "pattern": "\\S" }
+          }
+        }
+      ]
+    }
+  }
+}

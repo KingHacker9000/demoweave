@@ -32,13 +32,14 @@ jobs:
       - run: pnpm build
       - run: pnpm test
       - run: pnpm typecheck
-      - name: Smoke test built CLI, terminal execution, and M4 rendering
+      - name: Smoke test built CLI, terminal execution, M4 rendering, and M5 docs
         run: |
           node packages/cli/dist/index.js --help
           node packages/cli/dist/index.js doctor
           node packages/cli/dist/index.js init .
           node packages/cli/dist/index.js inspect .
           node packages/cli/dist/index.js status .
+          node packages/cli/dist/index.js docs inspect README.md --json
           node packages/cli/dist/index.js validate .
           node packages/cli/dist/index.js run inspect-project
           node packages/cli/dist/index.js render inspect-project-terminal --format png

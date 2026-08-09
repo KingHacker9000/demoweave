@@ -89,6 +89,35 @@ export {
   TerminalTrackSchema,
   TerminalTrackStatusSchema,
 } from './terminal-track.js';
+
+export {
+  DocumentAnchorSchema,
+  DocumentOperationSchema,
+  DocumentPlanError,
+  DocumentPlanSchema,
+  applyDocumentPlanFile,
+  canonicalDocumentPlan,
+  discardDocumentPlanFile,
+  inspectMarkdown,
+  inspectMarkdownFile,
+  normalizeProjectRelativePath,
+  parseDocumentPlan,
+  previewDocument,
+  previewDocumentPlanFile,
+} from './document-plan.js';
+export type {
+  DocumentAnchor,
+  DocumentApplyResult,
+  DocumentOperation,
+  DocumentOperationSummary,
+  DocumentPlan,
+  DocumentPlanIssue,
+  DocumentPreview,
+  MarkdownInspection,
+  MarkdownSection,
+  SourcePoint,
+  SourceRange,
+} from './document-plan.js';
 export type {
   TerminalCommand,
   TerminalCommandStatus,

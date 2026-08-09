@@ -28,6 +28,21 @@ Use DemoWeave when the user asks to create, improve, update, or validate documen
 12. Rendered Evidence uses the configured `.demoweave/config.json` `mediaDir`, derives from the source terminal Evidence, and is indexed in Manifest v1. A direct TerminalTrack path can also be rendered, but only indexed source Evidence produces a derived manifest entry.
 13. Run `demoweave validate .` after editing, executing, or rendering DemoWeave metadata. Fix schema and cross-reference errors before relying on the Flow/manifest.
 
+## Safe Markdown planning and patching
+
+Use the reviewed document workflow for intentional Markdown changes instead of rewriting a target wholesale:
+
+1. Run `demoweave docs inspect <markdown-path> --json` and use its project-relative target, base content hash, deterministic section IDs, hierarchy, and source ranges.
+2. Author DocumentPlan v1 JSON under `.demoweave/plans/`. Give every operation a unique `id`, copy the inspected `baseHash`, and carry the Markdown content you intend to insert.
+3. Run `demoweave docs preview <plan-path>`. Review or present the operation summary, bounded unified diff, and review token. Preview keeps the target untouched.
+4. If the prose or operation scope needs refinement, edit only the plan and preview again. A semantic plan or candidate change produces a different token.
+5. Apply only the reviewed candidate with `demoweave docs apply <plan-path> --review <token>`. Apply reloads the plan and target, rejects a stale base or mismatched token, rebuilds the candidate, and writes atomically.
+6. Run `demoweave docs discard <plan-path>` when a plan is no longer needed. Discard removes only the plan and never edits its target.
+
+Use `preserve` to assert that a full selected subtree stays byte-identical. Use `edit` to replace only a selected heading's direct body while keeping its heading and nested child sections. Use `replace` for the complete selected subtree, `create` with a deterministic before/after/document-start/document-end anchor, and `remove` for a complete subtree only with a non-empty reason. Markdown payloads are exact replacement or insertion source; include the intended blank lines and heading syntax. DemoWeave normalizes inserted line endings to CRLF only for a consistently CRLF target and otherwise splices untouched source ranges byte-for-byte.
+
+All document and plan paths must be project-relative. Do not bypass traversal, absolute-path, conflict, preservation, stale-hash, review-token, or symlink-escape failures. Published plan syntax lives in `schemas/document-plan.schema.json`.
+
 ## Current terminal execution and rendering boundaries
 
 DemoWeave executes non-interactive terminal Flows through a process/pipe session. It supports `run`, duration/process-exit/file-exists waits, output/exit-code/file-exists assertions, and terminal capture. A `run` expects exit code `0` unless its optional `expectedExitCodes` declares another accepted integer result. Unsupported terminal actions fail explicitly. The M4 renderer turns TerminalTrack v1 into PNG or GIF without a browser runtime; GIF encoding requires optional FFmpeg. Interactive PTY input and browser/desktop/mobile capture are not available yet.

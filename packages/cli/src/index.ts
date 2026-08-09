@@ -4,9 +4,14 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import {
+  DocumentPlanError,
   analyzeProject,
+  applyDocumentPlanFile,
+  discardDocumentPlanFile,
   FlowSchema,
+  inspectMarkdownFile,
   ManifestSchema,
+  previewDocumentPlanFile,
   ProjectProfileSchema,
   validateMetadataBindings,
   type FlowFile,
@@ -52,6 +57,18 @@ async function exists(file: string): Promise<boolean> {
 
 async function ensureDir(root: string) {
   await fs.mkdir(path.join(root, '.demoweave'), { recursive: true });
+}
+
+function reportDocumentError(error: unknown): void {
+  const code = error instanceof DocumentPlanError ? error.code : 'DOCUMENT_COMMAND_FAILED';
+  console.error(`${code}: ${error instanceof Error ? error.message : String(error)}`);
+  if (error instanceof DocumentPlanError) {
+    for (const issue of error.issues) {
+      const location = [issue.path, issue.operationId].filter(Boolean).join(' / ');
+      console.error(`  ${location ? `${location}: ` : ''}${issue.message}`);
+    }
+  }
+  process.exitCode = 1;
 }
 
 function repoRelative(root: string, target: string): string {
@@ -105,8 +122,10 @@ program.command('init').description('Initialize DemoWeave metadata in a reposito
   const metadataRoot = path.join(root, '.demoweave');
   const flowDir = path.join(metadataRoot, 'flows');
   const evidenceDir = path.join(metadataRoot, 'evidence');
+  const plansDir = path.join(metadataRoot, 'plans');
   await fs.mkdir(flowDir, { recursive: true });
   await fs.mkdir(evidenceDir, { recursive: true });
+  await fs.mkdir(plansDir, { recursive: true });
 
   const configPath = path.join(metadataRoot, 'config.json');
   if (!(await exists(configPath))) {
@@ -126,6 +145,7 @@ program.command('init').description('Initialize DemoWeave metadata in a reposito
 
   console.log(`Initialized ${repoRelative(process.cwd(), metadataRoot)}`);
   console.log(`Flows: ${repoRelative(process.cwd(), flowDir)}`);
+  console.log(`Document plans: ${repoRelative(process.cwd(), plansDir)}`);
   console.log(`Evidence manifest: ${repoRelative(process.cwd(), manifestPath)}`);
 });
 
@@ -237,6 +257,99 @@ program.command('render')
       const code = error instanceof RendererError ? error.code : 'RENDER_FAILED';
       console.error(`${code}: ${error instanceof Error ? error.message : String(error)}`);
       process.exitCode = 1;
+    }
+  });
+
+const docs = program.command('docs').description('Inspect and safely patch Markdown documents');
+
+docs.command('inspect')
+  .description('Inspect a Markdown document into deterministic source-positioned sections')
+  .argument('<markdown-path>', 'project-relative Markdown path')
+  .option('--project <path>', 'project root', '.')
+  .option('--json', 'print structured JSON')
+  .action(async (target, options) => {
+    try {
+      const inspection = await inspectMarkdownFile(options.project, target);
+      if (options.json) {
+        console.log(JSON.stringify(inspection, null, 2));
+        return;
+      }
+      console.log(`Document: ${inspection.target}`);
+      console.log(`Content hash: ${inspection.contentHash}`);
+      console.log(`Newlines: ${inspection.newlineStyle.toUpperCase()}; trailing newline: ${inspection.trailingNewline ? 'yes' : 'no'}`);
+      console.log('Sections:');
+      for (const section of inspection.sections) {
+        const label = section.kind === 'preamble' ? '[preamble]' : `${'#'.repeat(section.level)} ${section.heading}`;
+        console.log(`  ${section.id.padEnd(32)} ${label}`);
+      }
+    } catch (error) {
+      reportDocumentError(error);
+    }
+  });
+
+docs.command('preview')
+  .description('Validate a DocumentPlan and preview its exact in-memory candidate')
+  .argument('<plan-path>', 'project-relative DocumentPlan v1 JSON path')
+  .option('--project <path>', 'project root', '.')
+  .option('--json', 'print structured JSON')
+  .action(async (planPath, options) => {
+    try {
+      const preview = await previewDocumentPlanFile(options.project, planPath);
+      if (options.json) {
+        console.log(JSON.stringify(preview, null, 2));
+        return;
+      }
+      console.log(`Document plan: ${preview.plan.id}`);
+      console.log(`Target: ${preview.plan.target}\n`);
+      console.log('Operations:');
+      const markers = { preserve: '=', edit: '~', replace: '~', create: '+', remove: '-' } as const;
+      for (const operation of preview.operations) console.log(`  ${markers[operation.type]} ${operation.description} [${operation.id}]`);
+      console.log(`\n${preview.unifiedDiff.trimEnd()}\n`);
+      console.log('Review token:');
+      console.log(preview.reviewToken);
+    } catch (error) {
+      reportDocumentError(error);
+    }
+  });
+
+docs.command('apply')
+  .description('Atomically apply a DocumentPlan only with its matching review token')
+  .argument('<plan-path>', 'project-relative DocumentPlan v1 JSON path')
+  .requiredOption('--review <token>', 'review token emitted by docs preview')
+  .option('--project <path>', 'project root', '.')
+  .option('--json', 'print structured JSON')
+  .action(async (planPath, options) => {
+    try {
+      const result = await applyDocumentPlanFile(options.project, planPath, options.review);
+      if (options.json) {
+        console.log(JSON.stringify(result, null, 2));
+        return;
+      }
+      console.log(`Applied document plan: ${result.plan.id}`);
+      console.log(`Target: ${result.plan.target}`);
+      console.log(`Changed: ${result.changed ? 'yes' : 'no'}`);
+      console.log('Operations:');
+      for (const operation of result.operations) {
+        const status = operation.changed ? 'CHANGED' : operation.type === 'preserve' ? 'PRESERVED' : 'UNCHANGED';
+        console.log(`  ${status.padEnd(9)} ${operation.description} [${operation.id}]`);
+      }
+    } catch (error) {
+      reportDocumentError(error);
+    }
+  });
+
+docs.command('discard')
+  .description('Discard a DocumentPlan without touching its target')
+  .argument('<plan-path>', 'project-relative DocumentPlan v1 JSON path')
+  .option('--project <path>', 'project root', '.')
+  .option('--json', 'print structured JSON')
+  .action(async (planPath, options) => {
+    try {
+      const discarded = await discardDocumentPlanFile(options.project, planPath);
+      if (options.json) console.log(JSON.stringify({ discarded }, null, 2));
+      else console.log(`Discarded document plan: ${discarded}`);
+    } catch (error) {
+      reportDocumentError(error);
     }
   });
 
