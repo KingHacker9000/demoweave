@@ -66,7 +66,7 @@ test('inspects ATX sections deterministically, ignores fenced pseudo-headings, a
   assert.equal(first.sections.some((section) => section.heading === 'Not a real heading'), false);
 });
 
-test('reports CRLF/no-trailing-newline and supports documents with no headings', () => {
+test('reports CRLF/no-trailing-newline and supports headingless, Unicode-heading, and empty sections', () => {
   const crlf = inspectMarkdownSource('docs/guide.md', '# A\r\nbody\r\n# B');
   assert.equal(crlf.newline, 'crlf');
   assert.equal(crlf.trailingNewline, false);
@@ -77,6 +77,14 @@ test('reports CRLF/no-trailing-newline and supports documents with no headings',
   assert.equal(plain.sections.length, 1);
   assert.equal(plain.sections[0]?.id, 'preamble');
   assert.equal(plain.sections[0]?.end, 'plain unicode π text'.length);
+
+  const unicode = inspectMarkdownSource('unicode.md', '# ಕನ್ನಡ ಶೀರ್ಷಿಕೆ\n\n## 空の節\n# Next\nbody\n');
+  assert.deepEqual(unicode.sections.slice(1).map((section) => section.heading), ['ಕನ್ನಡ ಶೀರ್ಷಿಕೆ', '空の節', 'Next']);
+  const empty = unicode.sections.find((section) => section.heading === '空の節')!;
+  assert.equal(unicode.targetPath, 'unicode.md');
+  assert.equal(unicode.sections.some((section) => section.id.includes('heading')), false);
+  assert.equal(unicode.sections.find((section) => section.heading === 'Next')?.start, empty.end);
+  assert.equal(unicode.sections[0]?.start, 0);
 });
 
 test('previews preserve/edit/create operations without mutating the target, then applies only the reviewed candidate', async (context) => {
@@ -212,7 +220,7 @@ test('apply rejects missing/wrong review tokens, changed plans, and stale target
   await assert.rejects(() => applyDocumentPlan(root, planPath, preview.reviewToken), (error: unknown) => errorCode(error) === 'STALE_BASE');
 });
 
-test('discard deletes only the plan and leaves the document byte-for-byte unchanged', async (context) => {
+test('discard deletes valid or malformed plans and leaves the document byte-for-byte unchanged', async (context) => {
   const root = await fixture(context);
   const source = '# Keep\nunchanged\n';
   const target = path.join(root, 'README.md');
@@ -228,6 +236,12 @@ test('discard deletes only the plan and leaves the document byte-for-byte unchan
   });
   await discardDocumentPlan(root, planPath);
   await assert.rejects(() => fs.access(path.join(root, planPath)));
+  assert.equal(await fs.readFile(target, 'utf8'), source);
+
+  const malformed = '.demoweave/plans/malformed.json';
+  await fs.writeFile(path.join(root, malformed), '{ definitely not json');
+  await discardDocumentPlan(root, malformed);
+  await assert.rejects(() => fs.access(path.join(root, malformed)));
   assert.equal(await fs.readFile(target, 'utf8'), source);
 });
 
@@ -263,9 +277,14 @@ test('DocumentPlan v1 runtime schema and published JSON Schema expose all five o
   };
   assert.equal(DocumentPlanSchema.safeParse(sample).success, true);
   assert.equal(DocumentPlanSchema.safeParse({ ...sample, operations: [...sample.operations, sample.operations[0]] }).success, false);
+  assert.equal(DocumentPlanSchema.safeParse({
+    ...sample,
+    operations: [{ id: 'x', type: 'remove', selector: { sectionId: 'section-c' }, reason: '   ' }],
+  }).success, false);
 
   const published = JSON.parse(await fs.readFile(path.join(repository, 'schemas', 'document-plan.schema.json'), 'utf8')) as any;
   assert.equal(published.properties.schemaVersion.const, 1);
   assert.equal(published.$defs.operation.oneOf.length, 5);
   assert.deepEqual(published.$defs.operation.oneOf.map((item: any) => item.properties.type.const), ['preserve', 'edit', 'replace', 'create', 'remove']);
+  assert.equal(published.$defs.operation.oneOf[4].properties.reason.pattern, '\\S');
 });
