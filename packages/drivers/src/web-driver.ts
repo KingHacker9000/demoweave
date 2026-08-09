@@ -293,11 +293,12 @@ export class WebDriver implements SurfaceDriver {
     const timeout = step.timeoutMs ?? this.actionTimeoutMs;
     switch (step.condition.kind) {
       case 'duration': {
-        if (step.condition.ms > timeout) {
+        const durationMs = step.condition.ms;
+        if (durationMs > timeout) {
           await new Promise((resolve) => setTimeout(resolve, timeout));
           return this.failure(step.id, 'WAIT_TIMEOUT', `Duration wait exceeded its ${timeout}ms timeout`);
         }
-        await new Promise((resolve) => setTimeout(resolve, step.condition.ms));
+        await new Promise((resolve) => setTimeout(resolve, durationMs));
         return { stepId: step.id, status: 'passed' };
       }
       case 'visible':
