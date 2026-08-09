@@ -167,7 +167,7 @@ test('profiles DemoWeave workspace members while retaining nested manifest facts
   assert.deepEqual(profile.commands.build, ['pnpm build']);
   assert.deepEqual(profile.commands.test, ['pnpm test']);
   assert.deepEqual(profile.commands.run, ['demoweave']);
-  assert.deepEqual(profile.existingDocs, ['README.md', 'ROADMAP.md', 'docs/M5_DOGFOOD.md']);
+  assert.deepEqual(profile.existingDocs, ['README.md', 'ROADMAP.md', 'docs/M5_DOGFOOD.md', 'docs/M7_DESIGN.md']);
 });
 
 test('keeps component, workspace, path, and surface identifiers deterministic', async () => {
