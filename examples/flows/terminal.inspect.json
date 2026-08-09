@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "id": "inspect-project",
+  "title": "Inspect a project",
+  "surfaceId": "terminal-demoweave-cli",
+  "steps": [
+    {
+      "id": "run-inspect",
+      "type": "run",
+      "command": "demoweave",
+      "args": ["inspect", "."]
+    },
+    {
+      "id": "assert-surfaces",
+      "type": "assert",
+      "assertion": {
+        "kind": "outputContains",
+        "stream": "stdout",
+        "value": "Detected surfaces"
+      }
+    },
+    {
+      "id": "capture-terminal",
+      "type": "capture",
+      "evidenceId": "inspect-project-terminal",
+      "kind": "terminal"
+    }
+  ]
+}
