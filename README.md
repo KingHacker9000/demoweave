@@ -1,81 +1,128 @@
 # DemoWeave
 
-DemoWeave is an agent-native documentation studio for software repositories.
+**Runtime evidence for agent-authored software documentation.**
 
-The goal is to let Claude Code or Codex understand a project, run the surfaces users interact with, collect real runtime evidence, and produce clean written + visual documentation: READMEs, guides, screenshots, GIFs, and full tutorials.
+DemoWeave helps Claude Code, Codex, and other coding agents ground documentation in verified repository facts and captured runtime behavior. The agent decides what to explain and writes the document; DemoWeave inspects the repository, executes declared workflows, records evidence with provenance, and renders terminal media.
 
-DemoWeave is designed for more than websites. A repository may expose web, CLI, desktop, mobile, library/SDK, notebook, research, and other surfaces at the same time.
+![DemoWeave inspecting its own repository in a captured terminal workflow](docs-media/inspect-project-terminal.gif)
 
-> **M0–M4 are complete.** DemoWeave can analyze a repository, execute terminal Flows, capture structured terminal Evidence, and render that Evidence into polished PNG/GIF assets with provenance. **Pilot P0 is now using DemoWeave to document DemoWeave itself.** See [ROADMAP.md](./ROADMAP.md).
+*DemoWeave inspecting DemoWeave: the committed `inspect-project` Flow ran the built CLI, captured terminal evidence, and rendered this GIF. It demonstrates the current evidence pipeline—not automatic README generation.*
+
+## Why DemoWeave
+
+Many AI documentation workflows stop at:
+
+```text
+source code → LLM → Markdown
+```
+
+DemoWeave adds a verifiable runtime path:
+
+```text
+understand → run → capture evidence → render → document
+```
+
+The result is a shared workflow in which an agent supplies reasoning and writing while DemoWeave supplies deterministic inspection, execution, evidence, rendering, validation, and provenance.
+
+## What works today
+
+| Capability | Status | Current scope |
+|---|---|---|
+| Repository analysis | Available | `ProjectProfile v1` with baseline Node, Python, Rust, and Go manifest analysis |
+| Multi-surface model | Available | One profile can record multiple components, entrypoints, frameworks, and typed surfaces |
+| Terminal workflows | Available | Non-interactive `Flow v1` execution with process runs, waits, assertions, and capture |
+| Evidence and provenance | Available | `TerminalTrack v1`, `Evidence v1`, and `Manifest v1` with source and derived relationships |
+| Terminal rendering | Available | Headless PNG rendering; GIF rendering when FFmpeg is installed |
+| Web, desktop, mobile, notebook, and research execution | Planned | Surface drivers are not implemented yet |
+| Automatic Markdown updates and stale tracking | Planned | Roadmap milestones M5 and M6 |
+| Composed or narrated tutorials | Planned | Roadmap milestones M8–M10 |
+
+Interactive PTY input, Playwright capture, native desktop/mobile automation, arbitrary GUI screenshots, and complete video/tutorial generation are outside the current implementation.
+
+## How it works
+
+```mermaid
+flowchart LR
+    R["Repository"] --> A["Claude Code / Codex"]
+    A --> I["demoweave inspect"]
+    I --> P["ProjectProfile v1"]
+    P --> A
+    A --> F["Flow v1"]
+    F --> D["Terminal driver"]
+    D --> E["Evidence + Manifest"]
+    E --> V["Terminal renderer"]
+    V --> M["PNG / GIF"]
+    E --> A
+    M --> A
+    A --> O["README / docs"]
+```
+
+The repository includes a [shared DemoWeave skill](skills/demoweave/SKILL.md) that gives coding agents the same platform-neutral workflow. It is a checked-in agent playbook, not a separately published Claude Code or Codex plugin.
+
+## Quick start
+
+DemoWeave is currently a private pnpm workspace, not a published npm package. Use it from a repository checkout.
+
+Requirements: Node.js 20+, pnpm, and optionally FFmpeg for GIF rendering.
+
+```bash
+git clone https://github.com/KingHacker9000/demoweave.git
+cd demoweave
+pnpm install --frozen-lockfile
+pnpm build
+
+node packages/cli/dist/index.js doctor
+node packages/cli/dist/index.js inspect .
+node packages/cli/dist/index.js validate .
+```
+
+`inspect` writes the generated `.demoweave/project.json` profile. `validate` checks the profile, committed Flows, Evidence manifest, and cross-file bindings.
+
+## Run the dogfood workflow
+
+This repository ships the Flow and source evidence used by the animation above:
+
+```bash
+node packages/cli/dist/index.js run inspect-project
+node packages/cli/dist/index.js render inspect-project-terminal --format png
+node packages/cli/dist/index.js render inspect-project-terminal --format gif
+node packages/cli/dist/index.js validate .
+```
+
+The workflow produces or updates:
+
+- `.demoweave/project.json` — generated repository facts
+- `.demoweave/evidence/artifacts/inspect-project-terminal.terminal.json` — renderer-independent terminal capture
+- `.demoweave/evidence/manifest.json` — Flow, Evidence, provenance, and derivation records
+- `docs-media/inspect-project-terminal.png` and `.gif` — rendered documentation assets
+
+Use `node packages/cli/dist/index.js --help` for the complete command list, including `init`, `status`, `run`, `render`, and `validate`.
+
+## Core concepts
+
+- **ProjectProfile** — deterministic facts about components, ecosystems, manifests, workspaces, entrypoints, commands, docs, and surfaces.
+- **Flow** — a surface-neutral sequence of semantic actions. The current terminal driver implements process runs, supported waits and assertions, and terminal capture.
+- **Evidence** — a typed artifact record with lifecycle, producer, provenance, and optional derivation metadata.
+- **Manifest** — the project index that connects Flows to source and derived Evidence.
+
+The versioned JSON contracts live in [`schemas/`](schemas/).
+
+## Project status
+
+DemoWeave is in active development. M0–M4 established the monorepo, repository analyzer, Flow/Evidence contracts, terminal driver, and PNG/GIF renderer. Pilot P0 is dogfooding that stack on this README; safe Markdown planning is next.
+
+See [ROADMAP.md](ROADMAP.md) for milestone boundaries and future surface drivers. P0 does not mark the Markdown planner, stale regeneration, browser automation, or tutorial composition as shipped.
 
 ## Development
 
-Requirements:
-
-- Node.js 20+
-- pnpm
-- FFmpeg only when GIF rendering is needed
-
 ```bash
-pnpm install
 pnpm build
 pnpm test
 pnpm typecheck
 ```
 
-After building, the CLI package exposes:
+CI runs the build, tests, typecheck, CLI workflow, and renderer smoke tests on Ubuntu and Windows.
 
-```bash
-pnpm --filter @demoweave/cli exec demoweave --help
-```
+## License
 
-## Current capabilities
-
-```bash
-demoweave doctor
-demoweave init .
-demoweave inspect .
-demoweave status .
-demoweave validate .
-demoweave run <flow-id-or-path>
-demoweave render <evidence-id-or-path> --format png
-demoweave render <evidence-id-or-path> --format gif
-```
-
-Current compatibility/runtime contracts include:
-
-- `ProjectProfile v1`
-- `Flow v1`
-- `Evidence v1`
-- `Manifest v1`
-- `SurfaceDriver v1`
-- `TerminalTrack v1`
-
-The analyzer records ecosystem-neutral repository facts for Node, Python, Rust, and Go projects while allowing one repository to expose multiple surfaces. Flow v1 describes semantic actions without baking in Playwright, Appium, terminal-recorder, or renderer-specific implementation details.
-
-The first runtime driver is terminal-native. DemoWeave executes non-interactive CLI workflows through lightweight process pipes rather than recording the user's personal terminal window. Captures preserve ordered input/stdout/stderr events and ANSI output in a renderer-independent TerminalTrack, then update Evidence/Manifest provenance atomically.
-
-The renderer consumes those tracks separately from execution. It replays terminal content into a controlled DemoWeave presentation, rasterizes PNGs headlessly, and can use FFmpeg to encode short README-friendly GIFs. No OBS, Electron, Chromium, or desktop recording is required for terminal media.
-
-The repository already dogfoods the full path:
-
-```bash
-node packages/cli/dist/index.js inspect .
-node packages/cli/dist/index.js run inspect-project
-node packages/cli/dist/index.js render inspect-project-terminal --format png
-node packages/cli/dist/index.js render inspect-project-terminal --format gif
-```
-
-Committed pilot artifacts live under `docs-media/`, with source/derived relationships recorded in `.demoweave/evidence/manifest.json`.
-
-No external LLM API is required for the core. Claude Code/Codex are the intelligence layer; DemoWeave provides deterministic inspection, execution, evidence capture, rendering, validation, and provenance tooling.
-
-### Component discovery boundary
-
-ProjectProfile v1 records supported manifests anywhere in the repository as components. To avoid presenting fixtures and examples as user-facing surfaces, automatic surface detection is currently limited to repository-root components and members of a workspace declared at the repository root. Other nested components remain visible as deterministic facts and can gain explicit surface-selection semantics later without changing the component model.
-
-## Current development target
-
-**Pilot P0 — DemoWeave documents DemoWeave.**
-
-The next PR will use the shared DemoWeave skill and the already-generated runtime GIF to turn this bootstrap README into the first concise, public-quality dogfood README. The general section-aware Markdown planning/patching engine remains M5; P0 proves the workflow before automating that layer.
+[MIT](LICENSE)
