@@ -1,0 +1,202 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://demoweave.dev/schemas/project.schema.json",
+  "title": "DemoWeave ProjectProfile v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "name", "root", "analyzedAt", "packageManagers", "workspaces", "components", "languages", "frameworks", "surfaces", "commands", "existingDocs"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "name": { "type": "string", "minLength": 1 },
+    "root": { "type": "string" },
+    "analyzedAt": { "type": "string", "format": "date-time" },
+    "packageManagers": { "type": "array", "items": { "type": "string" } },
+    "workspaces": { "type": "array", "items": { "$ref": "#/$defs/workspace" } },
+    "components": { "type": "array", "items": { "$ref": "#/$defs/component" } },
+    "languages": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "files"],
+        "properties": {
+          "name": { "type": "string" },
+          "files": { "type": "integer", "minimum": 0 }
+        }
+      }
+    },
+    "frameworks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "root"],
+        "properties": {
+          "name": { "type": "string" },
+          "root": { "type": "string" },
+          "version": { "type": "string" }
+        }
+      }
+    },
+    "surfaces": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "type", "root"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "type": { "enum": ["terminal", "web", "library", "notebook", "research", "desktop", "mobile", "service", "unknown"] },
+          "root": { "type": "string", "minLength": 1 },
+          "componentId": { "type": "string", "minLength": 1 },
+          "label": { "type": "string" },
+          "framework": { "type": "string" },
+          "command": { "type": "string" }
+        }
+      }
+    },
+    "commands": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["install", "build", "test", "run"],
+      "properties": {
+        "install": { "type": "array", "items": { "type": "string" } },
+        "build": { "type": "array", "items": { "type": "string" } },
+        "test": { "type": "array", "items": { "type": "string" } },
+        "run": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "existingDocs": { "type": "array", "items": { "type": "string" } }
+  },
+  "$defs": {
+    "ecosystem": { "enum": ["node", "python", "rust", "go"] },
+    "manifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "path"],
+      "properties": {
+        "kind": { "enum": ["package.json", "pyproject.toml", "Cargo.toml", "go.mod", "pnpm-workspace.yaml"] },
+        "path": { "type": "string", "minLength": 1 }
+      }
+    },
+    "entrypoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind"],
+      "properties": {
+        "kind": { "enum": ["library", "terminal"] },
+        "name": { "type": "string", "minLength": 1 },
+        "target": { "type": "string", "minLength": 1 }
+      }
+    },
+    "component": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "ecosystem", "manifest", "root", "private", "entrypoints"],
+          "properties": {
+            "id": { "type": "string", "minLength": 1 },
+            "ecosystem": { "const": "node" },
+            "manifest": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["kind", "path"],
+              "properties": {
+                "kind": { "const": "package.json" },
+                "path": { "type": "string", "minLength": 1 }
+              }
+            },
+            "name": { "type": "string", "minLength": 1 },
+            "root": { "type": "string", "minLength": 1 },
+            "workspaceId": { "type": "string", "minLength": 1 },
+            "private": { "type": "boolean" },
+            "scripts": {
+              "type": "object",
+              "additionalProperties": { "type": "string" }
+            },
+            "entrypoints": { "type": "array", "items": { "$ref": "#/$defs/entrypoint" } }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "ecosystem", "manifest", "root", "entrypoints"],
+          "properties": {
+            "id": { "type": "string", "minLength": 1 },
+            "ecosystem": { "const": "python" },
+            "manifest": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["kind", "path"],
+              "properties": {
+                "kind": { "const": "pyproject.toml" },
+                "path": { "type": "string", "minLength": 1 }
+              }
+            },
+            "name": { "type": "string", "minLength": 1 },
+            "root": { "type": "string", "minLength": 1 },
+            "workspaceId": { "type": "string", "minLength": 1 },
+            "entrypoints": { "type": "array", "items": { "$ref": "#/$defs/entrypoint" } }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "ecosystem", "manifest", "root", "entrypoints"],
+          "properties": {
+            "id": { "type": "string", "minLength": 1 },
+            "ecosystem": { "const": "rust" },
+            "manifest": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["kind", "path"],
+              "properties": {
+                "kind": { "const": "Cargo.toml" },
+                "path": { "type": "string", "minLength": 1 }
+              }
+            },
+            "name": { "type": "string", "minLength": 1 },
+            "root": { "type": "string", "minLength": 1 },
+            "workspaceId": { "type": "string", "minLength": 1 },
+            "entrypoints": { "type": "array", "items": { "$ref": "#/$defs/entrypoint" } }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "ecosystem", "manifest", "root", "entrypoints"],
+          "properties": {
+            "id": { "type": "string", "minLength": 1 },
+            "ecosystem": { "const": "go" },
+            "manifest": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["kind", "path"],
+              "properties": {
+                "kind": { "const": "go.mod" },
+                "path": { "type": "string", "minLength": 1 }
+              }
+            },
+            "name": { "type": "string", "minLength": 1 },
+            "root": { "type": "string", "minLength": 1 },
+            "workspaceId": { "type": "string", "minLength": 1 },
+            "entrypoints": { "type": "array", "items": { "$ref": "#/$defs/entrypoint" } }
+          }
+        }
+      ]
+    },
+    "workspace": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "ecosystem", "manifest", "root", "patterns"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "ecosystem": { "$ref": "#/$defs/ecosystem" },
+        "manifest": { "$ref": "#/$defs/manifest" },
+        "root": { "type": "string", "minLength": 1 },
+        "patterns": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+      }
+    }
+  }
+}
