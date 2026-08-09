@@ -100,9 +100,10 @@ export const WaitConditionSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('fileExists'), path: z.string().min(1) }).strict(),
 ]);
 
-export const AssertStepSchema = StepBaseSchema.extend({
-  type: z.literal('assert'),
-  assertion: AssertionSchema,
+export const WaitStepSchema = StepBaseSchema.extend({
+  type: z.literal('wait'),
+  condition: WaitConditionSchema,
+  timeoutMs: z.number().int().positive().optional(),
 }).strict();
 
 export const AssertionSchema = z.discriminatedUnion('kind', [
@@ -117,6 +118,11 @@ export const AssertionSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('exitCode'), value: z.number().int() }).strict(),
   z.object({ kind: z.literal('fileExists'), path: z.string().min(1) }).strict(),
 ]);
+
+export const AssertStepSchema = StepBaseSchema.extend({
+  type: z.literal('assert'),
+  assertion: AssertionSchema,
+}).strict();
 
 export const CaptureStepSchema = StepBaseSchema.extend({
   type: z.literal('capture'),
