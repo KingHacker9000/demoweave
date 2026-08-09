@@ -27,7 +27,7 @@
         "flowId": "inspect-project",
         "stepId": "capture-terminal",
         "surfaceId": "terminal-demoweave-cli",
-        "gitCommit": "1b54f8c5c42c5a22b70e8ad48f4674dfb7db6cbb",
+        "gitCommit": "6335a1af25ee921237509ed878cc8a0ed31ddc85",
         "sources": [
           {
             "path": "packages/cli/src/index.ts",
@@ -58,7 +58,7 @@
         "flowId": "inspect-project",
         "stepId": "capture-terminal",
         "surfaceId": "terminal-demoweave-cli",
-        "gitCommit": "1b54f8c5c42c5a22b70e8ad48f4674dfb7db6cbb",
+        "gitCommit": "6335a1af25ee921237509ed878cc8a0ed31ddc85",
         "sources": [
           {
             "path": "packages/cli/src/index.ts",
@@ -92,7 +92,7 @@
         "flowId": "inspect-project",
         "stepId": "capture-terminal",
         "surfaceId": "terminal-demoweave-cli",
-        "gitCommit": "1b54f8c5c42c5a22b70e8ad48f4674dfb7db6cbb",
+        "gitCommit": "6335a1af25ee921237509ed878cc8a0ed31ddc85",
         "sources": [
           {
             "path": "packages/cli/src/index.ts",
