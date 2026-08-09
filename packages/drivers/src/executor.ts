@@ -4,6 +4,7 @@ import {
   FlowSchema,
   ManifestSchema,
   ProjectProfileSchema,
+  snapshotFlowEvidence,
   type Evidence,
   type Flow,
   type ProjectProfile,
@@ -162,6 +163,21 @@ export async function executeFlow(
   if (error && steps.length === 0) {
     steps.push(...flow.steps.map((step) => ({ stepId: step.id, status: 'skipped' as const })));
   }
+
+  let finalEvidence = evidence;
+  if (!error && evidence.length) {
+    try {
+      const snapshotted = await snapshotFlowEvidence(projectRoot, flow.id);
+      const byId = new Map(snapshotted.map((item) => [item.id, item]));
+      finalEvidence = evidence.map((item) => byId.get(item.id) ?? item);
+    } catch (snapshotError) {
+      error = {
+        code: 'PROVENANCE_SNAPSHOT_FAILED',
+        message: snapshotError instanceof Error ? snapshotError.message : String(snapshotError),
+      };
+    }
+  }
+
   return {
     status: error ? 'failed' : 'passed',
     flowId: flow.id,
@@ -169,7 +185,7 @@ export async function executeFlow(
     surfaceType: surface.type,
     driverId: driver.descriptor.id,
     steps,
-    evidence,
+    evidence: finalEvidence,
     ...(error ? { error } : {}),
   };
 }
