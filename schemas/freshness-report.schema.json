@@ -7,10 +7,7 @@
   "required": ["schemaVersion", "evidence", "documents", "regeneration", "summary"],
   "properties": {
     "schemaVersion": { "const": 1 },
-    "evidence": {
-      "type": "array",
-      "items": { "$ref": "#/$defs/evidenceFreshness" }
-    },
+    "evidence": { "type": "array", "items": { "$ref": "#/$defs/evidenceFreshness" } },
     "documents": {
       "type": "array",
       "items": {
@@ -23,10 +20,7 @@
         }
       }
     },
-    "regeneration": {
-      "type": "array",
-      "items": { "$ref": "#/$defs/action" }
-    },
+    "regeneration": { "type": "array", "items": { "$ref": "#/$defs/action" } },
     "summary": {
       "type": "object",
       "additionalProperties": false,
@@ -50,6 +44,7 @@
       "properties": {
         "code": {
           "enum": [
+            "declared-planned",
             "declared-stale",
             "declared-missing",
             "declared-failed",
@@ -93,11 +88,7 @@
           "properties": {
             "kind": { "const": "run-flow" },
             "flowId": { "type": "string", "minLength": 1 },
-            "evidenceIds": {
-              "type": "array",
-              "minItems": 1,
-              "items": { "type": "string", "minLength": 1 }
-            }
+            "evidenceIds": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } }
           }
         },
         {
