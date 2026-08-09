@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "id": "create-project",
+  "title": "Create a project",
+  "surfaceId": "web-fixture-web",
+  "steps": [
+    {
+      "id": "open-home",
+      "type": "navigate",
+      "destination": "/"
+    },
+    {
+      "id": "open-create",
+      "type": "activate",
+      "target": {
+        "strategy": "text",
+        "value": "New Project",
+        "exact": true
+      }
+    },
+    {
+      "id": "enter-name",
+      "type": "input",
+      "target": {
+        "strategy": "label",
+        "value": "Project name"
+      },
+      "value": "Demo Project",
+      "clear": true
+    },
+    {
+      "id": "submit",
+      "type": "activate",
+      "target": {
+        "strategy": "text",
+        "value": "Create",
+        "exact": true
+      }
+    },
+    {
+      "id": "verify-project",
+      "type": "assert",
+      "assertion": {
+        "kind": "textContains",
+        "value": "Demo Project"
+      }
+    },
+    {
+      "id": "capture-result",
+      "type": "capture",
+      "evidenceId": "create-project-screenshot",
+      "kind": "screenshot"
+    }
+  ]
+}

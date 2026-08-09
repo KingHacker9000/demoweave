@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://demoweave.dev/schemas/evidence.schema.json",
+  "title": "DemoWeave Evidence v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "id", "kind", "status", "provenance"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "id": { "type": "string", "minLength": 1 },
+    "kind": {
+      "enum": ["screenshot", "recording", "terminal", "image", "diagram", "plot", "table", "result", "text", "code", "comparison"]
+    },
+    "status": { "enum": ["planned", "available", "stale", "missing", "failed"] },
+    "label": { "type": "string", "minLength": 1 },
+    "format": { "enum": ["png", "jpeg", "webp", "gif", "webm", "mp4", "svg", "json", "csv", "txt", "md", "ansi", "html"] },
+    "path": { "type": "string", "minLength": 1 },
+    "mimeType": { "type": "string", "minLength": 1 },
+    "producer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "id"],
+      "properties": {
+        "kind": { "enum": ["driver", "renderer", "agent", "external"] },
+        "id": { "type": "string", "minLength": 1 },
+        "version": { "type": "string", "minLength": 1 }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sources"],
+      "properties": {
+        "flowId": { "type": "string", "minLength": 1 },
+        "stepId": { "type": "string", "minLength": 1 },
+        "surfaceId": { "type": "string", "minLength": 1 },
+        "gitCommit": { "type": "string", "minLength": 1 },
+        "sources": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["path"],
+            "properties": {
+              "path": { "type": "string", "minLength": 1 },
+              "role": { "enum": ["implementation", "config", "fixture", "data", "asset", "other"] }
+            }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": { "required": ["stepId"] },
+          "then": { "required": ["flowId"] }
+        }
+      ]
+    },
+    "derivedFrom": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "status": { "enum": ["available", "stale"] } },
+        "required": ["status"]
+      },
+      "then": { "required": ["path"] }
+    }
+  ]
+}
