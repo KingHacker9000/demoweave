@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://demoweave.dev/schemas/document-plan.schema.json",
+  "title": "DemoWeave DocumentPlan v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "id", "targetPath", "baseHash", "operations"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "id": { "type": "string", "minLength": 1 },
+    "targetPath": { "type": "string", "minLength": 1 },
+    "baseHash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "operations": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/operation" }
+    }
+  },
+  "$defs": {
+    "selector": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sectionId"],
+      "properties": {
+        "sectionId": { "type": "string", "minLength": 1 }
+      }
+    },
+    "operation": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "type", "selector"],
+          "properties": {
+            "id": { "type": "string", "minLength": 1 },
+            "type": { "const": "preserve" },
+            "selector": { "$ref": "#/$defs/selector" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "type", "selector", "markdown"],
+          "properties": {
+            "id": { "type": "string", "minLength": 1 },
+            "type": { "const": "edit" },
+            "selector": { "$ref": "#/$defs/selector" },
+            "markdown": { "type": "string" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "type", "selector", "markdown"],
+          "properties": {
+            "id": { "type": "string", "minLength": 1 },
+            "type": { "const": "replace" },
+            "selector": { "$ref": "#/$defs/selector" },
+            "markdown": { "type": "string" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "type", "anchor", "position", "markdown"],
+          "properties": {
+            "id": { "type": "string", "minLength": 1 },
+            "type": { "const": "create" },
+            "anchor": { "$ref": "#/$defs/selector" },
+            "position": { "enum": ["before", "after"] },
+            "markdown": { "type": "string", "minLength": 1 }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "type", "selector", "reason"],
+          "properties": {
+            "id": { "type": "string", "minLength": 1 },
+            "type": { "const": "remove" },
+            "selector": { "$ref": "#/$defs/selector" },
+            "reason": { "type": "string", "minLength": 1, "pattern": "\\S" }
+          }
+        }
+      ]
+    }
+  }
+}

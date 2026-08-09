@@ -97,3 +97,43 @@ export type {
   TerminalTrack,
   TerminalTrackStatus,
 } from './terminal-track.js';
+
+export {
+  DocumentNewlineSchema,
+  DocumentPatchError,
+  DocumentSectionSchema,
+  MarkdownDocumentInspectionSchema,
+  hashDocumentSource,
+  inspectMarkdownFile,
+  inspectMarkdownSource,
+  resolveProjectFile,
+} from './markdown-document.js';
+export type {
+  DocumentNewline,
+  DocumentSection,
+  MarkdownDocumentInspection,
+} from './markdown-document.js';
+
+export {
+  CreateDocumentOperationSchema,
+  DocumentOperationSchema,
+  DocumentPlanSchema,
+  EditDocumentOperationSchema,
+  PreserveDocumentOperationSchema,
+  RemoveDocumentOperationSchema,
+  ReplaceDocumentOperationSchema,
+  SectionSelectorSchema,
+  applyDocumentPlan,
+  createUnifiedDiff,
+  discardDocumentPlan,
+  previewDocumentPlan,
+  validateDocumentPlanFile,
+} from './document-plan.js';
+export type {
+  DocumentApplyResult,
+  DocumentOperation,
+  DocumentOperationSummary,
+  DocumentPlan,
+  DocumentPreview,
+  SectionSelector,
+} from './document-plan.js';
