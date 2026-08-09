@@ -1,6 +1,6 @@
 # DemoWeave Roadmap
 
-DemoWeave is an agent-native documentation studio for software repositories. Claude Code or Codex supplies the reasoning; DemoWeave supplies deterministic project inspection, workflow execution, evidence capture, rendering, validation, and provenance.
+DemoWeave is an agent-native documentation studio for software repositories. Claude Code or Codex supplies the reasoning; DemoWeave supplies deterministic project inspection, workflow execution, evidence capture, rendering, document patching, validation, and provenance.
 
 DemoWeave is **multi-surface by design**. A repository may expose web, CLI, desktop, mobile, libraries/SDKs, notebooks, research pipelines, services, and generated artifacts at the same time.
 
@@ -13,34 +13,11 @@ DemoWeave is **multi-surface by design**. A repository may expose web, CLI, desk
 | M2 — Flow / Evidence / Manifest | ✅ Complete | Platform-neutral workflow/evidence contracts + `SurfaceDriver v1` |
 | M3 — Terminal driver | ✅ Complete | Cross-platform Flow execution + `TerminalTrack v1` |
 | M4 — Media renderer | ✅ Complete | TerminalTrack → polished PNG/GIF + derived Evidence |
-| **P0 — DemoWeave documents itself** | **🚧 Current** | First public-quality dogfood README |
-| M5 — Safe Markdown patching | Next | Section-aware planning, diff/review/refine/discard |
+| P0 — DemoWeave documents itself | ✅ Complete | First public-quality dogfood README using real DemoWeave evidence |
+| **M5 — Safe Markdown patching** | **🚧 Current** | Section-aware plan → preview/review token → atomic apply |
+| M6 — Incremental stale tracking | Next | Explain and selectively regenerate stale evidence/docs |
 
-M0/M1 landed in PR #1, M2 in PR #2, M3 in PR #3, and M4 in PR #4.
-
-The first complete evidence path now works end to end:
-
-```text
-Repository
-  ↓
-demoweave inspect
-  ↓
-ProjectProfile v1
-  ↓
-Flow v1
-  ↓
-TerminalDriver
-  ↓
-TerminalTrack v1
-  ↓
-Evidence v1 + Manifest v1
-  ↓
-DemoWeave renderer
-  ↓
-PNG / GIF
-```
-
-The repository dogfoods this path with `inspect-project-terminal`, plus derived `inspect-project-terminal-png` and `inspect-project-terminal-gif` assets under `docs-media/`.
+M0/M1 landed in PR #1, M2 in PR #2, M3 in PR #3, M4 in PR #4, and Pilot P0 in PR #5.
 
 ## Product principles
 
@@ -55,33 +32,47 @@ The repository dogfoods this path with `inspect-project-terminal`, plus derived 
 - **Claude Code and Codex share the same workflow contracts.**
 - Keep the core lightweight; platform-specific drivers/renderers stay isolated.
 
+## Established pipeline
+
+```text
+Repository
+  ↓
+ProjectProfile v1
+  ↓
+Agent reasoning
+  ↓
+Flow v1
+  ↓
+SurfaceDriver v1
+  ↓
+Evidence v1 + Manifest v1
+  ↓
+Renderer
+  ↓
+PNG / GIF
+  ↓
+README / docs
+```
+
+P0 proved this with DemoWeave itself: Codex followed the checked-in shared skill, inspected the repository, ran the committed terminal Flow, refreshed structured evidence, rendered the GIF, and rewrote the README without claiming unimplemented features.
+
 ## Established contracts
 
 ### ProjectProfile v1
 
-Deterministic repository facts: components, ecosystems, manifests, workspaces, entrypoints, languages, frameworks, commands, existing docs, and stable surface IDs.
-
-Baseline ecosystems: Node (`package.json`), Python (`pyproject.toml`), Rust (`Cargo.toml`), and Go (`go.mod`).
+Deterministic repository facts: components, ecosystems, manifests, workspaces, entrypoints, languages, frameworks, commands, existing docs, and stable surface IDs. Baseline ecosystems: Node (`package.json`), Python (`pyproject.toml`), Rust (`Cargo.toml`), and Go (`go.mod`).
 
 ### Flow v1
 
-A platform-neutral workflow references a stable surface and uses semantic steps such as `run`, `navigate`, `activate`, `input`, `press`, `scroll`, `wait`, `assert`, and `capture`. Terminal run steps may explicitly declare `expectedExitCodes`; omission means `[0]`.
+Platform-neutral semantic steps such as `run`, `navigate`, `activate`, `input`, `press`, `scroll`, `wait`, `assert`, and `capture`. Terminal run steps may declare `expectedExitCodes`; omission means `[0]`.
 
 ### Evidence v1 / Manifest v1
 
-Evidence records lifecycle, artifact metadata, producer, provenance, and derivation. Manifest v1 indexes Flows and Evidence and preserves relationships such as:
-
-```text
-inspect-project-terminal
-    ├── inspect-project-terminal-png
-    └── inspect-project-terminal-gif
-```
+Evidence records lifecycle, artifact metadata, producer, provenance, and derivation. Manifest v1 indexes Flows and Evidence and preserves source/derived relationships.
 
 ### TerminalTrack v1
 
 Renderer-independent terminal capture with dimensions, portable command/cwd metadata, ordered input/stdout/stderr events, ANSI-preserving output, process lifecycle, exit code/signal, and duration.
-
-Normal non-zero exits are factual `completed` process lifecycles; Flow success is evaluated independently.
 
 ---
 
@@ -98,138 +89,207 @@ Normal non-zero exits are factual `completed` process lifecycles; Flow success i
 
 ## M1 — Project analyzer ✅
 
-Commands:
+- ecosystem-neutral component/workspace model
+- Node, Python, Rust, Go baseline manifest analysis
+- deterministic stable surface IDs
+- `doctor`, `init`, `inspect`, `status`, `validate`
 
-```bash
-demoweave doctor
-demoweave init
-demoweave inspect [path]
-demoweave status
-demoweave validate
-```
-
-Nested non-workspace manifests remain deterministic component facts without automatically leaking into user-facing surfaces.
-
-## M2 — Flow IR + Evidence + Manifest ✅
+## M2 — Flow / Evidence / Manifest ✅
 
 - Flow v1
 - Evidence v1
 - Manifest v1
 - SurfaceDriver v1
 - synchronized JSON Schemas
-- deterministic manifest normalization
-- cross-file metadata validation
-- terminal + web example Flows
+- deterministic manifest normalization + cross-file validation
 
 ## M3 — Terminal driver ✅
 
 - `TerminalDriver → TerminalSession → ProcessTerminalSession`
-- pipe-based non-interactive capture; no PTY requirement
-- Windows + Linux/WSL execution
+- Windows + Linux/WSL non-interactive execution
+- assertions, waits, timeouts, expected non-zero exits
 - `demoweave run <flow-id-or-path>`
-- output/exit/file assertions and waits
-- timeouts + structured failures
-- TerminalTrack v1 + schema
-- atomic Evidence/Manifest writes with provenance
-- committed self-dogfood `inspect-project` Flow
-- Windows + Ubuntu hosted CI
+- TerminalTrack v1
+- atomic evidence/manifest writes with provenance
+- committed self-dogfood Flow
 
 ## M4 — Lightweight media renderer ✅
 
-- TerminalTrack replay isolated from presentation/encoding
-- safe ANSI/control handling for current pipe-mode tracks
-- deterministic command typing + progressive output + final hold
-- SVG terminal presentation
-- `@resvg/resvg-js` headless PNG rasterization
-- optional FFmpeg two-pass palette GIF encoding
+- renderer-independent terminal replay/presentation/encoding separation
+- safe current pipe-mode ANSI/control handling
+- SVG terminal presentation + headless `resvg` PNG
+- optional FFmpeg two-pass GIF encoding
 - `demoweave render <evidence-id-or-path> --format png|gif`
-- configured `mediaDir` output safety
-- FFmpeg capability in `demoweave doctor`
-- derived renderer Evidence + provenance
-- real committed pilot assets:
-  - `docs-media/inspect-project-terminal.png`
-  - `docs-media/inspect-project-terminal.gif`
-- 1020×486 GIF, 5 seconds, 60 frames at 12 fps, ~36 KiB
-- Windows + Ubuntu hosted render smoke tests
-- visual review completed before merge
+- derived Evidence + provenance
+- committed 1020×486 self-inspection PNG/GIF
+- Windows + Ubuntu render smoke tests
 
-Intentional M4 boundary: no PTY emulator, web/desktop/mobile capture, compositor, narration, or MP4 tutorial pipeline yet.
+## P0 — DemoWeave documents DemoWeave ✅
+
+Pilot result:
+
+- Codex followed `skills/demoweave/SKILL.md` without a DemoWeave-specific hidden workflow.
+- The repo was inspected and validated using the real built CLI.
+- The committed self Flow executed successfully and refreshed TerminalTrack provenance.
+- PNG/GIF were regenerated from evidence; same-input rendering was byte-stable.
+- The README embeds the real generated GIF near the top with accurate context.
+- Current vs planned features are clearly separated.
+- No public npm/plugin installation was invented.
+- README commands/links/assets were audited.
+- Hosted Ubuntu + Windows CI passed on the P0 head.
+
+This proves the agent-native workflow before automating document patching itself.
 
 ---
 
-# Current pilot
+# Current milestone
 
-## P0 — DemoWeave documents DemoWeave 🚧
+## M5 — Document planning + safe Markdown patching 🚧
 
-**Goal:** use the same shared DemoWeave workflow we expect users to use and produce the first public-quality README from real repository understanding + real runtime evidence.
+**Goal:** give agents a deterministic way to inspect arbitrary Markdown, declare intentional section-level changes, preview the exact diff, obtain a review fingerprint, and apply only the reviewed patch without rewriting untouched content.
+
+The reasoning stays in Claude Code/Codex. DemoWeave should not decide what prose to write.
 
 ```text
-Codex / Claude Code
-       ↓
-understand DemoWeave repository
-       ↓
-demoweave inspect .
-       ↓
-review existing README + Manifest
-       ↓
-choose useful existing evidence
-       ↓
-embed docs-media/inspect-project-terminal.gif intentionally
-       ↓
-rewrite/preserve sections based on actual repository facts
-       ↓
-run commands/examples
-       ↓
-demoweave validate .
-       ↓
-review README diff + rendered GitHub presentation
+Markdown file
+   ↓
+section map + base hash
+   ↓
+agent-authored DocumentPlan v1
+   ↓
+validate selectors / operations
+   ↓
+preview patch in memory
+   ↓
+unified diff + review token
+   ↓
+review / refine / discard
+   ↓
+atomic apply only if base + review token still match
 ```
 
-### P0 rules
+### M5 architecture boundaries
 
-- Do **not** rewrite the README merely to make it longer.
-- Preserve correct/useful existing content.
-- The GIF must support the explanation rather than act as decoration.
-- Do not claim future features as currently available.
-- Clearly distinguish current capabilities from roadmap capabilities.
-- All commands shown as current usage must actually work.
-- Keep the README visual and scannable rather than AI-wall-of-text documentation.
-- Use relative repository asset paths suitable for GitHub Markdown.
-- P0 may improve the committed self-demo Flow/evidence only if a real documentation problem is discovered; avoid unrelated M5+ implementation.
+- **Preserve original source bytes outside edited ranges.** Do not parse and reserialize the entire Markdown file.
+- Use a real Markdown parser/position model rather than brittle regex-only heading matching.
+- Markdown parsing may locate section ranges; patching should splice the original source.
+- Support arbitrary project-relative Markdown targets, not only `README.md` or `/docs`.
+- Never allow target paths to escape the repository.
+- Reject stale plans if the target changed since the plan's base hash was computed.
+- Preview must not mutate the target.
+- Apply must be atomic.
+- A reviewed patch must not silently change between preview and apply.
+- Keep agent prose/content out of DemoWeave's deterministic core; the plan carries agent-authored Markdown.
+- Do not implement M6 stale/provenance tracking inside M5.
 
-### P0 acceptance criteria
+### Document section model
 
-1. Fresh clone installs normally.
-2. `demoweave doctor` succeeds.
-3. `demoweave inspect .` profiles DemoWeave correctly.
-4. Codex can follow `skills/demoweave/SKILL.md` without bespoke hidden instructions about the repository.
-5. The same shared skill remains usable by Claude Code.
-6. Agent identifies the existing self-inspection Flow/Evidence as useful documentation evidence.
-7. `demoweave run inspect-project` succeeds.
-8. Source terminal Evidence remains valid.
-9. `demoweave render inspect-project-terminal --format gif` succeeds.
-10. README intentionally embeds the generated GIF.
-11. Useful existing manual sections survive where appropriate.
-12. README accurately describes **current** commands/capabilities.
-13. Installation/development commands shown in README execute.
-14. `demoweave validate .` passes after documentation changes.
-15. README links/assets resolve on GitHub.
-16. Final README diff is manually reviewed for information density, hierarchy, and visual polish.
-17. A second reasoning pass identifies no unsupported product claims.
+M5 should expose stable, human/agent-readable section information derived from Markdown headings and source positions. It must handle duplicate heading text without ambiguous selection.
 
-P0 does **not** implement the general Markdown planner/patcher. That is M5. P0 proves the agent-native workflow manually using the same deterministic DemoWeave primitives.
+A useful selector may include a heading path plus occurrence/stable section ID. Exact schema should be chosen during implementation, but selection must remain deterministic after inspection.
+
+The tool also needs a way to target the document preamble/body region where appropriate.
+
+### DocumentPlan v1
+
+The agent should be able to express intentional operations such as:
+
+- `preserve` — explicitly record that an existing section should remain untouched.
+- `edit` — replace a section body while preserving its heading identity.
+- `replace` — replace an entire selected section when heading/content structure changes.
+- `create` — insert a new section before/after a deterministic anchor.
+- `remove` — remove an existing section; must include a non-empty reason.
+
+Plans should include at minimum:
+
+- schema version
+- plan ID
+- project-relative target path
+- target base SHA-256/content hash
+- ordered operations with stable operation IDs
+
+Do not add speculative fields unrelated to safe patching.
+
+### Review token
+
+`preview` should compute the complete candidate output and emit a deterministic review token/fingerprint derived from the base target + normalized plan + resulting candidate content.
+
+`apply` should require the matching review token (or an equivalently strong reviewed-state mechanism) and refuse when:
+
+- the target hash changed
+- the plan changed
+- the candidate diff changed
+
+This makes the apply step explicitly tied to what was reviewed.
+
+### CLI shape
+
+Prefer one coherent command group, conceptually:
+
+```bash
+demoweave docs inspect README.md
+demoweave docs preview .demoweave/plans/readme.json
+demoweave docs apply .demoweave/plans/readme.json --review <token>
+demoweave docs discard .demoweave/plans/readme.json
+```
+
+Exact naming may change if a cleaner implementation emerges, but avoid many overlapping commands.
+
+`inspect` should provide enough section IDs/paths and the target hash for an agent to author a plan. `preview` should show a concise operation summary and unified diff. `apply` should report exactly what changed. `discard` must never touch the target document.
+
+### Safety / preservation requirements
+
+M5 must correctly handle or safely reject cases involving:
+
+- ATX headings (`#` through `######`)
+- fenced code blocks containing heading-like text
+- duplicate headings
+- nested headings
+- CRLF vs LF
+- no trailing newline
+- empty sections
+- files with no headings
+- Unicode headings/content
+- invalid/missing selectors
+- overlapping operations
+- conflicting create anchors
+- stale base hashes
+- target/plan path traversal
+- symlink escape where relevant to Node filesystem behavior
+
+Untouched sections and whitespace should remain byte-for-byte unchanged wherever possible.
+
+### M5 exit criteria
+
+M5 is complete when:
+
+1. A Markdown target can be inspected into a deterministic section map + SHA-256 base hash.
+2. DocumentPlan v1 has runtime validation and a published JSON Schema.
+3. `preserve`, `edit`, `replace`, `create`, and reasoned `remove` are implemented with documented semantics.
+4. Duplicate headings can be selected unambiguously.
+5. Code-fence heading-like text is not misidentified as a document section.
+6. Preview produces the full candidate output and a readable unified diff without mutating the target.
+7. Preview emits a deterministic review token.
+8. Apply refuses without the matching reviewed token.
+9. Apply refuses if target or plan changed after preview.
+10. Apply writes atomically and preserves untouched source ranges.
+11. Discard removes/invalidates the plan without touching the target.
+12. Project-root path safety is enforced.
+13. README and non-README Markdown fixtures are both covered.
+14. Windows and Linux/WSL newline/path behavior are tested.
+15. The shared DemoWeave skill uses the real inspect → plan → preview → approval → apply workflow.
+16. Hosted Ubuntu + Windows CI is green.
+17. DemoWeave dogfoods M5 on a small real Markdown refinement without creating README churn.
+
+M5 does not implement automatic document authorship, stale detection, web capture, or tutorial composition.
 
 ---
 
-# Next milestones
-
-## M5 — Document planning + safe Markdown patching
-
-Arbitrary Markdown targets with section-aware `preserve`, `edit`, `replace`, `create`, and justified `remove` operations. Add diff/review/refine/discard UX before saving changes.
+# Later milestones
 
 ## M6 — Incremental stale/update tracking
 
-Use Manifest provenance to explain why evidence/docs are stale and selectively regenerate only affected artifacts.
+Use Manifest/document provenance to explain why evidence/docs are stale and selectively regenerate only affected artifacts.
 
 ## M7 — Web driver (Playwright)
 
@@ -286,8 +346,8 @@ DemoWeave 1.0 should provide stable agent workflows and contracts, multi-surface
 | 3 | ✅ M2 — Flow/Evidence/Manifest | stable internal contracts |
 | 4 | ✅ M3 — terminal driver | DemoWeave runs itself |
 | 5 | ✅ M4 — GIF renderer | first visual artifact |
-| 6 | **🚧 P0 — self-document README** | **first public-quality dogfood demo** |
-| 7 | M5 — safe Markdown patching | reliable docs |
+| 6 | ✅ P0 — self-document README | first public-quality dogfood demo |
+| 7 | **🚧 M5 — safe Markdown patching** | reliable reviewed document edits |
 | 8 | M6 — stale tracking | living documentation |
 | 9 | M7 — web driver | website support |
 | 10 | P1 — web fixture | second-surface proof |
@@ -303,8 +363,8 @@ DemoWeave 1.0 should provide stable agent workflows and contracts, multi-surface
 
 # Current next step
 
-## NOW: P0 — DemoWeave documents itself
+## NOW: M5 — section-aware Markdown patching
 
-Use DemoWeave exactly as an external project would: inspect the repository, review the existing docs and evidence, run/verify the self-demo, then create a concise polished README that embeds the real generated GIF and accurately explains what DemoWeave can do **today**.
+Build the first deterministic document-editing contract and CLI around arbitrary Markdown. The agent must be able to inspect section IDs and a base hash, author a plan, preview the exact patch, show it for review, refine without touching the file, and apply only the reviewed candidate atomically.
 
-Do not implement M5 inside P0. The point of this pilot is to prove that Claude Code/Codex + the shared skill + DemoWeave's deterministic primitives already form a useful end-to-end documentation workflow.
+The dogfood target for M5 should be deliberately small: use the new mechanism to make one justified README or documentation refinement while proving that unrelated sections remain byte-identical.
