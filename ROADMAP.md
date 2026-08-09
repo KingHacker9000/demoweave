@@ -6,6 +6,19 @@ The goal is simple: give Claude Code or Codex a repository, let the agent unders
 
 DemoWeave is **not** web-only. A single repository may expose several surfaces at once: web, CLI, desktop, mobile, libraries/SDKs, notebooks, research pipelines, and generated artifacts.
 
+## Current checkpoint
+
+| Milestone | Status | Result |
+|---|---|---|
+| M0 — Repository bootstrap | ✅ Complete | TypeScript/pnpm monorepo, CLI, package boundaries, CI |
+| M1 — Project analyzer | ✅ Complete | Frozen `ProjectProfile v1`; Node, Python, Rust, Go baseline; 15 analyzer tests |
+| **M2 — Flow IR + Evidence + Manifest** | **🚧 Current** | Freeze platform-neutral workflow/evidence/provenance contracts |
+| M3 — Terminal driver | Next | First runtime evidence driver |
+| M4 — Media renderer | Later | PNG/GIF/WebM/MP4 via lightweight rendering |
+| P0 — DemoWeave documents itself | Target | First public-quality dogfood demo |
+
+M0/M1 landed through PR #1. `ProjectProfile v1` is now the compatibility baseline for subsequent milestones.
+
 ## Product principles
 
 - **Agent supplies intelligence; DemoWeave supplies deterministic tooling.**
@@ -60,9 +73,7 @@ Surface Drivers  Process/Result   Existing Artifacts
 
 ### Core models
 
-DemoWeave should stabilize these before broad platform support:
-
-1. **ProjectProfile** — deterministic facts about a repository and all detected surfaces.
+1. **ProjectProfile** — deterministic facts about a repository and all detected surfaces. **v1 frozen at M1.**
 2. **DocPlan** — what documents/sections should exist and what should be preserved, added, or changed.
 3. **Flow** — platform-neutral description of a user/research workflow.
 4. **Evidence** — screenshot, GIF, video, terminal capture, result, plot, table, diagram, etc.
@@ -73,11 +84,11 @@ DemoWeave should stabilize these before broad platform support:
 
 # Milestones
 
-## M0 — Repository bootstrap
+## M0 — Repository bootstrap ✅
 
 **Goal:** establish the TypeScript monorepo and stable package boundaries.
 
-Planned structure:
+Delivered:
 
 ```text
 packages/
@@ -90,33 +101,23 @@ skills/
     SKILL.md
 schemas/
 fixtures/
-  cli/
-  web/
-  library/
 ```
 
-Initial requirements:
-
-- TypeScript
-- pnpm workspace
-- build/test/lint/typecheck scripts
+- TypeScript + pnpm workspace
 - CLI binary named `demoweave`
+- build/test/typecheck scripts
 - CI on GitHub Actions
 - MIT license
 
-**Exit criteria**
-
-- Fresh clone installs successfully.
-- `pnpm build`, `pnpm test`, and `pnpm typecheck` pass.
-- `demoweave --help` runs locally.
+**Exit criteria:** complete.
 
 ---
 
-## M1 — Project analyzer
+## M1 — Project analyzer ✅
 
 **Goal:** deterministic repository inspection with no LLM API dependency.
 
-Initial commands:
+Delivered commands:
 
 ```bash
 demoweave doctor
@@ -126,47 +127,49 @@ demoweave status
 demoweave validate
 ```
 
-`inspect` should detect facts such as:
+`ProjectProfile v1` records deterministic facts including:
 
-- package managers and workspace layout
-- languages
-- frameworks
-- package binaries / CLI entry points
-- build/test/run scripts
-- web surfaces
-- libraries/SDKs
-- notebooks/research directories
-- existing README/docs files
-- examples/tests/configuration files
+- package managers/tooling evidence
+- workspace layout
+- ecosystem-neutral components
+- manifests and entrypoints
+- languages/frameworks
+- build/test/run commands when evidenced
+- detected user surfaces
+- existing documentation
 
-Output:
+Baseline ecosystems:
 
-```text
-.demoweave/project.json
-.demoweave/config.json
-```
+- Node — `package.json`, pnpm/package.json workspaces
+- Python — `pyproject.toml`
+- Rust — `Cargo.toml`, Cargo workspaces
+- Go — `go.mod`
 
-Important: repositories may expose **multiple surfaces simultaneously**.
+A repository may expose **multiple surfaces simultaneously**.
 
-**Exit criteria**
+**Exit criteria:** complete. `ProjectProfile v1` is frozen as the compatibility baseline.
 
-- DemoWeave correctly profiles itself.
-- CLI fixture is detected as terminal/CLI.
-- web fixture is detected as web.
-- library fixture is detected as a code/library surface.
-- `ProjectProfile` v1 schema is validated and frozen for the next milestone.
+Known M1 boundaries intentionally left for later:
+
+- Detection is manifest/structure based; it does not execute surfaces.
+- Python dynamic metadata and complex Poetry script objects are not fully modeled.
+- Python workspaces and Go `go.work` are not yet modeled.
+- Nested non-workspace manifests are retained as facts but do not automatically emit user-facing surfaces.
 
 ---
 
-## M2 — Flow IR + Evidence model + manifest
+## M2 — Flow IR + Evidence model + Manifest 🚧
 
-**Goal:** create platform-neutral workflow and evidence contracts before capture implementations grow.
+**Goal:** create platform-neutral workflow, evidence, and provenance contracts before capture implementations grow.
 
-Example flow:
+The Flow IR must describe **semantic intent**, not Playwright/Appium/VHS implementation calls.
+
+Example:
 
 ```yaml
+schemaVersion: 1
 id: inspect-project
-surface: cli
+surface: terminal-demoweave-cli
 steps:
   - run:
       command: demoweave inspect .
@@ -176,18 +179,52 @@ steps:
       id: inspection-result
 ```
 
-Create:
+M2 should create stable models for:
 
 ```text
-.demoweave/flows/
-.demoweave/evidence/manifest.json
+Flow
+FlowStep
+Evidence
+EvidenceRef
+Manifest
+Provenance
+SourceDependency
+Driver contract
 ```
+
+Expected repository state:
+
+```text
+.demoweave/
+  flows/
+  evidence/
+    manifest.json
+schemas/
+  flow.schema.json
+  evidence.schema.json
+  manifest.schema.json
+```
+
+Requirements:
+
+- Every Flow references a real `ProjectProfile` surface by stable surface ID.
+- Actions are semantic and platform-neutral where possible.
+- Capture requests describe desired evidence, not renderer-specific encoding details.
+- Evidence has stable identity, type, path/status, producer metadata, and provenance.
+- Provenance can link evidence to a Flow, source paths, and Git commit.
+- Manifest is deterministic and machine-editable.
+- Missing/stale files can eventually be represented without redesigning the model.
+- Driver API consumes semantic actions and returns structured execution/capture results.
+- Runtime Zod schemas and published JSON Schemas remain synchronized.
 
 **Exit criteria**
 
-- JSON Schema validation for Flow, Evidence, and Manifest.
+- JSON Schema + runtime validation for Flow, Evidence, and Manifest.
 - Driver API accepts semantic actions rather than Playwright/Appium-specific code.
-- Provenance can associate evidence with a flow, source files, and a Git commit.
+- Provenance can associate evidence with a Flow, source files, and a Git commit.
+- Example terminal and web Flows validate against the same Flow contract.
+- Manifest round-trip tests are deterministic.
+- No capture/PTY/Playwright implementation is required to finish M2.
 
 ---
 
@@ -218,7 +255,7 @@ Prefer a controlled rendered terminal over recording the user's personal termina
 
 **Goal:** render first visual evidence assets without OBS.
 
-Default media dependency: **FFmpeg**.
+Default substantial media dependency: **FFmpeg**.
 
 Initial output formats:
 
@@ -260,10 +297,10 @@ agent understands repo
 
 1. Fresh clone installs with the normal workspace command.
 2. `demoweave doctor` succeeds.
-3. `demoweave inspect .` recognizes DemoWeave as a TypeScript CLI/tooling repository.
+3. `demoweave inspect .` recognizes DemoWeave correctly.
 4. Claude Code can follow `skills/demoweave/SKILL.md`.
 5. Codex can follow the same underlying skill/workflow.
-6. Agent identifies `demoweave inspect .` (or another genuinely useful CLI workflow) as evidence worth showing.
+6. Agent identifies a genuinely useful CLI workflow as evidence worth showing.
 7. Agent creates a valid Flow.
 8. DemoWeave executes the Flow.
 9. DemoWeave records a clean terminal track.
@@ -292,15 +329,9 @@ docs/*.md
 any other Markdown target selected by the agent/user
 ```
 
-Plans should explicitly mark sections as:
+Plans should explicitly mark sections as preserve, edit, replace, create, or justified removal.
 
-- preserve
-- edit
-- replace
-- create
-- remove (rare and justified)
-
-Add a review workflow inspired by good diff/refine tools:
+Add a review workflow inspired by strong diff/refine tools:
 
 ```text
 proposed docs/assets
@@ -333,11 +364,10 @@ Future convenience command:
 demoweave update
 ```
 
-The manifest should explain *why* something is stale.
-
 **Exit criteria**
 
 - Source changes can mark related evidence stale.
+- Manifest explains why an artifact is stale.
 - Unrelated docs/assets remain current.
 - Regeneration can be selective.
 
@@ -384,7 +414,7 @@ Generate:
 
 **Goal:** compose independent surface recordings into polished scenes without OBS.
 
-Support initially:
+Initial support:
 
 - single source
 - split screen
@@ -394,7 +424,7 @@ Support initially:
 - simple transitions
 - audio track
 
-Example use:
+Example:
 
 ```text
 terminal recording + browser recording
@@ -420,7 +450,7 @@ youtube-title.txt
 youtube-description.md
 ```
 
-Narration/TTS must be an adapter, never a hard core dependency.
+Narration/TTS is an adapter, never a hard core dependency.
 
 Possible modes:
 
@@ -464,19 +494,13 @@ Detect/use:
 
 Prefer actual generated artifacts over screenshots of notebook UI.
 
-Evidence types expand to include:
-
-- PlotEvidence
-- TableEvidence
-- ResultEvidence
-- ComparisonEvidence
-- AnimationEvidence
+Evidence types expand to include plots, tables, structured results, comparisons, and animations.
 
 ---
 
 ## M12 — Desktop drivers
 
-**Goal:** native/electron desktop apps without OBS.
+**Goal:** native/Electron desktop apps without OBS.
 
 Planned adapters:
 
@@ -514,15 +538,7 @@ Typical actions:
 
 ## M14 — Plugin/driver SDK
 
-**Goal:** allow third-party drivers, evidence producers, renderers, and publishers.
-
-Potential extension points:
-
-- SurfaceDriver
-- EvidenceProducer
-- Renderer
-- Publisher
-- Detector
+**Goal:** allow third-party drivers, evidence producers, renderers, publishers, and detectors.
 
 ---
 
@@ -566,9 +582,9 @@ DemoWeave 1.0 should provide:
 
 | Order | Milestone | Demo value |
 |---|---|---|
-| 1 | M0 — scaffold | real project skeleton |
-| 2 | M1 — analyzer | understands repositories |
-| 3 | M2 — Flow/Evidence/Manifest | stable internal contracts |
+| 1 | ✅ M0 — scaffold | real project skeleton |
+| 2 | ✅ M1 — analyzer | understands repositories |
+| 3 | **🚧 M2 — Flow/Evidence/Manifest** | stable internal contracts |
 | 4 | M3 — terminal driver | DemoWeave runs itself |
 | 5 | M4 — GIF renderer | first visual artifact |
 | 6 | **P0 — self-document README** | **first killer demo** |
@@ -588,19 +604,21 @@ DemoWeave 1.0 should provide:
 
 # Current next step
 
-## NOW: M0 + M1
+## NOW: M2 — Flow IR + Evidence + Manifest
 
-Build the initial TypeScript workspace and implement:
+Build and freeze the contracts that every runtime driver will consume.
 
-```bash
-demoweave --help
-demoweave doctor
-demoweave init
-demoweave inspect .
-```
+Immediate work:
 
-Also add the CLI, web, and library fixtures plus CI.
+1. Define `Flow v1` and semantic step/action schemas.
+2. Define `Evidence v1` with stable IDs, evidence kinds, lifecycle status, output paths, and provenance.
+3. Define `Manifest v1` as the repository-level index of flows/evidence.
+4. Define the first platform-neutral `SurfaceDriver` contract in `@demoweave/drivers`.
+5. Publish synchronized JSON Schemas under `schemas/`.
+6. Add valid/invalid fixtures plus round-trip/determinism tests.
+7. Extend `demoweave validate` to validate M2 metadata when present.
+8. Add example terminal and web Flows proving the IR is not tied to either platform.
 
-**Do not start media capture yet.**
+**Do not implement PTY capture, Playwright, FFmpeg, or media rendering in M2.**
 
-The immediate goal is to make `demoweave inspect .` produce a clean, validated `ProjectProfile` for DemoWeave itself and all three fixture categories. Once that representation is solid, freeze `ProjectProfile` v1 and move to M2.
+The immediate goal is to make the M3 terminal driver implement a stable contract rather than forcing us to redesign Flow/Evidence once additional surfaces arrive.
