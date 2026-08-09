@@ -30,13 +30,7 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
-      - run: pnpm install --no-frozen-lockfile
-      - name: Upload generated lockfile
-        if: runner.os == 'Linux'
-        uses: actions/upload-artifact@v4
-        with:
-          name: m7-pnpm-lock
-          path: pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
       - name: Install Playwright Chromium (Ubuntu)
         if: runner.os == 'Linux'
         run: pnpm --filter @demoweave/drivers exec playwright install --with-deps chromium
