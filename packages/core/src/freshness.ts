@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
+import type { Dirent } from 'node:fs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { z } from 'zod';
@@ -10,6 +11,7 @@ const HashSchema = z.string().regex(/^sha256:[0-9a-f]{64}$/);
 
 export const FreshnessStateSchema = z.enum(['fresh', 'stale', 'missing', 'unknown']);
 export const FreshnessReasonCodeSchema = z.enum([
+  'declared-planned',
   'declared-stale',
   'declared-missing',
   'declared-failed',
@@ -89,15 +91,6 @@ function sha256(data: Buffer | string): string {
   return `sha256:${createHash('sha256').update(data).digest('hex')}`;
 }
 
-async function pathExists(target: string): Promise<boolean> {
-  try {
-    await fs.access(target);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 function portable(root: string, target: string): string {
   return path.relative(root, target).replaceAll(path.sep, '/');
 }
@@ -135,15 +128,23 @@ async function readManifest(root: string): Promise<Manifest> {
   return ManifestSchema.parse(JSON.parse(await fs.readFile(manifestPath, 'utf8')));
 }
 
-function directState(reasons: FreshnessReason[]): FreshnessState {
+const UNKNOWN_REASON_CODES = new Set<FreshnessReason['code']>([
+  'declared-planned',
+  'source-baseline-unavailable',
+  'flow-baseline-unavailable',
+  'upstream-unknown',
+]);
+
+function stateFromReasons(reasons: FreshnessReason[]): FreshnessState {
   if (reasons.some((reason) => reason.code === 'artifact-missing' || reason.code === 'declared-missing')) return 'missing';
-  if (reasons.some((reason) => !reason.code.endsWith('baseline-unavailable'))) return 'stale';
+  if (reasons.some((reason) => !UNKNOWN_REASON_CODES.has(reason.code))) return 'stale';
   if (reasons.length) return 'unknown';
   return 'fresh';
 }
 
 async function inspectDirectEvidence(root: string, manifest: Manifest, evidence: Evidence): Promise<EvidenceFreshness> {
   const reasons: FreshnessReason[] = [];
+  if (evidence.status === 'planned') reasons.push({ code: 'declared-planned', message: 'Evidence is planned but has not been produced yet.' });
   if (evidence.status === 'stale') reasons.push({ code: 'declared-stale', message: 'Manifest explicitly marks this Evidence stale.' });
   if (evidence.status === 'missing') reasons.push({ code: 'declared-missing', message: 'Manifest explicitly marks this Evidence missing.' });
   if (evidence.status === 'failed') reasons.push({ code: 'declared-failed', message: 'The producing operation previously failed.' });
@@ -221,7 +222,7 @@ async function inspectDirectEvidence(root: string, manifest: Manifest, evidence:
     }
   }
 
-  return { evidenceId: evidence.id, state: directState(reasons), reasons };
+  return { evidenceId: evidence.id, state: stateFromReasons(reasons), reasons };
 }
 
 function propagateDerived(manifest: Manifest, direct: Map<string, EvidenceFreshness>): EvidenceFreshness[] {
@@ -234,9 +235,16 @@ function propagateDerived(manifest: Manifest, direct: Map<string, EvidenceFreshn
     if (existing) return existing;
     const own = direct.get(id) ?? { evidenceId: id, state: 'unknown' as const, reasons: [] };
     const evidence = byId.get(id);
-    if (!evidence?.derivedFrom?.length || resolving.has(id)) {
+    if (!evidence?.derivedFrom?.length) {
       resolved.set(id, own);
       return own;
+    }
+    if (resolving.has(id)) {
+      return {
+        evidenceId: id,
+        state: 'unknown',
+        reasons: [{ code: 'upstream-unknown', upstreamEvidenceId: id, message: `Derived Evidence cycle prevents freshness resolution at ${id}.` }],
+      };
     }
     resolving.add(id);
     const reasons = [...own.reasons];
@@ -260,8 +268,7 @@ function propagateDerived(manifest: Manifest, direct: Map<string, EvidenceFreshn
       }
     }
     resolving.delete(id);
-    const state = directState(reasons);
-    const result = { evidenceId: id, state, reasons } satisfies EvidenceFreshness;
+    const result = { evidenceId: id, state: stateFromReasons(reasons), reasons } satisfies EvidenceFreshness;
     resolved.set(id, result);
     return result;
   };
@@ -273,7 +280,7 @@ const SKIP_DIRECTORIES = new Set(['.git', 'node_modules', '.pnpm', 'dist', 'buil
 
 async function markdownFiles(root: string, directory = root): Promise<string[]> {
   const output: string[] = [];
-  let entries: Awaited<ReturnType<typeof fs.readdir>>;
+  let entries: Dirent[];
   try {
     entries = await fs.readdir(directory, { withFileTypes: true });
   } catch {
