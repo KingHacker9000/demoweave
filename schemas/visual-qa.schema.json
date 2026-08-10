@@ -1,13 +1,20 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://demoweave.dev/schemas/visual-qa.schema.json",
-  "title": "DemoWeave VisualQAReport v1",
-  "type": "object",
-  "additionalProperties": false,
-  "required": ["schemaVersion", "id", "source", "sampling", "signals", "verdict", "findings"],
-  "properties": {
-    "schemaVersion": { "const": 1 },
-    "id": { "$ref": "#/$defs/stableId" },
+  "title": "DemoWeave Visual QA v1",
+  "oneOf": [
+    { "$ref": "#/$defs/packet" },
+    { "$ref": "#/$defs/report" }
+  ],
+  "$defs": {
+    "stableId": { "type": "string", "minLength": 1, "pattern": "^[a-z0-9]+(?:[a-z0-9-]*[a-z0-9])?$" },
+    "timestamp": { "type": "integer", "minimum": 0, "maximum": 86400000 },
+    "hash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "projectPath": {
+      "type": "string",
+      "minLength": 1,
+      "not": { "pattern": "^(?:/|[A-Za-z]:[\\\\/]|//)|(?:^|[\\\\/])\\.\\.(?:[\\\\/]|$)" }
+    },
     "source": {
       "type": "object",
       "additionalProperties": false,
@@ -32,89 +39,107 @@
         }
       ]
     },
-    "sampling": {
+    "sampleContext": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["strategy", "requestedCount", "samples"],
       "properties": {
-        "strategy": { "const": "uniform" },
-        "requestedCount": { "type": "integer", "minimum": 1, "maximum": 20 },
-        "samples": {
-          "type": "array",
-          "minItems": 1,
-          "maxItems": 40,
-          "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": ["id", "atMs", "path", "artifactHash", "width", "height"],
-            "properties": {
-              "id": { "$ref": "#/$defs/stableId" },
-              "atMs": { "$ref": "#/$defs/timestamp" },
-              "path": { "$ref": "#/$defs/projectPath" },
-              "artifactHash": { "$ref": "#/$defs/hash" },
-              "width": { "type": "integer", "minimum": 1, "maximum": 16384 },
-              "height": { "type": "integer", "minimum": 1, "maximum": 16384 },
-              "context": {
-                "type": "object",
-                "additionalProperties": false,
-                "properties": {
-                  "sceneIds": { "type": "array", "items": { "$ref": "#/$defs/stableId" } },
-                  "captionIds": { "type": "array", "items": { "$ref": "#/$defs/stableId" } }
-                }
-              }
-            }
+        "sceneIds": { "type": "array", "items": { "$ref": "#/$defs/stableId" } },
+        "captionIds": { "type": "array", "items": { "$ref": "#/$defs/stableId" } }
+      }
+    },
+    "sample": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "atMs", "path", "artifactHash", "width", "height"],
+      "properties": {
+        "id": { "$ref": "#/$defs/stableId" },
+        "atMs": { "$ref": "#/$defs/timestamp" },
+        "path": { "$ref": "#/$defs/projectPath" },
+        "artifactHash": { "$ref": "#/$defs/hash" },
+        "width": { "type": "integer", "minimum": 1, "maximum": 16384 },
+        "height": { "type": "integer", "minimum": 1, "maximum": 16384 },
+        "context": { "$ref": "#/$defs/sampleContext" }
+      }
+    },
+    "contactSheet": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "artifactHash", "width", "height"],
+      "properties": {
+        "path": { "$ref": "#/$defs/projectPath" },
+        "artifactHash": { "$ref": "#/$defs/hash" },
+        "width": { "type": "integer", "minimum": 1, "maximum": 16384 },
+        "height": { "type": "integer", "minimum": 1, "maximum": 16384 }
+      }
+    },
+    "signal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "startMs", "endMs"],
+      "properties": {
+        "id": { "$ref": "#/$defs/stableId" },
+        "kind": { "enum": ["black-range", "freeze-range"] },
+        "startMs": { "$ref": "#/$defs/timestamp" },
+        "endMs": { "$ref": "#/$defs/timestamp" }
+      }
+    },
+    "finding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "severity", "category", "message"],
+      "properties": {
+        "id": { "$ref": "#/$defs/stableId" },
+        "severity": { "enum": ["info", "warning", "error"] },
+        "category": { "enum": ["readability", "clipping", "loading-state", "secret", "dead-time", "caption-mismatch", "composition", "text-overlap", "flicker", "other"] },
+        "message": { "type": "string", "minLength": 1, "maxLength": 1000 },
+        "sampleId": { "$ref": "#/$defs/stableId" },
+        "startMs": { "$ref": "#/$defs/timestamp" },
+        "endMs": { "$ref": "#/$defs/timestamp" },
+        "recommendation": { "type": "string", "minLength": 1, "maxLength": 1000 }
+      },
+      "allOf": [
+        {
+          "if": { "anyOf": [{ "required": ["startMs"] }, { "required": ["endMs"] }] },
+          "then": { "required": ["startMs", "endMs"] }
+        }
+      ]
+    },
+    "packet": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "id", "source", "sampling", "contactSheet", "signals"],
+      "properties": {
+        "schemaVersion": { "const": 1 },
+        "id": { "$ref": "#/$defs/stableId" },
+        "source": { "$ref": "#/$defs/source" },
+        "sampling": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["strategy", "requestedCount", "samples"],
+          "properties": {
+            "strategy": { "const": "uniform" },
+            "requestedCount": { "type": "integer", "minimum": 1, "maximum": 20 },
+            "samples": { "type": "array", "minItems": 1, "maxItems": 40, "items": { "$ref": "#/$defs/sample" } }
           }
-        }
-      }
-    },
-    "signals": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["id", "kind", "startMs", "endMs"],
-        "properties": {
-          "id": { "$ref": "#/$defs/stableId" },
-          "kind": { "enum": ["black-range", "freeze-range"] },
-          "startMs": { "$ref": "#/$defs/timestamp" },
-          "endMs": { "$ref": "#/$defs/timestamp" }
-        }
-      }
-    },
-    "verdict": { "enum": ["pending", "pass", "needs-changes"] },
-    "findings": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["id", "severity", "category", "message"],
-        "properties": {
-          "id": { "$ref": "#/$defs/stableId" },
-          "severity": { "enum": ["info", "warning", "error"] },
-          "category": { "enum": ["readability", "clipping", "loading-state", "secret", "dead-time", "caption-mismatch", "composition", "text-overlap", "flicker", "other"] },
-          "message": { "type": "string", "minLength": 1, "maxLength": 1000 },
-          "sampleId": { "$ref": "#/$defs/stableId" },
-          "startMs": { "$ref": "#/$defs/timestamp" },
-          "endMs": { "$ref": "#/$defs/timestamp" },
-          "recommendation": { "type": "string", "minLength": 1, "maxLength": 1000 }
         },
-        "allOf": [
-          {
-            "if": { "anyOf": [{ "required": ["startMs"] }, { "required": ["endMs"] }] },
-            "then": { "required": ["startMs", "endMs"] }
-          }
-        ]
+        "contactSheet": { "$ref": "#/$defs/contactSheet" },
+        "signals": { "type": "array", "items": { "$ref": "#/$defs/signal" } }
       }
-    }
-  },
-  "$defs": {
-    "stableId": { "type": "string", "minLength": 1, "pattern": "^[a-z0-9]+(?:[a-z0-9-]*[a-z0-9])?$" },
-    "timestamp": { "type": "integer", "minimum": 0, "maximum": 86400000 },
-    "hash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
-    "projectPath": {
-      "type": "string",
-      "minLength": 1,
-      "not": { "pattern": "^(?:/|[A-Za-z]:[\\\\/]|//)|(?:^|[\\\\/])\\.\\.(?:[\\\\/]|$)" }
+    },
+    "report": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "id", "packetId", "packetHash", "sourceEvidenceId", "sourceArtifactHash", "verdict", "findings"],
+      "properties": {
+        "schemaVersion": { "const": 1 },
+        "id": { "$ref": "#/$defs/stableId" },
+        "packetId": { "$ref": "#/$defs/stableId" },
+        "packetHash": { "$ref": "#/$defs/hash" },
+        "sourceEvidenceId": { "$ref": "#/$defs/stableId" },
+        "sourceArtifactHash": { "$ref": "#/$defs/hash" },
+        "verdict": { "enum": ["pending", "pass", "needs-changes"] },
+        "findings": { "type": "array", "items": { "$ref": "#/$defs/finding" } }
+      }
     }
   }
 }
