@@ -18,7 +18,6 @@ import {
 import { inspectMediaBytes } from './compositor.js';
 import { RendererError, runProcess, type ProcessRunner } from './ffmpeg.js';
 import { ResvgRasterizer, type Rasterizer } from './rasterizer.js';
-import { rendererVersion } from './render.js';
 import { probeTutorialVideo } from './tutorial.js';
 
 export type PrepareVisualQaOptions = {
@@ -286,7 +285,7 @@ async function detectVisualSignals(source: ResolvedSource, options: PrepareVisua
   try {
     const result = await runner(options.ffmpegPath ?? 'ffmpeg', [
       '-hide_banner', '-nostats', '-i', source.path,
-      '-vf', 'blackdetect=d=0.5:pix_th=0.10,freezedetect=n=-50dB:d=1.0',
+      '-vf', 'blackdetect=d=0.5:pix_th=0.10,freezedetect=n=0.0001:d=1.0',
       '-an', '-f', 'null', '-',
     ]);
     if (result.exitCode !== 0) return [];
@@ -329,6 +328,13 @@ function packetHash(packet: VisualQAPacket): `sha256:${string}` {
   return sha256(JSON.stringify(packet));
 }
 
+function defaultReviewId(evidenceId: string): string {
+  if (/^[a-z0-9]+(?:[a-z0-9-]*[a-z0-9])?$/.test(evidenceId)) return `${evidenceId}-review`;
+  const slug = evidenceId.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 48) || 'evidence';
+  const suffix = createHash('sha256').update(evidenceId).digest('hex').slice(0, 8);
+  return `${slug}-${suffix}-review`;
+}
+
 export function hashVisualQaPacket(packet: VisualQAPacket): `sha256:${string}` {
   return packetHash(VisualQAPacketSchema.parse(packet));
 }
@@ -337,7 +343,7 @@ export async function prepareVisualQa(evidenceId: string, options: PrepareVisual
   const sampleCount = options.sampleCount ?? 7;
   if (!Number.isInteger(sampleCount) || sampleCount < 1 || sampleCount > 20) throw new RendererError('INVALID_QA_SAMPLE_COUNT', 'Visual QA sampleCount must be an integer from 1 to 20.');
   const source = await resolveVisualQaSource(evidenceId, options.projectRoot ?? '.', options);
-  const id = options.id ?? `${evidenceId}-review`;
+  const id = options.id ?? defaultReviewId(evidenceId);
   if (!/^[a-z0-9]+(?:[a-z0-9-]*[a-z0-9])?$/.test(id)) throw new RendererError('INVALID_QA_ID', `Visual QA id must be lowercase kebab-case: ${id}`);
 
   const cacheDir = path.join(source.root, '.demoweave', 'cache', 'qa', id);
@@ -499,7 +505,7 @@ export async function finalizeVisualQa(reference: string, options: FinalizeVisua
     path: repositoryPath(root, reportPath),
     artifactHash: sha256(reportBytes),
     mimeType: 'application/vnd.demoweave.visual-qa+json',
-    producer: { kind: 'agent', id: 'visual-qa', version: rendererVersion },
+    producer: { kind: 'agent', id: 'visual-qa' },
     provenance: { sources: [] },
     derivedFrom: [report.sourceEvidenceId],
   };
