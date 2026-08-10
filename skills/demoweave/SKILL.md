@@ -5,44 +5,45 @@ Use DemoWeave when the user asks to create, improve, update, or validate documen
 ## Principles
 
 - Treat the repository as potentially multi-surface: web, CLI, desktop, mobile, library/SDK, notebook, research, service, or combinations of these.
-- Use DemoWeave for deterministic inspection, execution, evidence capture, rendering, composition, tutorial packaging, freshness analysis, Markdown patch review, validation, and provenance.
+- Use DemoWeave for deterministic inspection, execution, evidence capture, rendering, composition, tutorial packaging, visual-review preparation/binding, freshness analysis, Markdown patch review, validation, and provenance.
 - Use your own repository tools to understand intent, architecture, and which workflows actually matter.
 - Do not generate visual media merely to decorate a document. Capture evidence only when it improves comprehension.
 - Preserve useful existing documentation. Prefer intentional section-level edits over rewriting files wholesale.
 - Never assume `/docs` is the only output. README.md and arbitrary Markdown files are first-class targets.
-- DemoWeave does not write the prose for you. The agent authors Markdown and tutorial narrative/metadata; DemoWeave deterministically inspects, validates, renders/packages, previews, reviews, and applies.
-- Treat `unknown` freshness as unresolved information, not permission to regenerate. Never invent a baseline or silently classify it as fresh/stale.
-- Prefer the minimal regeneration plan from DemoWeave over manually rerunning the whole evidence pipeline.
-- Keep runtime/browser configuration out of Flow v1. Do not embed Playwright selectors, scripts, browser launch settings, Appium instructions, shell-recorder commands, renderer-specific details, timeline layout, or tutorial metadata in a Flow.
-- Keep capture and presentation separate. A composed static browser screenshot is still a static browser screenshot; do not describe it as browser interaction recording.
-- Do not invent DemoWeave commands or Flow actions. Check `demoweave --help` and the published schemas before using them.
+- The agent supplies judgment and narrative. DemoWeave does not secretly call an LLM to write prose, tutorial captions, or visual-QA findings.
+- Treat `unknown` freshness as unresolved information, not permission to regenerate or review. Never invent a baseline.
+- Prefer DemoWeave's minimal regeneration plan over rerunning an entire evidence pipeline manually.
+- Keep runtime/browser configuration out of Flow v1. Do not embed Playwright selectors, browser launch settings, recorder commands, renderer/compositor layout, or tutorial metadata in a Flow.
+- Keep capture, presentation, and review separate. A composed static browser screenshot is still a static browser screenshot.
+- Black/freeze ranges produced by visual QA are advisory signals, not automatic verdicts.
+- Never reuse a visual-QA report after its packet or source bytes changed. Prepare and visually review the new packet.
+- Do not invent DemoWeave commands or Flow actions. Check `demoweave --help` and the published schemas first.
 
 ## Repository and evidence workflow
 
 1. Run `demoweave doctor` when environment readiness matters.
 2. Run `demoweave init .` if DemoWeave metadata has not been initialized.
-3. Run `demoweave inspect .` to produce the generated `.demoweave/project.json` ProjectProfile.
-4. Read ProjectProfile together with the repository itself. ProjectProfile contains facts; use repository tools to reason about which workflows actually matter to users.
-5. When a workflow needs to be demonstrated, create a JSON Flow v1 file under `.demoweave/flows/`.
-6. Set `surfaceId` to an existing stable surface ID from `.demoweave/project.json`.
-7. Declare project-relative `sources` on the Flow when specific implementation/config/fixture/data/asset files materially determine the captured result. Do not invent broad source lists just to populate provenance.
-8. Use semantic Flow actions such as `run`, `navigate`, `activate`, `input`, `press`, `scroll`, `wait`, `assert`, and `capture` as appropriate for the selected surface.
-9. Execute the Flow with the surface-specific runtime guidance below.
-10. A successful capture updates `.demoweave/evidence/manifest.json` and fingerprints the Flow, declared sources, and produced artifact for later freshness checks. Existing Evidence-level source provenance is preserved.
-11. Run `demoweave validate .` after editing, executing, rendering, composing, packaging tutorials, or adding DemoWeave metadata. Fix schema and cross-reference errors before relying on the output.
+3. Run `demoweave inspect .` to produce `.demoweave/project.json`.
+4. Read ProjectProfile together with the repository itself. ProjectProfile contains facts; use repository tools to decide what matters to users.
+5. Create a Flow v1 under `.demoweave/flows/` when a workflow needs runtime evidence.
+6. Set `surfaceId` to an existing stable surface ID from ProjectProfile.
+7. Declare only project-relative Flow `sources` that materially determine the captured result.
+8. Use semantic Flow actions such as `run`, `navigate`, `activate`, `input`, `press`, `scroll`, `wait`, `assert`, and `capture` where supported by the selected surface.
+9. Execute the Flow with the appropriate runtime context.
+10. Successful capture updates Manifest/Evidence and fingerprints the Flow, declared sources, and artifact.
+11. Run `demoweave validate .` after metadata/evidence changes.
+12. Before regenerating or visually reviewing existing Evidence, inspect freshness with `demoweave status .`.
 
 ## Terminal Flow workflow
-
-Run a terminal Flow with:
 
 ```bash
 demoweave run <flow-id-or-path>
 demoweave run <flow-id-or-path> --project <path>
 ```
 
-The current terminal driver executes non-interactive process/pipe workflows. It supports `run`, duration/process-exit/file-exists waits, output/exit-code/file-exists assertions, and terminal capture. A `run` expects exit code `0` unless its optional `expectedExitCodes` declares another accepted integer result. Unsupported terminal actions fail explicitly.
+The terminal driver is currently non-interactive process/pipe execution. It supports terminal-compatible `run`, waits, assertions, and capture. A `run` expects exit code `0` unless `expectedExitCodes` explicitly accepts another result.
 
-A successful terminal `capture` writes:
+A successful terminal capture writes:
 
 ```text
 .demoweave/evidence/artifacts/<evidence-id>.terminal.json
@@ -55,135 +56,75 @@ demoweave render <evidence-id-or-path> --format png
 demoweave render <evidence-id-or-path> --format gif
 ```
 
-PNG rendering is built in. GIF rendering additionally requires FFmpeg reported by `demoweave doctor`. CLI rendering fingerprints the derived artifact.
+PNG is headless/built in. GIF additionally requires FFmpeg.
 
 ## Web Flow workflow
 
-M7 implements Flow v1 against `web` surfaces with Playwright Chromium.
+The web driver implements Flow v1 against Playwright Chromium.
 
-### 1. Check browser readiness
+Check readiness:
 
 ```bash
 demoweave doctor
 ```
 
-If Chromium is not installed in a source checkout:
+If Chromium is missing in a source checkout:
 
 ```bash
 pnpm --filter @demoweave/drivers exec playwright install chromium
 ```
 
-On Linux systems that also need Playwright's browser system dependencies, use the supported Playwright installation form with `--with-deps chromium`.
+Start the application separately with its real project command. DemoWeave does not guess how arbitrary repositories should start.
 
-### 2. Start the application separately
-
-The web driver does not guess how to start an arbitrary repository or choose a port. Start the web application with its real project command, wait until it is reachable, and keep that process alive while DemoWeave executes the Flow.
-
-Do not put the application startup command, localhost origin, or Playwright launch configuration into Flow v1 merely to make a browser run work.
-
-### 3. Run the semantic Flow
-
-Relative `navigate` destinations require an explicit runtime base URL:
+For relative navigation, provide the runtime origin:
 
 ```bash
 demoweave run <flow-id-or-path> --base-url http://127.0.0.1:3000
 ```
 
-Use `--project <path>` when needed. For local debugging only, `--headed` shows Chromium:
+Use `--headed` only when a visible browser helps local debugging.
 
-```bash
-demoweave run <flow-id-or-path> --base-url http://127.0.0.1:3000 --headed
-```
+Prefer semantic targets (`role`, `label`, test/automation IDs) over brittle text where available. Raw Playwright selectors do not belong in Flow v1.
 
-Absolute HTTP/HTTPS `navigate` destinations do not require `--base-url`. Do not guess an origin if the Flow uses relative navigation and none was provided.
-
-### 4. Use semantic browser actions and targets
-
-Current web-driver actions:
-
-- `navigate`
-- `activate`
-- `input`
-- `press`
-- `scroll`
-- supported `wait`
-- supported `assert`
-- `capture` with `kind: "screenshot"`
-
-Current target strategies are translated by the driver:
-
-- `text`
-- `label`
-- `role`
-- `name`
-- `testId`
-- `accessibilityId`
-- `automationId`
-
-Prefer stable semantic targets (`role`, `label`, test/automation IDs) over brittle visible text when the repository already exposes them. Playwright strictness is intentional: ambiguous interactions should fail rather than silently choosing an arbitrary element.
-
-Current web waits cover duration, visible, hidden, and text conditions. Current web assertions cover visible, hidden, and text-contains checks. Terminal-only wait/assertion kinds fail explicitly on a web surface.
-
-### 5. Capture screenshot Evidence
-
-A successful web screenshot capture writes:
-
-```text
-.demoweave/evidence/artifacts/<evidence-id>.png
-```
-
-The manifest records `driver/web` provenance. The normal post-Flow snapshot fingerprints the producing Flow, declared sources, and PNG bytes, so `status` and document-impact analysis use the same M6 freshness model as terminal Evidence.
-
-M7 does **not** implement browser interaction GIF/video recording. Do not claim or fabricate animated browser Evidence.
+Current web capture writes PNG screenshot Evidence. Browser interaction GIF/video recording is not implemented; do not fabricate or claim it.
 
 ## Timeline composition workflow
 
-M8 composes existing local Evidence/media through a persistent presentation-only `TimelinePlan v1` under `.demoweave/timelines/`. Timeline plans are separate from Flow v1: Flows capture factual source evidence, while timelines describe canvas dimensions, frame rate, scene duration/order, single or horizontal split layout, pane sources, and `contain`/`cover` fit.
+`TimelinePlan v1` lives under `.demoweave/timelines/` and describes presentation only. It is separate from Flow v1.
 
-Timeline pane sources may reference either:
-
-- root-project Evidence by `evidenceId`; or
-- a project-relative PNG/GIF file by `path`.
-
-File sources must remain inside the project. URLs, absolute paths, traversal, symlink escapes, and unsupported formats are rejected. Static PNG sources remain static; animated GIF sources retain their animation. Composition requires FFmpeg but does not require a browser, Chromium, OBS, or desktop capture.
-
-Compose through the one public command:
+Timeline panes may reference root-project Evidence IDs or safe project-relative PNG/GIF files. Static PNGs remain static; GIFs retain real animation.
 
 ```bash
 demoweave compose <timeline-id-or-path> --format mp4
 demoweave compose <timeline-id-or-path> --format gif
 ```
 
-Use `--project <path>` when needed and `--out <project-relative-path>` to override the configured `mediaDir` destination. A successful compose records `<timeline-id>-mp4` or `<timeline-id>-gif` as derived recording Evidence. Root-manifest Evidence sources appear in `derivedFrom`; the timeline file and direct file sources appear as SHA-256 provenance sources.
+Use `--project <path>` or `--out <project-relative-path>` when needed. Composition requires FFmpeg and records derived compositor Evidence.
 
-Current freshness analysis can detect compositor source/plan/artifact changes, but selective `update --apply` does not yet schedule composition regeneration. Do not manually describe a composed static screenshot as recorded browser motion.
+Current freshness analysis can explain changed compositor inputs, but `update --apply` does not yet invent automatic compose actions.
 
 ## Tutorial packaging workflow
 
-M9 packages existing MP4 Evidence through a persistent `TutorialPlan v1` under `.demoweave/tutorials/`. TutorialPlan is presentation metadata, not automation: keep it separate from Flow v1 and TimelinePlan v1.
+`TutorialPlan v1` lives under `.demoweave/tutorials/` and packages an existing root-project MP4 Evidence source.
 
-The agent authors the tutorial facts and narrative that require judgment:
+The agent authors:
 
 - title and description;
 - language and optional tags;
-- caption text plus explicit start/end times;
-- chapter titles plus explicit start times;
-- thumbnail timestamp, size, fit/background, and optional title/subtitle.
+- caption text and explicit start/end timing;
+- chapter titles and explicit start timing;
+- thumbnail timestamp, dimensions, fit/background, and optional title/subtitle.
 
-The video source is an existing root-project MP4 Evidence ID. Do not point TutorialPlan at arbitrary URLs or fabricate a source recording. The source ID must not collide with any deterministic generated tutorial output ID.
-
-Build the package with:
+Build with:
 
 ```bash
 demoweave tutorial build <tutorial-id-or-path>
 demoweave tutorial build <tutorial-id-or-path> --project <path>
 ```
 
-Use `--out-dir <project-relative-path>` only when the configured `mediaDir/tutorials/<tutorial-id>/` destination should be overridden.
+Use `--out-dir <project-relative-path>` only when overriding the configured tutorial package directory.
 
-Tutorial build requires FFmpeg and `ffprobe`. DemoWeave validates that the source is project-local MP4 Evidence, probes its dimensions/duration, rejects out-of-range caption/chapter/thumbnail timing, extracts the real thumbnail frame, and applies title treatment through the headless SVG/resvg path rather than FFmpeg system-font drawtext.
-
-The default package contains:
+Tutorial build requires FFmpeg and `ffprobe`. DemoWeave validates project-local MP4 Evidence and timing, extracts a real source frame, applies deterministic SVG/resvg thumbnail text treatment, and writes:
 
 ```text
 docs-media/tutorials/<tutorial-id>/
@@ -196,162 +137,204 @@ docs-media/tutorials/<tutorial-id>/
   <tutorial-id>-youtube.json
 ```
 
-The MP4 is byte-preserved from the source Evidence. Caption/description/chapter prose comes from the agent-authored TutorialPlan; DemoWeave does not call an LLM to invent it. Each output is recorded as `renderer/tutorial` Evidence derived from the source MP4 and fingerprinted against the TutorialPlan.
+The packaged MP4 preserves the source bytes. DemoWeave does not synthesize narration/TTS, upload to a platform, invent caption prose, or turn static screenshots into fake motion.
 
-M9 does **not** synthesize narration/TTS, upload to YouTube or another platform, generate browser interaction recording, or perform M10 automated visual QA. If narration is required, treat it as a later optional adapter rather than silently generating or implying it.
+## Visual QA workflow
 
-Current freshness analysis propagates changed source MP4 / TutorialPlan / artifact state into tutorial outputs, but `update --apply` intentionally does not schedule tutorial rebuilds yet.
+Visual QA is a two-stage agent/tool workflow. The generated packet is cache; the reviewed report is durable metadata.
+
+### 1. Ensure the source Evidence is fresh
+
+```bash
+demoweave status .
+```
+
+Do not visually approve stale, missing, or unknown Evidence. Regenerate/resolve it first.
+
+### 2. Prepare deterministic review material
+
+```bash
+demoweave qa prepare <evidence-id>
+demoweave qa prepare <evidence-id> --samples 7 --project <path>
+```
+
+Current supported source formats are PNG, GIF, and MP4 Evidence.
+
+`qa prepare` writes generated material under:
+
+```text
+.demoweave/cache/qa/<review-id>/
+  frame-001.png
+  ...
+  contact-sheet.png
+  packet.json
+```
+
+The `VisualQAPacket v1` binds:
+
+- source Evidence ID/path/hash;
+- dimensions and duration where applicable;
+- deterministic uniform sample timestamps;
+- hashes for every sample and the contact sheet;
+- scene/caption context when source provenance exposes a TimelinePlan/TutorialPlan;
+- advisory black/freeze ranges when detected.
+
+It also creates a pending report template under `.demoweave/qa/reports/<review-id>.json` if one does not already exist. Re-preparing cache does not silently overwrite an existing agent report.
+
+### 3. Actually inspect the images
+
+Open the contact sheet and full-size frames where necessary. Review at minimum:
+
+- readability;
+- clipping/cropping;
+- broken/loading states;
+- visible secrets or machine-specific paths;
+- dead time / unintended holds;
+- caption/visual mismatch when caption context exists;
+- composition and aspect ratio;
+- text overlap;
+- flicker or abrupt ending where visible from samples/signals.
+
+A black/freeze signal is not itself a failure. For example, a deliberate final reading hold may be acceptable and should be recorded as an informational finding rather than removed blindly.
+
+Do not claim OCR/secret scanning occurred unless a separate tool actually performed it. The current M10 workflow relies on agent visual inspection.
+
+### 4. Author the durable VisualQAReport v1
+
+Edit the pending report only after inspection. Set:
+
+- `verdict`: `pass` or `needs-changes`;
+- structured findings with stable IDs;
+- severity (`info`, `warning`, `error`);
+- category;
+- clear message;
+- relevant `sampleId` and/or time range where useful;
+- optional recommendation.
+
+A PASS report cannot contain error findings. NEEDS-CHANGES must contain at least one warning/error.
+
+Do not alter the packet/source binding fields to make an old report fit new bytes.
+
+### 5. Finalize against the exact reviewed bytes
+
+```bash
+demoweave qa finalize <review-id-or-path>
+demoweave qa finalize <review-id-or-path> --project <path>
+```
+
+Finalization rechecks:
+
+- report schema;
+- exact packet ID/hash;
+- exact source Evidence/artifact hash;
+- current source bytes;
+- every sampled frame hash;
+- contact-sheet hash;
+- finding sample/time references.
+
+If anything changed, prepare and review again.
+
+PASS records derived `agent/visual-qa` result Evidence and exits zero. NEEDS-CHANGES also records the review but exits non-zero so it can block CI/publication.
+
+DemoWeave does not automatically fix the media after a finding. The agent decides the correction, reruns the relevant renderer/compositor/capture path, prepares a fresh packet, and reviews again.
 
 ## Freshness and selective update workflow
 
-Use M6 before manually regenerating existing Evidence or media.
-
-### 1. Explain current freshness
+Explain current freshness:
 
 ```bash
 demoweave status .
 demoweave status . --json
 ```
 
-Evidence is classified as:
+Evidence is classified as `fresh`, `stale`, `missing`, or `unknown`, with explicit reasons. Derived Evidence propagates upstream state; local Markdown references are mapped to impacted documents.
 
-- `fresh` — current bytes match available provenance fingerprints/baselines;
-- `stale` — a concrete dependency, Flow, artifact, plan, or upstream Evidence changed;
-- `missing` — a required artifact/dependency is absent;
-- `unknown` — DemoWeave lacks enough baseline information to decide safely.
-
-Read the reason chain. Derived Evidence propagates upstream stale/missing/unknown state. DemoWeave also reports Markdown files that link to affected Evidence paths.
-
-Do not mutate anything merely because a document is listed as impacted. An impacted document may only need its referenced asset regenerated, not prose changes.
-
-### 2. Preview the minimal regeneration plan
+Preview the minimal supported regeneration plan:
 
 ```bash
 demoweave update .
 demoweave update . --json
 ```
 
-`update` is a dry run unless `--apply` is supplied. Review the computed actions before execution. Current planning deduplicates stale source Evidence into one producing Flow run per Flow, then schedules only the currently supported derived renders. Compositor and tutorial stale state is explained but does not yet produce automatic rebuild actions.
-
-If an item is `unknown`, resolve the missing baseline/dependency information first or make an explicit human/agent decision. DemoWeave deliberately does not auto-regenerate unknown state.
-
-For a web Flow that requires runtime context such as a base URL or a separately running application, ensure that context exists before applying any plan that would rerun it. Do not invent the runtime origin.
-
-### 3. Apply only when wanted
+Apply only when wanted:
 
 ```bash
 demoweave update . --apply
 ```
 
-After apply, DemoWeave re-analyzes freshness. Check the result rather than assuming regeneration succeeded.
+For stale web Flows with relative navigation, keep the app running and supply the runtime origin:
 
-If a dry run reports zero actions, do not manually rerun the Flow/render pipeline. A no-change `update --apply` should also execute zero actions and create no artifact/document churn.
+```bash
+demoweave update . --apply --base-url http://127.0.0.1:3000
+```
+
+Current update planning supports known Flow/terminal regeneration paths. Compositor/tutorial rebuilds are explained by freshness but are not automatically scheduled yet. Do not treat `unknown` as permission to regenerate.
+
+Finalized visual-QA report Evidence derives from its reviewed media source, so later source changes make the review stale through normal upstream propagation.
 
 ## Safe Markdown workflow
 
-When changing an existing Markdown document, do not blindly overwrite the file. Use the M5 review workflow unless the user explicitly asks for a different editing mechanism.
-
-### 1. Inspect the exact target
+Inspect the exact target first:
 
 ```bash
 demoweave docs inspect README.md
 demoweave docs inspect docs/guide.md --json
 ```
 
-Inspection returns:
-
-- the project-relative target path;
-- a SHA-256 base hash;
-- newline/trailing-newline facts;
-- the preamble region;
-- deterministic section IDs, heading paths, levels, and source ranges.
-
-Section IDs disambiguate duplicate heading text. Heading-looking text inside fenced code blocks is not a section.
-
-### 2. Author a DocumentPlan v1
-
-Create the plan under `.demoweave/plans/`, using the exact `baseHash` and section IDs from inspection. The agent supplies all Markdown content.
+The agent authors `DocumentPlan v1` under `.demoweave/plans/` using the exact base hash and inspected section IDs.
 
 Supported operations:
 
-- `preserve` — assert that a selected section must remain untouched;
-- `edit` — replace only the selected section's direct body while preserving its heading and nested child sections;
-- `replace` — replace the selected section's complete source range;
-- `create` — insert exact Markdown `before` or `after` a selected anchor, or at document start/end;
-- `remove` — remove a selected section and include a non-empty reason.
+- `preserve` — selected section must stay untouched;
+- `edit` — replace only direct body, preserving heading/nested sections;
+- `replace` — replace full section subtree;
+- `create` — insert exact Markdown before/after an anchor or at document start/end;
+- `remove` — remove selected subtree with a non-empty reason.
 
-Example:
-
-```json
-{
-  "schemaVersion": 1,
-  "id": "readme-quickstart",
-  "targetPath": "README.md",
-  "baseHash": "sha256:<hash from inspect>",
-  "operations": [
-    {
-      "id": "keep-overview",
-      "type": "preserve",
-      "selector": { "sectionId": "<section id>" }
-    },
-    {
-      "id": "edit-quickstart",
-      "type": "edit",
-      "selector": { "sectionId": "<section id>" },
-      "markdown": "Updated body Markdown exactly as it should appear.\n"
-    }
-  ]
-}
-```
-
-Do not guess section IDs or base hashes. Re-inspect after external document changes.
-
-### 3. Preview before asking to apply
+Preview without mutation:
 
 ```bash
-demoweave docs preview .demoweave/plans/readme-quickstart.json
+demoweave docs preview .demoweave/plans/readme.json
 ```
 
-Preview does not mutate the target. It prints the operation summary, unified diff, candidate hash, and deterministic `review-v1:...` token. Use `--candidate` when the complete resulting document is useful for review, or `--json` for the full structured preview.
+Review the operation summary and unified diff. If content changes, preview again and use the new token.
 
-Review the diff yourself and surface it to the user when approval is required. If the content needs refinement, edit the plan and preview again; the review token will change.
-
-### 4. Apply only the reviewed token
+Apply only the token that was actually reviewed:
 
 ```bash
-demoweave docs apply .demoweave/plans/readme-quickstart.json --review 'review-v1:<token>'
+demoweave docs apply .demoweave/plans/readme.json --review 'review-v1:<token>'
 ```
 
-Apply is atomic and refuses when:
-
-- the target no longer matches the plan base hash;
-- the plan changed after preview;
-- the candidate changed;
-- the supplied review token does not match;
-- selectors conflict/overlap;
-- a mutation would violate an explicit `preserve` operation;
-- a project path escapes the repository or resolves through a rejected symlink.
-
-Never substitute a newly generated token for the token that was actually reviewed.
-
-### 5. Discard when a plan is not wanted
+Discard an unwanted plan without touching its target:
 
 ```bash
-demoweave docs discard .demoweave/plans/readme-quickstart.json
+demoweave docs discard .demoweave/plans/readme.json
 ```
 
-Discard deletes the plan only. It never changes the target Markdown document.
+## Current boundaries
 
-## Current execution and rendering boundaries
+Current executable surface drivers:
 
-DemoWeave currently has two executable surface drivers:
+- **terminal** — non-interactive process/pipe execution + TerminalTrack capture;
+- **web** — Playwright Chromium semantic interaction + PNG screenshot capture against an already-running app.
 
-- **terminal** — non-interactive process/pipe execution and renderer-independent TerminalTrack capture;
-- **web** — Playwright Chromium semantic interaction and PNG screenshot capture against an already-running/reachable web application.
+Current presentation/review tooling:
 
-The terminal renderer turns TerminalTrack v1 into PNG or GIF without a browser runtime. The M8 compositor turns local PNG/GIF Evidence and project-relative media into deterministic single/split MP4 or GIF scenes. M9 packages existing MP4 Evidence into upload-oriented video/thumbnail/caption/chapter/metadata sidecars. FFmpeg is required for GIF rendering, timeline composition, and tutorial thumbnail extraction; `ffprobe` is additionally required for tutorial video/timing validation.
+- terminal PNG/GIF rendering;
+- TimelinePlan MP4/GIF composition over local PNG/GIF media;
+- TutorialPlan package generation from existing MP4 Evidence;
+- VisualQAPacket/VisualQAReport agent-reviewed QA for fresh PNG/GIF/MP4 Evidence.
 
-Browser screenshots remain static when composed; composition does not turn them into browser recordings. Interactive PTY input, browser video/GIF recording, desktop capture, native mobile capture, research/notebook drivers, narration/TTS generation, publishing/upload integration, and M10 automated visual QA are not available yet.
+Not yet available:
+
+- interactive PTY input;
+- browser interaction GIF/video recording;
+- desktop/native mobile capture;
+- research/notebook driver;
+- narration/TTS generation;
+- publishing/upload integration;
+- OCR-based secret detection;
+- automatic visual fixes.
 
 Current metadata layout:
 
@@ -367,12 +350,18 @@ Current metadata layout:
     <tutorial>.json
   plans/
     <document-plan>.json
+  qa/
+    reports/
+      <review-id>.json      # durable agent-authored VisualQAReport
+  cache/
+    qa/
+      <review-id>/          # generated packet, frames, contact sheet
   evidence/
     manifest.json
     artifacts/
       <evidence-id>.terminal.json
       <evidence-id>.png
-docs-media/                  # configured rendered-media directory
+docs-media/
   <terminal-evidence-id>.png
   <terminal-evidence-id>.gif
   <timeline-id>.mp4
@@ -398,4 +387,5 @@ Published contracts live under `schemas/`:
 - `document-plan.schema.json`
 - `timeline.schema.json`
 - `tutorial.schema.json`
+- `visual-qa.schema.json`
 - `freshness-report.schema.json`
