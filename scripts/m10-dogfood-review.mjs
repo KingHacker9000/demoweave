@@ -6,6 +6,7 @@ import path from 'node:path';
 const repository = path.resolve(import.meta.dirname, '..');
 const cli = path.join(repository, 'packages', 'cli', 'dist', 'index.js');
 const reviewId = 'terminal-web-proof-review';
+const reviewedSourceHash = 'sha256:513b407302ba8cb401737998457ff514b5a2063f7de9dc83b40cb82b56268b52';
 const packetPath = path.join(repository, '.demoweave', 'cache', 'qa', reviewId, 'packet.json');
 const reportPath = path.join(repository, '.demoweave', 'qa', 'reports', `${reviewId}.json`);
 
@@ -14,6 +15,11 @@ const report = JSON.parse(await fs.readFile(reportPath, 'utf8'));
 
 assert.equal(packet.id, reviewId);
 assert.equal(packet.source.evidenceId, 'terminal-web-proof-mp4');
+assert.equal(
+  packet.source.artifactHash,
+  reviewedSourceHash,
+  'terminal-web-proof changed after the M10 visual review; inspect the new packet and update this reviewed hash/findings instead of inheriting the old PASS'
+);
 assert.equal(packet.source.width, 1920);
 assert.equal(packet.source.height, 720);
 assert.equal(packet.source.durationMs, 5000);
