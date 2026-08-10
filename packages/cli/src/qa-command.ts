@@ -1,6 +1,7 @@
+import fs from 'node:fs/promises';
 import path from 'node:path';
 import type { Command } from 'commander';
-import { analyzeFreshness } from '@demoweave/core';
+import { VisualQAReportSchema, analyzeFreshness } from '@demoweave/core';
 import { finalizeVisualQa, prepareVisualQa, RendererError } from '@demoweave/renderer';
 
 function positiveInteger(value: string): number {
@@ -11,6 +12,52 @@ function positiveInteger(value: string): number {
 
 function repoRelative(root: string, target: string): string {
   return path.relative(root, target).replaceAll(path.sep, '/') || '.';
+}
+
+function unsafePortablePath(value: string): boolean {
+  const portable = value.replaceAll('\\', '/');
+  return !portable || path.isAbsolute(value) || /^[a-zA-Z]:\//.test(portable) || portable.startsWith('//')
+    || portable.split('/').some((part) => part === '..');
+}
+
+function insideRoot(root: string, target: string): boolean {
+  const relative = path.relative(root, target);
+  return relative === '' || (relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative));
+}
+
+async function loadQaReportSourceId(reference: string, projectRoot: string): Promise<string> {
+  if (unsafePortablePath(reference)) throw new RendererError('UNSAFE_QA_REPORT_PATH', `Visual QA report path must be project-relative: ${reference}`);
+  const root = await fs.realpath(projectRoot);
+  const explicit = reference.includes('/') || reference.includes('\\') || reference.endsWith('.json');
+  const relative = explicit ? reference : `.demoweave/qa/reports/${reference}.json`;
+  const candidate = path.resolve(root, relative.replaceAll('\\', path.sep));
+  if (!insideRoot(root, candidate)) throw new RendererError('UNSAFE_QA_REPORT_PATH', `Visual QA report path must remain inside the project root: ${relative}`);
+  let realReport: string;
+  try {
+    realReport = await fs.realpath(candidate);
+  } catch (error) {
+    throw new RendererError('QA_REPORT_NOT_FOUND', `Visual QA report does not exist: ${relative}`, { cause: error });
+  }
+  if (!insideRoot(root, realReport)) throw new RendererError('UNSAFE_QA_REPORT_PATH', `Visual QA report resolves outside the project root: ${relative}`);
+  let input: unknown;
+  try {
+    input = JSON.parse(await fs.readFile(realReport, 'utf8'));
+  } catch (error) {
+    throw new RendererError('INVALID_QA_REPORT', `Visual QA report is unreadable JSON: ${error instanceof Error ? error.message : String(error)}`, { cause: error });
+  }
+  const parsed = VisualQAReportSchema.safeParse(input);
+  if (!parsed.success) throw new RendererError('INVALID_QA_REPORT', `VisualQAReport v1 is invalid: ${parsed.error.issues[0]?.message ?? 'unknown validation error'}`);
+  return parsed.data.sourceEvidenceId;
+}
+
+async function requireFreshEvidence(root: string, evidenceId: string): Promise<void> {
+  const freshness = await analyzeFreshness(root);
+  const sourceFreshness = freshness.evidence.find((item) => item.evidenceId === evidenceId);
+  if (!sourceFreshness) throw new RendererError('EVIDENCE_NOT_FOUND', `Visual QA references missing Evidence: ${evidenceId}`);
+  if (sourceFreshness.state !== 'fresh') {
+    const reason = sourceFreshness.reasons[0]?.message ?? 'No deterministic fresh baseline is available.';
+    throw new RendererError('QA_SOURCE_NOT_FRESH', `Visual QA requires fresh Evidence; ${evidenceId} is ${sourceFreshness.state}. ${reason}`);
+  }
 }
 
 export function registerQaCommand(program: Command): void {
@@ -25,13 +72,7 @@ export function registerQaCommand(program: Command): void {
     .action(async (evidenceId, options) => {
       try {
         const root = path.resolve(options.project);
-        const freshness = await analyzeFreshness(root);
-        const sourceFreshness = freshness.evidence.find((item) => item.evidenceId === evidenceId);
-        if (!sourceFreshness) throw new RendererError('EVIDENCE_NOT_FOUND', `Visual QA references missing Evidence: ${evidenceId}`);
-        if (sourceFreshness.state !== 'fresh') {
-          const reason = sourceFreshness.reasons[0]?.message ?? 'No deterministic fresh baseline is available.';
-          throw new RendererError('QA_SOURCE_NOT_FRESH', `Visual QA requires fresh Evidence; ${evidenceId} is ${sourceFreshness.state}. ${reason}`);
-        }
+        await requireFreshEvidence(root, evidenceId);
         const result = await prepareVisualQa(evidenceId, {
           projectRoot: root,
           ...(options.id ? { id: options.id } : {}),
@@ -60,7 +101,10 @@ export function registerQaCommand(program: Command): void {
     .option('--project <path>', 'project root', '.')
     .action(async (reference, options) => {
       try {
-        const result = await finalizeVisualQa(reference, { projectRoot: options.project });
+        const root = path.resolve(options.project);
+        const sourceEvidenceId = await loadQaReportSourceId(reference, root);
+        await requireFreshEvidence(root, sourceEvidenceId);
+        const result = await finalizeVisualQa(reference, { projectRoot: root });
         console.log(`Visual QA: ${result.report.id}`);
         console.log(`Verdict: ${result.verdict.toUpperCase()}`);
         console.log(`Findings: ${result.report.findings.length}`);
