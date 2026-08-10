@@ -5,15 +5,16 @@ Use DemoWeave when the user asks to create, improve, update, or validate documen
 ## Principles
 
 - Treat the repository as potentially multi-surface: web, CLI, desktop, mobile, library/SDK, notebook, research, service, or combinations of these.
-- Use DemoWeave for deterministic inspection, execution, evidence capture, rendering, freshness analysis, Markdown patch review, validation, and provenance.
+- Use DemoWeave for deterministic inspection, execution, evidence capture, rendering, composition, tutorial packaging, freshness analysis, Markdown patch review, validation, and provenance.
 - Use your own repository tools to understand intent, architecture, and which workflows actually matter.
 - Do not generate visual media merely to decorate a document. Capture evidence only when it improves comprehension.
 - Preserve useful existing documentation. Prefer intentional section-level edits over rewriting files wholesale.
 - Never assume `/docs` is the only output. README.md and arbitrary Markdown files are first-class targets.
-- DemoWeave does not write the prose for you. The agent authors Markdown; DemoWeave deterministically inspects, previews, reviews, and applies it.
+- DemoWeave does not write the prose for you. The agent authors Markdown and tutorial narrative/metadata; DemoWeave deterministically inspects, validates, renders/packages, previews, reviews, and applies.
 - Treat `unknown` freshness as unresolved information, not permission to regenerate. Never invent a baseline or silently classify it as fresh/stale.
 - Prefer the minimal regeneration plan from DemoWeave over manually rerunning the whole evidence pipeline.
-- Keep runtime/browser configuration out of Flow v1. Do not embed Playwright selectors, scripts, browser launch settings, Appium instructions, shell-recorder commands, or renderer-specific details in a Flow.
+- Keep runtime/browser configuration out of Flow v1. Do not embed Playwright selectors, scripts, browser launch settings, Appium instructions, shell-recorder commands, renderer-specific details, timeline layout, or tutorial metadata in a Flow.
+- Keep capture and presentation separate. A composed static browser screenshot is still a static browser screenshot; do not describe it as browser interaction recording.
 - Do not invent DemoWeave commands or Flow actions. Check `demoweave --help` and the published schemas before using them.
 
 ## Repository and evidence workflow
@@ -28,7 +29,7 @@ Use DemoWeave when the user asks to create, improve, update, or validate documen
 8. Use semantic Flow actions such as `run`, `navigate`, `activate`, `input`, `press`, `scroll`, `wait`, `assert`, and `capture` as appropriate for the selected surface.
 9. Execute the Flow with the surface-specific runtime guidance below.
 10. A successful capture updates `.demoweave/evidence/manifest.json` and fingerprints the Flow, declared sources, and produced artifact for later freshness checks. Existing Evidence-level source provenance is preserved.
-11. Run `demoweave validate .` after editing, executing, rendering, or adding DemoWeave metadata. Fix schema and cross-reference errors before relying on the output.
+11. Run `demoweave validate .` after editing, executing, rendering, composing, packaging tutorials, or adding DemoWeave metadata. Fix schema and cross-reference errors before relying on the output.
 
 ## Terminal Flow workflow
 
@@ -133,7 +134,7 @@ A successful web screenshot capture writes:
 
 The manifest records `driver/web` provenance. The normal post-Flow snapshot fingerprints the producing Flow, declared sources, and PNG bytes, so `status` and document-impact analysis use the same M6 freshness model as terminal Evidence.
 
-M7 does **not** implement browser interaction GIF/video recording. Do not claim or fabricate animated browser Evidence. That remains later roadmap work.
+M7 does **not** implement browser interaction GIF/video recording. Do not claim or fabricate animated browser Evidence.
 
 ## Timeline composition workflow
 
@@ -153,7 +154,53 @@ demoweave compose <timeline-id-or-path> --format mp4
 demoweave compose <timeline-id-or-path> --format gif
 ```
 
-Use `--project <path>` when needed and `--out <project-relative-path>` to override the configured `mediaDir` destination. A successful compose records `<timeline-id>-mp4` or `<timeline-id>-gif` as derived recording Evidence. Root-manifest Evidence sources appear in `derivedFrom`; the timeline file and direct file sources appear as SHA-256 provenance sources. Current freshness analysis can detect those changes, but selective `update --apply` does not yet schedule composition regeneration.
+Use `--project <path>` when needed and `--out <project-relative-path>` to override the configured `mediaDir` destination. A successful compose records `<timeline-id>-mp4` or `<timeline-id>-gif` as derived recording Evidence. Root-manifest Evidence sources appear in `derivedFrom`; the timeline file and direct file sources appear as SHA-256 provenance sources.
+
+Current freshness analysis can detect compositor source/plan/artifact changes, but selective `update --apply` does not yet schedule composition regeneration. Do not manually describe a composed static screenshot as recorded browser motion.
+
+## Tutorial packaging workflow
+
+M9 packages existing MP4 Evidence through a persistent `TutorialPlan v1` under `.demoweave/tutorials/`. TutorialPlan is presentation metadata, not automation: keep it separate from Flow v1 and TimelinePlan v1.
+
+The agent authors the tutorial facts and narrative that require judgment:
+
+- title and description;
+- language and optional tags;
+- caption text plus explicit start/end times;
+- chapter titles plus explicit start times;
+- thumbnail timestamp, size, fit/background, and optional title/subtitle.
+
+The video source is an existing root-project MP4 Evidence ID. Do not point TutorialPlan at arbitrary URLs or fabricate a source recording. The source ID must not collide with any deterministic generated tutorial output ID.
+
+Build the package with:
+
+```bash
+demoweave tutorial build <tutorial-id-or-path>
+demoweave tutorial build <tutorial-id-or-path> --project <path>
+```
+
+Use `--out-dir <project-relative-path>` only when the configured `mediaDir/tutorials/<tutorial-id>/` destination should be overridden.
+
+Tutorial build requires FFmpeg and `ffprobe`. DemoWeave validates that the source is project-local MP4 Evidence, probes its dimensions/duration, rejects out-of-range caption/chapter/thumbnail timing, extracts the real thumbnail frame, and applies title treatment through the headless SVG/resvg path rather than FFmpeg system-font drawtext.
+
+The default package contains:
+
+```text
+docs-media/tutorials/<tutorial-id>/
+  <tutorial-id>.mp4
+  <tutorial-id>-thumbnail.png
+  <tutorial-id>.srt
+  <tutorial-id>.vtt
+  <tutorial-id>-chapters.txt
+  <tutorial-id>-description.txt
+  <tutorial-id>-youtube.json
+```
+
+The MP4 is byte-preserved from the source Evidence. Caption/description/chapter prose comes from the agent-authored TutorialPlan; DemoWeave does not call an LLM to invent it. Each output is recorded as `renderer/tutorial` Evidence derived from the source MP4 and fingerprinted against the TutorialPlan.
+
+M9 does **not** synthesize narration/TTS, upload to YouTube or another platform, generate browser interaction recording, or perform M10 automated visual QA. If narration is required, treat it as a later optional adapter rather than silently generating or implying it.
+
+Current freshness analysis propagates changed source MP4 / TutorialPlan / artifact state into tutorial outputs, but `update --apply` intentionally does not schedule tutorial rebuilds yet.
 
 ## Freshness and selective update workflow
 
@@ -169,7 +216,7 @@ demoweave status . --json
 Evidence is classified as:
 
 - `fresh` — current bytes match available provenance fingerprints/baselines;
-- `stale` — a concrete dependency, Flow, artifact, or upstream Evidence changed;
+- `stale` — a concrete dependency, Flow, artifact, plan, or upstream Evidence changed;
 - `missing` — a required artifact/dependency is absent;
 - `unknown` — DemoWeave lacks enough baseline information to decide safely.
 
@@ -184,7 +231,7 @@ demoweave update .
 demoweave update . --json
 ```
 
-`update` is a dry run unless `--apply` is supplied. Review the computed actions before execution. Current planning deduplicates stale source Evidence into one producing Flow run per Flow, then schedules supported derived renders.
+`update` is a dry run unless `--apply` is supplied. Review the computed actions before execution. Current planning deduplicates stale source Evidence into one producing Flow run per Flow, then schedules only the currently supported derived renders. Compositor and tutorial stale state is explained but does not yet produce automatic rebuild actions.
 
 If an item is `unknown`, resolve the missing baseline/dependency information first or make an explicit human/agent decision. DemoWeave deliberately does not auto-regenerate unknown state.
 
@@ -302,9 +349,9 @@ DemoWeave currently has two executable surface drivers:
 - **terminal** — non-interactive process/pipe execution and renderer-independent TerminalTrack capture;
 - **web** — Playwright Chromium semantic interaction and PNG screenshot capture against an already-running/reachable web application.
 
-The terminal renderer turns TerminalTrack v1 into PNG or GIF without a browser runtime. The M8 compositor turns local PNG/GIF Evidence and project-relative media into deterministic single/split MP4 or GIF scenes. FFmpeg is required for GIF rendering and all timeline composition. Browser screenshots remain static when composed; composition does not turn them into browser recordings.
+The terminal renderer turns TerminalTrack v1 into PNG or GIF without a browser runtime. The M8 compositor turns local PNG/GIF Evidence and project-relative media into deterministic single/split MP4 or GIF scenes. M9 packages existing MP4 Evidence into upload-oriented video/thumbnail/caption/chapter/metadata sidecars. FFmpeg is required for GIF rendering, timeline composition, and tutorial thumbnail extraction; `ffprobe` is additionally required for tutorial video/timing validation.
 
-Interactive PTY input, browser video/GIF recording, desktop capture, native mobile capture, research/notebook drivers, narration, captions, chapters, and full tutorial generation are not available yet.
+Browser screenshots remain static when composed; composition does not turn them into browser recordings. Interactive PTY input, browser video/GIF recording, desktop capture, native mobile capture, research/notebook drivers, narration/TTS generation, publishing/upload integration, and M10 automated visual QA are not available yet.
 
 Current metadata layout:
 
@@ -316,6 +363,8 @@ Current metadata layout:
     <flow>.json
   timelines/
     <timeline>.json
+  tutorials/
+    <tutorial>.json
   plans/
     <document-plan>.json
   evidence/
@@ -328,6 +377,15 @@ docs-media/                  # configured rendered-media directory
   <terminal-evidence-id>.gif
   <timeline-id>.mp4
   <timeline-id>.gif
+  tutorials/
+    <tutorial-id>/
+      <tutorial-id>.mp4
+      <tutorial-id>-thumbnail.png
+      <tutorial-id>.srt
+      <tutorial-id>.vtt
+      <tutorial-id>-chapters.txt
+      <tutorial-id>-description.txt
+      <tutorial-id>-youtube.json
 ```
 
 Published contracts live under `schemas/`:
@@ -339,4 +397,5 @@ Published contracts live under `schemas/`:
 - `terminal-track.schema.json`
 - `document-plan.schema.json`
 - `timeline.schema.json`
+- `tutorial.schema.json`
 - `freshness-report.schema.json`
