@@ -111,6 +111,10 @@ test('inspection covers ATX levels, empty sections, Unicode, no headings, CRLF, 
   const crlf = inspectMarkdown('# A\r\n\r\nBody\r\n', 'README.md');
   assert.equal(crlf.newline, 'crlf');
   assert.equal(crlf.trailingNewline, true);
+  assert.deepEqual(crlf.sections[1]?.directBodyRange, {
+    start: { offset: 5, line: 2, column: 1 },
+    end: { offset: 13, line: 4, column: 1 },
+  });
 });
 
 test('edit replaces only direct body and preserves nested section bytes', () => {
@@ -234,6 +238,88 @@ test('CRLF insertion is normalized while untouched bytes and trailing-newline st
   assert.equal(preview.candidate.includes('\n') && !preview.candidate.includes('\r\n'), false);
   assert.equal(preview.candidate.slice(preview.candidate.indexOf('# B')), untouched);
   assert.equal(preview.candidate.endsWith('\n'), false);
+});
+
+test('CR-only inspection reports correct points and edits direct body without changing nested bytes', () => {
+  const source = '# Title\rbody\r## Child\rtext\r';
+  const inspection = inspectMarkdown(source, 'README.md');
+  const title = inspection.sections.find((section) => section.id === 'section:title')!;
+  const child = inspection.sections.find((section) => section.id === 'section:title/child')!;
+
+  assert.equal(inspection.newline, 'cr');
+  assert.deepEqual(title.headingRange, {
+    start: { offset: 0, line: 1, column: 1 },
+    end: { offset: 7, line: 1, column: 8 },
+  });
+  assert.deepEqual(title.directBodyRange, {
+    start: { offset: 8, line: 2, column: 1 },
+    end: { offset: 13, line: 3, column: 1 },
+  });
+  assert.deepEqual(child.headingRange, {
+    start: { offset: 13, line: 3, column: 1 },
+    end: { offset: 21, line: 3, column: 9 },
+  });
+  assert.deepEqual(child.directBodyRange, {
+    start: { offset: 22, line: 4, column: 1 },
+    end: { offset: 27, line: 5, column: 1 },
+  });
+
+  const untouchedChild = source.slice(child.subtreeRange.start.offset, child.subtreeRange.end.offset);
+  const preview = previewDocument(planFor(source, [{
+    id: 'edit-title',
+    type: 'edit',
+    selector: { sectionId: title.id },
+    markdown: 'new\n',
+  }]), source);
+
+  assert.equal(preview.candidate, '# Title\rnew\r## Child\rtext\r');
+  assert.equal(preview.candidate.includes('\n'), false);
+  assert.equal(preview.candidate.slice(preview.candidate.indexOf('## Child')), untouchedChild);
+});
+
+test('filesystem inspect, preview, and apply preserve a UTF-8 BOM during an unrelated edit', async (context) => {
+  const source = '\uFEFF# Title\n\nIntro stays.\n\n## Later\n\nOld body.\n\n## Tail\n\nTail stays.\n';
+  const root = await projectFixture(context, source);
+  const target = path.join(root, 'README.md');
+  const originalBytes = await fs.readFile(target);
+  assert.deepEqual([...originalBytes.subarray(0, 3)], [0xef, 0xbb, 0xbf]);
+
+  const inspection = await inspectMarkdownFile(root, 'README.md');
+  const later = inspection.sections.find((section) => section.id === 'section:title/later')!;
+  assert.equal(inspection.sections[0]?.subtreeRange.start.offset, 0);
+  assert.equal(inspection.sections[0]?.subtreeRange.end.offset, 0);
+  assert.equal(inspection.sections[1]?.headingRange?.start.offset, 0);
+  assert.equal(inspection.baseHash, planFor(source, [{
+    id: 'keep-title',
+    type: 'preserve',
+    selector: { sectionId: 'section:title' },
+  }]).baseHash);
+
+  const plan = planFor(source, [{
+    id: 'edit-later',
+    type: 'edit',
+    selector: { sectionId: later.id },
+    markdown: '\nNew body.\n\n',
+  }]);
+  const planPath = await writePlan(root, plan, 'bom.json');
+  const firstPreview = await previewDocumentPlanFile(root, planPath);
+  const secondPreview = await previewDocumentPlanFile(root, planPath);
+  assert.equal(firstPreview.inspection.baseHash, secondPreview.inspection.baseHash);
+  assert.equal(firstPreview.candidateHash, secondPreview.candidateHash);
+  assert.equal(firstPreview.reviewToken, secondPreview.reviewToken);
+  assert.equal(firstPreview.candidate.charCodeAt(0), 0xfeff);
+
+  const beforeRange = Buffer.from(source.slice(0, later.directBodyRange.start.offset));
+  const afterRange = Buffer.from(source.slice(later.directBodyRange.end.offset));
+  assert.deepEqual(Buffer.from(firstPreview.candidate.slice(0, later.directBodyRange.start.offset)), beforeRange);
+  assert.deepEqual(Buffer.from(firstPreview.candidate.slice(-source.slice(later.directBodyRange.end.offset).length)), afterRange);
+
+  await applyDocumentPlanFile(root, planPath, firstPreview.reviewToken);
+  const appliedBytes = await fs.readFile(target);
+  assert.deepEqual([...appliedBytes.subarray(0, 3)], [0xef, 0xbb, 0xbf]);
+  assert.deepEqual(appliedBytes.subarray(0, beforeRange.length), beforeRange);
+  assert.deepEqual(appliedBytes.subarray(appliedBytes.length - afterRange.length), afterRange);
+  await assert.rejects(previewDocumentPlanFile(root, planPath), expectCode('STALE_BASE'));
 });
 
 test('review tokens bind canonical semantic plan and candidate, not JSON property order', () => {

@@ -329,7 +329,12 @@ function newlineStyle(source: string): MarkdownInspection['newline'] {
 function lineStarts(source: string): number[] {
   const starts = [0];
   for (let index = 0; index < source.length; index += 1) {
-    if (source[index] === '\n') starts.push(index + 1);
+    if (source[index] === '\r') {
+      if (source[index + 1] === '\n') index += 1;
+      starts.push(index + 1);
+    } else if (source[index] === '\n') {
+      starts.push(index + 1);
+    }
   }
   return starts;
 }
@@ -479,8 +484,10 @@ export function inspectMarkdownSource(targetPath: string, source: string): Markd
   return inspectMarkdown(source, targetPath);
 }
 
-function preferredNewline(inspection: MarkdownInspection): '\n' | '\r\n' {
-  return inspection.newline === 'crlf' ? '\r\n' : '\n';
+function preferredNewline(inspection: MarkdownInspection): '\n' | '\r\n' | '\r' {
+  if (inspection.newline === 'crlf') return '\r\n';
+  if (inspection.newline === 'cr') return '\r';
+  return '\n';
 }
 
 function normalizeInsertedMarkdown(markdown: string, inspection: MarkdownInspection): string {
@@ -714,7 +721,8 @@ async function resolveExistingProjectFile(projectRoot: string, input: string, ki
 async function readUtf8(file: string, code: string): Promise<string> {
   const buffer = await fs.readFile(file);
   try {
-    return new TextDecoder('utf-8', { fatal: true }).decode(buffer);
+    // WHATWG ignoreBOM keeps U+FEFF in the decoded source so unrelated splices preserve its UTF-8 bytes.
+    return new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(buffer);
   } catch {
     throw new DocumentPlanError(code, 'File is not valid UTF-8');
   }
