@@ -37,7 +37,8 @@ program.name('demoweave').description('Agent-native documentation tooling for so
 
 function commandAvailable(command: string): { ok: boolean; version?: string } {
   if (command === 'node') return { ok: true, version: `v${process.versions.node}` };
-  const result = spawnSync(command, ['--version'], { encoding: 'utf8', shell: false, windowsHide: true });
+  const versionArgs = command === 'ffprobe' ? ['-version'] : ['--version'];
+  const result = spawnSync(command, versionArgs, { encoding: 'utf8', shell: false, windowsHide: true });
   return {
     ok: result.status === 0,
     version: (result.stdout || result.stderr || '').trim().split('\n')[0] || undefined,
