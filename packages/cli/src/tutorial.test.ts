@@ -26,7 +26,7 @@ async function fixture(context: test.TestContext): Promise<string> {
     flows: [],
     evidence: [{
       schemaVersion: 1,
-      id: 'proof-video',
+      id: 'source-video',
       kind: 'recording',
       status: 'available',
       format: 'mp4',
@@ -37,7 +37,7 @@ async function fixture(context: test.TestContext): Promise<string> {
   await fs.writeFile(path.join(root, '.demoweave', 'tutorials', 'proof.json'), JSON.stringify({
     schemaVersion: 1,
     id: 'proof',
-    video: { evidenceId: 'proof-video' },
+    video: { evidenceId: 'source-video' },
     metadata: {
       title: 'DemoWeave proof',
       description: 'A short deterministic tutorial package.',
@@ -84,7 +84,7 @@ test('tutorial build creates the complete package when ffmpeg/ffprobe are availa
   const result = run(['tutorial', 'build', 'proof', '--project', root], root);
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
   assert.match(result.stdout, /Tutorial: proof/);
-  assert.match(result.stdout, /Source Evidence: proof-video/);
+  assert.match(result.stdout, /Source Evidence: source-video/);
   assert.match(result.stdout, /Video: 1920x720, 5\.00s/);
   for (const name of [
     'proof.mp4',
