@@ -9,8 +9,12 @@ import path from 'node:path';
 const repository = process.cwd();
 const committedFixture = path.join(repository, 'fixtures', 'web');
 const cli = path.join(repository, 'packages', 'cli', 'dist', 'index.js');
-const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+const npm = process.platform === 'win32' ? (process.env.ComSpec ?? 'cmd.exe') : 'npm';
 const git = process.platform === 'win32' ? 'git.exe' : 'git';
+
+function npmArgs(args) {
+  return process.platform === 'win32' ? ['/d', '/s', '/c', 'npm', ...args] : args;
+}
 
 function sha256(bytes) {
   return createHash('sha256').update(bytes).digest('hex');
@@ -84,7 +88,7 @@ async function trackedSnapshot(projectRoot) {
 function startServer(projectRoot, port) {
   let stdout = '';
   let stderr = '';
-  const child = spawn(npm, ['run', 'dev', '--', '--hostname', '127.0.0.1', '--port', String(port)], {
+  const child = spawn(npm, npmArgs(['run', 'dev', '--', '--hostname', '127.0.0.1', '--port', String(port)]), {
     cwd: projectRoot,
     detached: process.platform !== 'win32',
     windowsHide: true,
@@ -140,8 +144,8 @@ try {
   await runChecked(git, ['add', '.'], { cwd: projectRoot });
   await runChecked(git, ['commit', '-m', 'P1 fixture baseline'], { cwd: projectRoot });
 
-  await runChecked(npm, ['ci'], { cwd: projectRoot });
-  await runChecked(npm, ['run', 'build'], { cwd: projectRoot });
+  await runChecked(npm, npmArgs(['ci']), { cwd: projectRoot });
+  await runChecked(npm, npmArgs(['run', 'build']), { cwd: projectRoot });
   const postBuildStatus = await runChecked(git, ['status', '--porcelain'], { cwd: projectRoot });
   assert.equal(postBuildStatus.stdout, '', `Fixture install/build changed tracked files:\n${postBuildStatus.stdout}`);
 
