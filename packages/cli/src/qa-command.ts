@@ -1,5 +1,6 @@
 import path from 'node:path';
 import type { Command } from 'commander';
+import { analyzeFreshness } from '@demoweave/core';
 import { finalizeVisualQa, prepareVisualQa, RendererError } from '@demoweave/renderer';
 
 function positiveInteger(value: string): number {
@@ -16,14 +17,21 @@ export function registerQaCommand(program: Command): void {
   const qa = program.command('qa').description('Prepare and finalize agent-reviewed visual QA for media Evidence');
 
   qa.command('prepare')
-    .description('Sample PNG/GIF/MP4 Evidence into a deterministic visual-review packet')
-    .argument('<evidence-id>', 'available PNG, GIF, or MP4 Evidence id from Manifest v1')
+    .description('Sample fresh PNG/GIF/MP4 Evidence into a deterministic visual-review packet')
+    .argument('<evidence-id>', 'fresh PNG, GIF, or MP4 Evidence id from Manifest v1')
     .option('--project <path>', 'project root', '.')
     .option('--id <id>', 'review id; defaults to <evidence-id>-review')
     .option('--samples <count>', 'uniform sample count for animated media', positiveInteger, 7)
     .action(async (evidenceId, options) => {
       try {
         const root = path.resolve(options.project);
+        const freshness = await analyzeFreshness(root);
+        const sourceFreshness = freshness.evidence.find((item) => item.evidenceId === evidenceId);
+        if (!sourceFreshness) throw new RendererError('EVIDENCE_NOT_FOUND', `Visual QA references missing Evidence: ${evidenceId}`);
+        if (sourceFreshness.state !== 'fresh') {
+          const reason = sourceFreshness.reasons[0]?.message ?? 'No deterministic fresh baseline is available.';
+          throw new RendererError('QA_SOURCE_NOT_FRESH', `Visual QA requires fresh Evidence; ${evidenceId} is ${sourceFreshness.state}. ${reason}`);
+        }
         const result = await prepareVisualQa(evidenceId, {
           projectRoot: root,
           ...(options.id ? { id: options.id } : {}),
