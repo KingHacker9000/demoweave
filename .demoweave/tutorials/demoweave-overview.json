@@ -18,7 +18,7 @@
     "atMs": 2500,
     "width": 1280,
     "height": 720,
-    "fit": "cover",
+    "fit": "contain",
     "background": "#0b0d14",
     "title": "DemoWeave",
     "subtitle": "Runtime evidence for agent-authored docs"
