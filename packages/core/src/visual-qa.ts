@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { ContentHashSchema, EvidenceFormatSchema } from './evidence.js';
 
 const StableIdSchema = z.string().min(1).regex(/^[a-z0-9]+(?:[a-z0-9-]*[a-z0-9])?$/, 'Expected a lowercase kebab-case id');
+const EvidenceIdSchema = z.string().min(1);
 const TimestampSchema = z.number().int().nonnegative().max(86_400_000);
 const ProjectPathSchema = z.string().min(1).refine((value) => {
   const portable = value.replaceAll('\\', '/');
@@ -28,7 +29,7 @@ export const VisualQACategorySchema = z.enum([
 export const VisualQASignalKindSchema = z.enum(['black-range', 'freeze-range']);
 
 export const VisualQASourceSchema = z.object({
-  evidenceId: StableIdSchema,
+  evidenceId: EvidenceIdSchema,
   path: ProjectPathSchema,
   format: EvidenceFormatSchema.refine((format) => ['png', 'gif', 'mp4'].includes(format), 'Visual QA supports PNG, GIF, or MP4 Evidence'),
   artifactHash: ContentHashSchema,
@@ -144,7 +145,7 @@ export const VisualQAReportSchema = z.object({
   id: StableIdSchema,
   packetId: StableIdSchema,
   packetHash: ContentHashSchema,
-  sourceEvidenceId: StableIdSchema,
+  sourceEvidenceId: EvidenceIdSchema,
   sourceArtifactHash: ContentHashSchema,
   verdict: VisualQAVerdictSchema,
   findings: z.array(VisualQAFindingSchema),
