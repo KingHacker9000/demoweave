@@ -88,7 +88,7 @@ async function trackedSnapshot(projectRoot) {
 function startServer(projectRoot, port) {
   let stdout = '';
   let stderr = '';
-  const child = spawn(npm, npmArgs(['run', 'dev', '--', '--hostname', '127.0.0.1', '--port', String(port)]), {
+  const child = spawn(npm, npmArgs(['run', 'start', '--', '--hostname', '127.0.0.1', '--port', String(port)]), {
     cwd: projectRoot,
     detached: process.platform !== 'win32',
     windowsHide: true,
@@ -209,6 +209,7 @@ try {
   assert.notEqual(changedSource, source);
   await fs.writeFile(sourcePath, changedSource, 'utf8');
   await stopServer(server);
+  await runChecked(npm, npmArgs(['run', 'build']), { cwd: projectRoot });
   server = startServer(projectRoot, port);
   await waitForPage(baseUrl, 'Keep launch work visible and moving.', server.output);
 
