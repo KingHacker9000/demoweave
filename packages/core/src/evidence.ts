@@ -19,6 +19,7 @@ export const EvidenceFormatSchema = z.enum([
   'html',
   'srt',
   'vtt',
+  'ipynb',
 ]);
 
 export const EvidenceStatusSchema = z.enum([
