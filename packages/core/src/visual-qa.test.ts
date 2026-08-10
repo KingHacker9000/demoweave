@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { VisualQAPacketSchema, VisualQAReportSchema } from './visual-qa.js';
 
-function packet() {
+function packet(): any {
   return {
     schemaVersion: 1,
     id: 'terminal-web-proof-review',
@@ -34,7 +34,7 @@ function packet() {
   };
 }
 
-function report() {
+function report(): any {
   return {
     schemaVersion: 1,
     id: 'terminal-web-proof-review',
@@ -53,27 +53,27 @@ test('accepts a deterministic VisualQAPacket v1 for MP4 Evidence', () => {
 
 test('requires duration for animated media and forbids it for PNG', () => {
   const missing = packet();
-  delete (missing.source as any).durationMs;
+  delete missing.source.durationMs;
   assert.equal(VisualQAPacketSchema.safeParse(missing).success, false);
 
   const png = packet();
   png.source.format = 'png';
-  delete (png.source as any).durationMs;
-  png.sampling.samples = [{ ...png.sampling.samples[0]!, atMs: 0 }];
+  delete png.source.durationMs;
+  png.sampling.samples = [{ ...png.sampling.samples[0], atMs: 0 }];
   png.sampling.requestedCount = 1;
   assert.equal(VisualQAPacketSchema.safeParse(png).success, true);
 
-  (png.source as any).durationMs = 5000;
+  png.source.durationMs = 5000;
   assert.equal(VisualQAPacketSchema.safeParse(png).success, false);
 });
 
 test('packet rejects duplicate samples and out-of-range timestamps', () => {
   const duplicate = packet();
-  duplicate.sampling.samples[1]!.id = 'frame-001';
+  duplicate.sampling.samples[1].id = 'frame-001';
   assert.equal(VisualQAPacketSchema.safeParse(duplicate).success, false);
 
   const outside = packet();
-  outside.sampling.samples[2]!.atMs = 5000;
+  outside.sampling.samples[2].atMs = 5000;
   assert.equal(VisualQAPacketSchema.safeParse(outside).success, false);
 });
 
