@@ -62,6 +62,7 @@ jobs:
       - name: Refresh real root composition for downstream M9/M10 dogfood
         run: |
           node packages/cli/dist/index.js compose terminal-web-proof --format mp4 --project .
+          node packages/cli/dist/index.js compose terminal-web-proof --format gif --project .
           node packages/cli/dist/index.js status .
       - name: Build real M9 dogfood tutorial package
         run: |
@@ -90,3 +91,17 @@ jobs:
           path: |
             .demoweave/cache/qa/terminal-web-proof-review/
             .demoweave/qa/reports/terminal-web-proof-review.json
+      - name: Upload fresh root dogfood evidence chain
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: m10-fresh-root-evidence
+          if-no-files-found: error
+          retention-days: 7
+          path: |
+            .demoweave/evidence/artifacts/inspect-project-terminal.terminal.json
+            .demoweave/evidence/manifest.json
+            docs-media/inspect-project-terminal.png
+            docs-media/inspect-project-terminal.gif
+            docs-media/terminal-web-proof.mp4
+            docs-media/terminal-web-proof.gif
