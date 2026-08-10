@@ -43,6 +43,15 @@ test('rejects unsupported schema versions and invalid stable ids', () => {
   assert.equal(TutorialPlanSchema.safeParse({ ...validPlan(), id: 'Demo Weave' }).success, false);
 });
 
+test('rejects source Evidence that collides with generated tutorial video Evidence', () => {
+  const collision = validPlan();
+  collision.id = 'proof';
+  collision.video.evidenceId = 'proof-video';
+  const parsed = TutorialPlanSchema.safeParse(collision);
+  assert.equal(parsed.success, false);
+  if (!parsed.success) assert.match(parsed.error.issues[0]?.message ?? '', /collides with the generated tutorial video Evidence id/);
+});
+
 test('rejects duplicate, overlapping, or reversed caption cues', () => {
   const duplicate = validPlan();
   duplicate.captions[1]!.id = 'intro';
