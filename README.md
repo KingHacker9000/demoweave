@@ -2,7 +2,7 @@
 
 **Runtime evidence for agent-authored software documentation.**
 
-DemoWeave helps Claude Code, Codex, and other coding agents ground documentation in verified repository facts and captured runtime behavior. The agent decides what to explain and writes the narrative; DemoWeave inspects the repository, executes declared terminal or browser workflows, records evidence with provenance, renders and composes media, packages tutorial assets, explains when evidence becomes stale, and safely previews/applies reviewed Markdown changes.
+DemoWeave helps Claude Code, Codex, and other coding agents ground documentation in verified repository facts and captured runtime behavior. The agent decides what to explain and writes the narrative; DemoWeave inspects the repository, executes declared terminal or browser workflows, records evidence with provenance, renders and composes media, packages tutorial assets, prepares deterministic visual-review packets, explains when evidence becomes stale, and safely previews/applies reviewed Markdown changes.
 
 ![DemoWeave inspecting its own repository in a captured terminal workflow](docs-media/inspect-project-terminal.gif)
 
@@ -16,13 +16,13 @@ Many AI documentation workflows stop at:
 source code → LLM → Markdown
 ```
 
-DemoWeave adds deterministic execution, evidence, freshness, presentation, and review boundaries:
+DemoWeave adds deterministic execution, evidence, freshness, presentation, visual review, and document-review boundaries:
 
 ```text
-understand → run → capture evidence → render/compose → check freshness → write → preview diff → reviewed apply
+understand → run → capture evidence → render/compose → visually review → check freshness → write → preview diff → reviewed apply
 ```
 
-The result is a shared workflow in which an agent supplies reasoning and writing while DemoWeave supplies deterministic inspection, execution, evidence, rendering, composition, tutorial packaging, freshness analysis, safe patch review, validation, and provenance.
+The result is a shared workflow in which an agent supplies reasoning, writing, and visual judgment while DemoWeave supplies deterministic inspection, execution, evidence, rendering, composition, tutorial packaging, visual-review preparation/binding, freshness analysis, safe patch review, validation, and provenance.
 
 ## What works today
 
@@ -36,13 +36,14 @@ The result is a shared workflow in which an agent supplies reasoning and writing
 | Terminal rendering | Available | Headless PNG rendering; GIF rendering when FFmpeg is installed |
 | Timeline composition | Available | `TimelinePlan v1`; deterministic single/split scenes over local PNG/GIF Evidence/media; MP4/GIF output through FFmpeg |
 | Tutorial packaging | Available | `TutorialPlan v1`; existing MP4 Evidence → packaged MP4, thumbnail, SRT/VTT, chapters, description, and YouTube-oriented JSON metadata |
+| Visual QA | Available | Fresh PNG/GIF/MP4 Evidence → sampled frames/contact sheet/signals → agent-authored hash-bound PASS or NEEDS-CHANGES report |
 | Safe Markdown planning/patching | Available | `DocumentPlan v1`, section inspection, exact diff preview, review token, atomic apply/discard |
 | Incremental stale tracking | Available | `FreshnessReport v1`, explainable stale chains, document impact, dry-run/minimal selective regeneration |
 | Desktop, mobile, notebook, and research execution | Planned | Surface drivers are not implemented yet |
-| Browser interaction recording | Planned | Web screenshot Evidence exists; M8 composition does not pretend a static browser screenshot is browser video |
-| Narration/TTS and publishing | Planned/optional | M9 packages agent-authored captions/metadata; it does not synthesize narration or upload to a platform |
+| Browser interaction recording | Planned | Web screenshot Evidence exists; composition does not pretend a static browser screenshot is browser video |
+| Narration/TTS and publishing | Planned/optional | Tutorial packaging uses agent-authored captions/metadata; it does not synthesize narration or upload to a platform |
 
-Interactive PTY input, browser video/GIF recording, native desktop/mobile automation, narration generation, automatic publishing, and M10 visual-QA automation are outside the current implementation.
+Interactive PTY input, browser video/GIF recording, native desktop/mobile automation, narration generation, automatic publishing, OCR-based secret detection, and automatic visual fixes are outside the current implementation.
 
 ## How it works
 
@@ -64,10 +65,16 @@ flowchart LR
     TL --> C["MP4 / GIF composition"]
     C --> TP["TutorialPlan v1"]
     TP --> PKG["video + thumbnail + captions + chapters + metadata"]
+    M --> QA["VisualQAPacket v1"]
+    C --> QA
+    PKG --> QA
+    QA --> A
+    A --> QR["VisualQAReport v1"]
     E --> S["freshness analysis"]
     M --> S
     C --> S
     PKG --> S
+    QR --> S
     S --> A
     E --> A
     A --> W["Agent-authored Markdown"]
@@ -82,7 +89,7 @@ The repository includes a [shared DemoWeave skill](skills/demoweave/SKILL.md) th
 
 DemoWeave is currently a source pnpm workspace, not a published npm package. Use it from a repository checkout.
 
-Requirements: Node.js 20+ and pnpm. FFmpeg is optional for core inspection and screenshot capture, but required for GIF rendering, timeline composition, and tutorial thumbnail generation. `ffprobe` is required for tutorial video validation. Playwright Chromium is required only when executing web Flows.
+Requirements: Node.js 20+ and pnpm. FFmpeg is optional for core inspection and screenshot capture, but required for GIF rendering, timeline composition, tutorial thumbnail generation, and sampling animated media for visual QA. `ffprobe` is required for tutorial video validation and MP4 visual QA. Playwright Chromium is required only when executing web Flows.
 
 ```bash
 git clone https://github.com/KingHacker9000/demoweave.git
@@ -101,7 +108,7 @@ node packages/cli/dist/index.js validate .
 
 On Linux, Playwright may also need its system browser dependencies; `playwright install --with-deps chromium` installs those on supported distributions. `doctor` reports whether Chromium, FFmpeg, and ffprobe are ready for the capabilities that use them.
 
-`inspect` writes the generated `.demoweave/project.json` profile. `init` creates Flow, Evidence, document-plan, timeline, and tutorial metadata directories. `validate` checks the profile, committed Flows, DocumentPlans, TimelinePlans, TutorialPlans, Evidence manifest, and cross-file bindings without requiring FFmpeg just to parse metadata.
+`inspect` writes the generated `.demoweave/project.json` profile. `init` creates Flow, Evidence, document-plan, timeline, and tutorial metadata directories. `validate` checks the profile, committed Flows, DocumentPlans, TimelinePlans, TutorialPlans, Evidence manifest, and cross-file bindings without requiring FFmpeg just to parse metadata. Visual QA reports are strictly packet/source-bound by `qa finalize` before they become Evidence.
 
 ## Run a terminal evidence workflow
 
@@ -186,9 +193,33 @@ Each output is recorded as `renderer/tutorial` Evidence derived from the source 
 
 Use `--out-dir <project-relative-path>` when a different package directory is wanted.
 
+## Review visual output
+
+M10 keeps visual judgment with the coding agent while making the evidence being judged deterministic and hash-bound. Review only **fresh** PNG, GIF, or MP4 Evidence:
+
+```bash
+node packages/cli/dist/index.js qa prepare terminal-web-proof-mp4 \
+  --project . \
+  --samples 7
+```
+
+`qa prepare` creates generated review material under `.demoweave/cache/qa/<review-id>/`: sampled PNG frames, a contact sheet, and a `VisualQAPacket v1` containing the exact source hash, timestamps, dimensions, optional scene/caption context, and advisory black/freeze ranges. It also creates a pending durable template under `.demoweave/qa/reports/` if one does not already exist.
+
+The agent opens the contact sheet and relevant frames, then edits the report with a `pass` or `needs-changes` verdict and structured findings such as readability, clipping, loading state, visible-secret risk, dead time, caption mismatch, composition, text overlap, or flicker. Black/freeze ranges are **signals, not automatic failures**; a deliberate final reading hold may be acceptable.
+
+Finalize only after the actual samples were reviewed:
+
+```bash
+node packages/cli/dist/index.js qa finalize terminal-web-proof-mp4-review --project .
+```
+
+Finalization rechecks the exact packet hash, source Evidence/artifact hash, every sampled frame, contact sheet bytes, finding references, and timing. A changed source/packet must be prepared and reviewed again. PASS creates derived `agent/visual-qa` result Evidence and exits zero; NEEDS-CHANGES records the report but returns a failing gate exit status so CI/workflows can stop before publishing bad media.
+
+DemoWeave does not silently run an external vision API, OCR secrets, or auto-fix visual findings. The agent is the reviewer; DemoWeave makes the review reproducible and provenance-aware.
+
 ## Keep evidence fresh
 
-M6 turns provenance into an explain-first update workflow. Check status before regenerating anything:
+M6 turns provenance into an explain-first update workflow. Check status before regenerating or visually reviewing anything:
 
 ```bash
 node packages/cli/dist/index.js status .
@@ -215,7 +246,7 @@ node packages/cli/dist/index.js update . --apply \
   --base-url http://127.0.0.1:3000
 ```
 
-A stale source Evidence item schedules one run of its producing Flow when the required runtime context is available; affected supported terminal derivations are selectively re-rendered. Compositor and tutorial outputs still participate in freshness propagation through `derivedFrom` and plan/file fingerprints, but the current minimal regeneration planner intentionally does not invent automatic compose/tutorial rebuild actions. Unknown baselines are reported rather than guessed. If everything is fresh, `update --apply` executes zero actions, so unchanged evidence and documents are not churned.
+A stale source Evidence item schedules one run of its producing Flow when the required runtime context is available; affected supported terminal derivations are selectively re-rendered. Compositor and tutorial outputs still participate in freshness propagation through `derivedFrom` and plan/file fingerprints, but the current minimal regeneration planner intentionally does not invent automatic compose/tutorial rebuild actions. Finalized QA reports derive from their reviewed source, so later source changes propagate stale state into the review record. Unknown baselines are reported rather than guessed. If everything is fresh, `update --apply` executes zero actions, so unchanged evidence and documents are not churned.
 
 Use `--json` with `status` or `update` for the structured `FreshnessReport v1`/update result.
 
@@ -250,7 +281,7 @@ node packages/cli/dist/index.js docs discard .demoweave/plans/readme.json
 
 The repository also contains a small committed M5 dogfood document/plan. CI previews and applies it in a disposable checkout, verifies stale re-application is rejected, and restores the document afterward.
 
-Use `node packages/cli/dist/index.js --help`, `node packages/cli/dist/index.js docs --help`, and `node packages/cli/dist/index.js tutorial --help` for command help.
+Use `node packages/cli/dist/index.js --help`, `node packages/cli/dist/index.js docs --help`, `node packages/cli/dist/index.js tutorial --help`, and `node packages/cli/dist/index.js qa --help` for command help.
 
 ## Core concepts
 
@@ -260,6 +291,7 @@ Use `node packages/cli/dist/index.js --help`, `node packages/cli/dist/index.js d
 - **Manifest** — the project index that connects Flows to source and derived Evidence.
 - **TimelinePlan** — presentation-only single/split scene composition over local Evidence/media. It never contains browser/terminal automation instructions.
 - **TutorialPlan** — agent-authored tutorial metadata, captions, chapters, and thumbnail treatment bound to an existing MP4 Evidence source.
+- **VisualQAPacket / VisualQAReport** — generated sampled review material plus a durable agent-authored verdict/findings bound to the exact packet and source artifact hashes.
 - **FreshnessReport** — an explainable view of Evidence freshness, impacted Markdown, and the minimal safe regeneration actions currently supported.
 - **DocumentPlan** — an agent-authored, target-hash-bound set of intentional Markdown operations whose exact candidate must be previewed and fingerprinted before atomic apply.
 
@@ -267,9 +299,9 @@ The versioned JSON contracts live in [`schemas/`](schemas/).
 
 ## Project status
 
-DemoWeave is in active development. **M0–M8 plus Pilots P0 and P1 are complete:** the project can inspect multi-ecosystem repositories; execute terminal and Playwright-backed web Flows; capture fingerprinted terminal or browser screenshot Evidence; render terminal PNG/GIF media; compose independent media into deterministic MP4/GIF scenes; explain stale evidence; use runtime artifacts in reviewed Markdown; and prove provenance/no-churn behavior across terminal and web surfaces.
+DemoWeave is in active development. **M0–M9 plus Pilots P0 and P1 are complete:** the project can inspect multi-ecosystem repositories; execute terminal and Playwright-backed web Flows; capture fingerprinted terminal or browser screenshot Evidence; render terminal PNG/GIF media; compose independent media into deterministic MP4/GIF scenes; package existing MP4 Evidence into upload-oriented tutorial assets; explain stale evidence; use runtime artifacts in reviewed Markdown; and prove provenance/no-churn behavior across terminal and web surfaces.
 
-**M9 is current:** `TutorialPlan v1` packages an existing MP4 Evidence source into a video/thumbnail/captions/chapters/metadata bundle. Narration/TTS, publishing, browser recording, and M10 automated visual QA remain separate later work.
+**M10 is current:** deterministic visual-review packets sample fresh PNG/GIF/MP4 Evidence and bind an agent-authored PASS/NEEDS-CHANGES report to the exact source and sampled bytes. OCR-based secret detection, automatic visual fixes, browser recording, narration/TTS, publishing, and the M11 research/notebook driver remain separate later work.
 
 See [ROADMAP.md](ROADMAP.md) for milestone boundaries and future surface drivers.
 
@@ -281,7 +313,7 @@ pnpm test
 pnpm typecheck
 ```
 
-CI installs Chromium and FFmpeg, runs build/full tests/typecheck, exercises M5/M6/M7/P1/M8/M9 smokes on Ubuntu and Windows, and builds the real `demoweave-overview` tutorial package from committed M8 Evidence.
+CI installs Chromium and FFmpeg, runs build/full tests/typecheck, exercises M5/M6/M7/P1/M8/M9/M10 smokes on Ubuntu and Windows, refreshes the real composition, builds the real tutorial package, and prepares/finalizes the reviewed M10 dogfood packet on Linux.
 
 ## License
 
