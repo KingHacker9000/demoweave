@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { VisualQAReportSchema } from './visual-qa.js';
+import { VisualQAPacketSchema, VisualQAReportSchema } from './visual-qa.js';
 
-function report() {
+function packet() {
   return {
     schemaVersion: 1,
     id: 'terminal-web-proof-review',
@@ -19,74 +19,79 @@ function report() {
       strategy: 'uniform',
       requestedCount: 3,
       samples: [
-        { id: 'frame-001', atMs: 0, path: '.demoweave/qa/terminal-web-proof-review/frame-001.png', artifactHash: `sha256:${'b'.repeat(64)}`, width: 1920, height: 720 },
-        { id: 'frame-002', atMs: 2500, path: '.demoweave/qa/terminal-web-proof-review/frame-002.png', artifactHash: `sha256:${'c'.repeat(64)}`, width: 1920, height: 720 },
-        { id: 'frame-003', atMs: 4950, path: '.demoweave/qa/terminal-web-proof-review/frame-003.png', artifactHash: `sha256:${'d'.repeat(64)}`, width: 1920, height: 720 },
+        { id: 'frame-001', atMs: 0, path: '.demoweave/cache/qa/terminal-web-proof-review/frame-001.png', artifactHash: `sha256:${'b'.repeat(64)}`, width: 1920, height: 720 },
+        { id: 'frame-002', atMs: 2500, path: '.demoweave/cache/qa/terminal-web-proof-review/frame-002.png', artifactHash: `sha256:${'c'.repeat(64)}`, width: 1920, height: 720 },
+        { id: 'frame-003', atMs: 4950, path: '.demoweave/cache/qa/terminal-web-proof-review/frame-003.png', artifactHash: `sha256:${'d'.repeat(64)}`, width: 1920, height: 720 },
       ],
     },
+    contactSheet: {
+      path: '.demoweave/cache/qa/terminal-web-proof-review/contact-sheet.png',
+      artifactHash: `sha256:${'e'.repeat(64)}`,
+      width: 1280,
+      height: 760,
+    },
     signals: [],
+  };
+}
+
+function report() {
+  return {
+    schemaVersion: 1,
+    id: 'terminal-web-proof-review',
+    packetId: 'terminal-web-proof-review',
+    packetHash: `sha256:${'f'.repeat(64)}`,
+    sourceEvidenceId: 'terminal-web-proof-mp4',
+    sourceArtifactHash: `sha256:${'a'.repeat(64)}`,
     verdict: 'pending',
     findings: [],
   };
 }
 
-test('accepts a pending VisualQAReport v1 prepared from MP4 Evidence', () => {
-  assert.equal(VisualQAReportSchema.safeParse(report()).success, true);
+test('accepts a deterministic VisualQAPacket v1 for MP4 Evidence', () => {
+  assert.equal(VisualQAPacketSchema.safeParse(packet()).success, true);
 });
 
 test('requires duration for animated media and forbids it for PNG', () => {
-  const missing = report();
+  const missing = packet();
   delete (missing.source as any).durationMs;
-  assert.equal(VisualQAReportSchema.safeParse(missing).success, false);
+  assert.equal(VisualQAPacketSchema.safeParse(missing).success, false);
 
-  const png = report();
+  const png = packet();
   png.source.format = 'png';
   delete (png.source as any).durationMs;
-  png.sampling.samples = [png.sampling.samples[0]!];
+  png.sampling.samples = [{ ...png.sampling.samples[0]!, atMs: 0 }];
   png.sampling.requestedCount = 1;
-  assert.equal(VisualQAReportSchema.safeParse(png).success, true);
+  assert.equal(VisualQAPacketSchema.safeParse(png).success, true);
 
   (png.source as any).durationMs = 5000;
-  assert.equal(VisualQAReportSchema.safeParse(png).success, false);
+  assert.equal(VisualQAPacketSchema.safeParse(png).success, false);
 });
 
-test('rejects duplicate samples and out-of-range timestamps', () => {
-  const duplicate = report();
+test('packet rejects duplicate samples and out-of-range timestamps', () => {
+  const duplicate = packet();
   duplicate.sampling.samples[1]!.id = 'frame-001';
-  assert.equal(VisualQAReportSchema.safeParse(duplicate).success, false);
+  assert.equal(VisualQAPacketSchema.safeParse(duplicate).success, false);
 
-  const outside = report();
+  const outside = packet();
   outside.sampling.samples[2]!.atMs = 5000;
-  assert.equal(VisualQAReportSchema.safeParse(outside).success, false);
+  assert.equal(VisualQAPacketSchema.safeParse(outside).success, false);
 });
 
-test('validates agent findings against prepared samples and source duration', () => {
-  const reviewed = report();
-  reviewed.verdict = 'needs-changes';
-  reviewed.findings = [{
-    id: 'clipped-title',
-    severity: 'error',
-    category: 'clipping',
-    message: 'The title is clipped in the final frame.',
-    sampleId: 'frame-003',
-    startMs: 4500,
-    endMs: 4950,
-    recommendation: 'Increase lower padding before rendering again.',
-  }];
-  assert.equal(VisualQAReportSchema.safeParse(reviewed).success, true);
+test('packet rejects unsafe paths and invalid signal ranges', () => {
+  const unsafe = packet();
+  unsafe.source.path = '../outside.mp4';
+  assert.equal(VisualQAPacketSchema.safeParse(unsafe).success, false);
 
-  reviewed.findings[0]!.sampleId = 'missing-frame';
-  assert.equal(VisualQAReportSchema.safeParse(reviewed).success, false);
+  const signal = packet();
+  signal.signals = [{ id: 'freeze-1', kind: 'freeze-range', startMs: 3000, endMs: 2500 }];
+  assert.equal(VisualQAPacketSchema.safeParse(signal).success, false);
 });
 
-test('a passing report cannot contain error findings', () => {
-  const reviewed = report();
-  reviewed.verdict = 'pass';
-  reviewed.findings = [{ id: 'bad', severity: 'error', category: 'readability', message: 'Unreadable.' }];
-  assert.equal(VisualQAReportSchema.safeParse(reviewed).success, false);
+test('accepts a pending durable VisualQAReport v1 bound to a packet/source hash', () => {
+  assert.equal(VisualQAReportSchema.safeParse(report()).success, true);
 });
 
-test('needs-changes requires a warning/error while pass may contain info findings', () => {
+test('report validates verdict/finding severity relationships', () => {
   const needs = report();
   needs.verdict = 'needs-changes';
   needs.findings = [{ id: 'note', severity: 'info', category: 'other', message: 'Informational only.' }];
@@ -94,16 +99,33 @@ test('needs-changes requires a warning/error while pass may contain info finding
 
   const pass = report();
   pass.verdict = 'pass';
-  pass.findings = [{ id: 'note', severity: 'info', category: 'other', message: 'Presentation is intentionally static here.' }];
-  assert.equal(VisualQAReportSchema.safeParse(pass).success, true);
+  pass.findings = [{ id: 'bad', severity: 'error', category: 'readability', message: 'Unreadable.' }];
+  assert.equal(VisualQAReportSchema.safeParse(pass).success, false);
+
+  const valid = report();
+  valid.verdict = 'needs-changes';
+  valid.findings = [{
+    id: 'clipped-title',
+    severity: 'error',
+    category: 'clipping',
+    message: 'The title is clipped in the final sample.',
+    sampleId: 'frame-003',
+    startMs: 4500,
+    endMs: 4950,
+    recommendation: 'Increase lower padding before rendering again.',
+  }];
+  assert.equal(VisualQAReportSchema.safeParse(valid).success, true);
 });
 
-test('rejects unsafe project-relative paths and invalid signal ranges', () => {
-  const unsafe = report();
-  unsafe.source.path = '../outside.mp4';
-  assert.equal(VisualQAReportSchema.safeParse(unsafe).success, false);
+test('report rejects duplicate finding ids and incomplete time ranges', () => {
+  const duplicate = report();
+  duplicate.findings = [
+    { id: 'same', severity: 'info', category: 'other', message: 'One.' },
+    { id: 'same', severity: 'warning', category: 'composition', message: 'Two.' },
+  ];
+  assert.equal(VisualQAReportSchema.safeParse(duplicate).success, false);
 
-  const signal = report();
-  signal.signals = [{ id: 'freeze-1', kind: 'freeze-range', startMs: 3000, endMs: 2500 }];
-  assert.equal(VisualQAReportSchema.safeParse(signal).success, false);
+  const range = report();
+  range.findings = [{ id: 'range', severity: 'info', category: 'other', message: 'Range.', startMs: 1000 }];
+  assert.equal(VisualQAReportSchema.safeParse(range).success, false);
 });
