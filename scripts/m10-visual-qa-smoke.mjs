@@ -81,9 +81,9 @@ try {
   await fs.appendFile(path.join(root, 'media', 'proof.mp4'), Buffer.from('changed'));
   const changed = run(['qa', 'prepare', 'proof-video', '--project', root, '--id', 'changed-review', '--samples', '3']);
   assert.equal(changed.status, 1);
-  assert.match(changed.stderr, /QA_SOURCE_HASH_MISMATCH/);
+  assert.match(changed.stderr, /QA_SOURCE_NOT_FRESH/);
 
-  console.log('M10 visual QA smoke passed: deterministic MP4 sampling/contact sheet -> agent report binding -> finalized QA Evidence.');
+  console.log('M10 visual QA smoke passed: fresh MP4 Evidence -> deterministic sampling/contact sheet -> agent report binding -> finalized QA Evidence; stale media is refused.');
 } finally {
   await fs.rm(root, { recursive: true, force: true });
 }
