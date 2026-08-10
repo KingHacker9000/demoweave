@@ -73,6 +73,17 @@ test('init creates the TutorialPlan directory', async (context) => {
   assert.equal((await fs.stat(path.join(root, '.demoweave', 'tutorials'))).isDirectory(), true);
 });
 
+test('doctor recognizes an installed ffprobe', (context) => {
+  const ffprobe = spawnSync('ffprobe', ['-version'], { encoding: 'utf8', windowsHide: true });
+  if (ffprobe.status !== 0) {
+    context.skip('ffprobe is not available on PATH');
+    return;
+  }
+  const result = run(['doctor']);
+  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+  assert.match(result.stdout, /^OK\s+ffprobe\s+/m);
+});
+
 test('tutorial build creates the complete package when ffmpeg/ffprobe are available', async (context) => {
   const ffmpeg = spawnSync('ffmpeg', ['-version'], { encoding: 'utf8', windowsHide: true });
   const ffprobe = spawnSync('ffprobe', ['-version'], { encoding: 'utf8', windowsHide: true });
