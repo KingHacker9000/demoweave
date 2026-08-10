@@ -8,6 +8,7 @@
   ],
   "$defs": {
     "stableId": { "type": "string", "minLength": 1, "pattern": "^[a-z0-9]+(?:[a-z0-9-]*[a-z0-9])?$" },
+    "evidenceId": { "type": "string", "minLength": 1 },
     "timestamp": { "type": "integer", "minimum": 0, "maximum": 86400000 },
     "hash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
     "projectPath": {
@@ -20,7 +21,7 @@
       "additionalProperties": false,
       "required": ["evidenceId", "path", "format", "artifactHash", "width", "height"],
       "properties": {
-        "evidenceId": { "$ref": "#/$defs/stableId" },
+        "evidenceId": { "$ref": "#/$defs/evidenceId" },
         "path": { "$ref": "#/$defs/projectPath" },
         "format": { "enum": ["png", "gif", "mp4"] },
         "artifactHash": { "$ref": "#/$defs/hash" },
@@ -135,7 +136,7 @@
         "id": { "$ref": "#/$defs/stableId" },
         "packetId": { "$ref": "#/$defs/stableId" },
         "packetHash": { "$ref": "#/$defs/hash" },
-        "sourceEvidenceId": { "$ref": "#/$defs/stableId" },
+        "sourceEvidenceId": { "$ref": "#/$defs/evidenceId" },
         "sourceArtifactHash": { "$ref": "#/$defs/hash" },
         "verdict": { "enum": ["pending", "pass", "needs-changes"] },
         "findings": { "type": "array", "items": { "$ref": "#/$defs/finding" } }
