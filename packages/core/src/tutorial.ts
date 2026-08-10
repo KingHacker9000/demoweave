@@ -53,6 +53,14 @@ export const TutorialPlanSchema = z.object({
   captions: z.array(TutorialCaptionCueSchema).min(1),
   chapters: z.array(TutorialChapterSchema).min(1),
 }).strict().superRefine((plan, ctx) => {
+  if (plan.video.evidenceId === `${plan.id}-video`) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['video', 'evidenceId'],
+      message: `Source Evidence id ${plan.video.evidenceId} collides with the generated tutorial video Evidence id`,
+    });
+  }
+
   const captionIds = new Set<string>();
   let previousCaptionEnd = -1;
   plan.captions.forEach((cue, index) => {
