@@ -28,7 +28,7 @@ try {
   await fs.writeFile(path.join(root, '.demoweave', 'tutorials', 'proof.json'), JSON.stringify({
     schemaVersion: 1,
     id: 'proof',
-    video: { evidenceId: 'proof-video' },
+    video: { evidenceId: 'source-video' },
     metadata: {
       title: 'DemoWeave evidence proof',
       description: 'A deterministic package built from verified MP4 Evidence.',
@@ -56,7 +56,7 @@ try {
     flows: [],
     evidence: [{
       schemaVersion: 1,
-      id: 'proof-video',
+      id: 'source-video',
       kind: 'recording',
       status: 'available',
       format: 'mp4',
@@ -69,7 +69,7 @@ try {
   const first = build();
   assert.equal(first.status, 0, `${first.stdout}\n${first.stderr}`);
   assert.match(first.stdout, /Tutorial: proof/);
-  assert.match(first.stdout, /Source Evidence: proof-video/);
+  assert.match(first.stdout, /Source Evidence: source-video/);
   assert.match(first.stdout, /Video: 1920x720, 5\.00s/);
 
   const base = 'output/tutorials/proof';
@@ -90,7 +90,7 @@ try {
   assert.equal(await fs.readFile(path.join(root, `${base}/proof-chapters.txt`), 'utf8'), '0:00 Evidence proof\n');
   assert.match(await fs.readFile(path.join(root, `${base}/proof-description.txt`), 'utf8'), /Chapters\n0:00 Evidence proof/);
   const metadata = JSON.parse(await fs.readFile(path.join(root, `${base}/proof-youtube.json`), 'utf8'));
-  assert.equal(metadata.sourceEvidenceId, 'proof-video');
+  assert.equal(metadata.sourceEvidenceId, 'source-video');
   assert.deepEqual(metadata.video, { width: 1920, height: 720, durationMs: 5000 });
 
   const probe = spawnSync('ffprobe', ['-v', 'error', '-show_entries', 'stream=width,height:format=duration', '-of', 'json', path.join(root, `${base}/proof.mp4`)], { encoding: 'utf8', shell: false });
@@ -103,7 +103,7 @@ try {
   const manifest = JSON.parse(await fs.readFile(path.join(root, '.demoweave', 'evidence', 'manifest.json'), 'utf8'));
   const tutorialEvidence = manifest.evidence.filter((item) => item.producer?.id === 'tutorial');
   assert.equal(tutorialEvidence.length, 7);
-  assert.ok(tutorialEvidence.every((item) => item.derivedFrom?.length === 1 && item.derivedFrom[0] === 'proof-video'));
+  assert.ok(tutorialEvidence.every((item) => item.derivedFrom?.length === 1 && item.derivedFrom[0] === 'source-video'));
   assert.ok(tutorialEvidence.every((item) => /^sha256:[0-9a-f]{64}$/.test(item.artifactHash ?? '')));
 
   const before = await snapshot(tracked);
