@@ -16,9 +16,10 @@ DemoWeave is **multi-surface by design**. A repository may expose web, CLI, desk
 | P0 — DemoWeave documents itself | ✅ Complete | First public-quality dogfood README using real DemoWeave evidence |
 | M5 — Safe Markdown patching | ✅ Complete | Section-aware plan → preview/review token → atomic apply |
 | M6 — Incremental stale tracking | ✅ Complete | Explainable freshness → minimal selective regeneration → no-change/no-churn |
-| **M7 — Web driver (Playwright)** | **🚧 Current** | Implement Flow v1 against browser surfaces |
+| M7 — Web driver (Playwright) | ✅ Complete | Semantic browser Flow execution + fingerprinted PNG screenshot Evidence |
+| **P1 — Web fixture pilot** | **🚧 Current** | Prove the public documentation workflow on a second surface |
 
-M0/M1 landed in PR #1, M2 in PR #2, M3 in PR #3, M4 in PR #4, Pilot P0 in PR #5, M5 in PR #6, and M6 in PR #7.
+M0/M1 landed in PR #1, M2 in PR #2, M3 in PR #3, M4 in PR #4, Pilot P0 in PR #5, M5 in PR #6, M6 in PR #7, and M7 in PR #8.
 
 ## Product principles
 
@@ -28,7 +29,7 @@ M0/M1 landed in PR #1, M2 in PR #2, M3 in PR #3, M4 in PR #4, Pilot P0 in PR #5,
 - **Preserve good existing documentation.** Patch intentionally instead of regenerating blindly.
 - **README.md and arbitrary Markdown are first-class targets.** `/docs` is not special.
 - **No OBS requirement.** Capture the smallest useful surface directly and compose later.
-- **One source of truth for demos.** Structured Flows feed evidence, GIFs, docs, and later tutorials.
+- **One source of truth for demos.** Structured Flows feed evidence, docs, and later animated/tutorial outputs.
 - **Incremental by default.** Provenance should make stale evidence selectively regenerable.
 - **Unknown is not stale.** When a deterministic baseline is unavailable, report uncertainty instead of inventing a conclusion.
 - **Claude Code and Codex share the same workflow contracts.**
@@ -46,12 +47,14 @@ Agent reasoning
 Flow v1 + declared sources
   ↓
 SurfaceDriver v1
+  ├─ terminal → TerminalTrack Evidence
+  └─ web/Playwright → screenshot Evidence
   ↓
 Evidence v1 + Manifest v1 + fingerprints
   ↓
-Renderer
+optional renderer
   ↓
-PNG / GIF
+PNG / GIF (currently terminal renderer)
   ↓
 FreshnessReport v1
   ↓
@@ -62,7 +65,7 @@ DocumentPlan v1
 reviewed Markdown patch
 ```
 
-P0 proved the evidence path with DemoWeave itself. M5 added the reviewed document-editing path. M6 closes the loop for living documentation: current Flow/source/artifact bytes are compared with deterministic provenance fingerprints, stale state propagates through derived Evidence, impacted Markdown is identified, and only the necessary Flow/render actions are proposed.
+P0 proved the terminal evidence path with DemoWeave itself. M5 added reviewed document editing. M6 closed the freshness loop. M7 proves that the same Flow/Evidence/Manifest/freshness contracts can drive a second surface—Chromium through Playwright—without introducing browser-specific instructions into Flow v1.
 
 ## Established contracts
 
@@ -74,9 +77,11 @@ Deterministic repository facts: components, ecosystems, manifests, workspaces, e
 
 Platform-neutral semantic steps such as `run`, `navigate`, `activate`, `input`, `press`, `scroll`, `wait`, `assert`, and `capture`. Terminal run steps may declare `expectedExitCodes`; omission means `[0]`. Flows may also declare project-relative source dependencies that materially determine their captured result.
 
+M7 deliberately reuses this contract. Raw Playwright selectors, browser launch flags, origins, and implementation scripts do not belong in Flow v1.
+
 ### Evidence v1 / Manifest v1
 
-Evidence records lifecycle, artifact metadata, producer, provenance, optional SHA-256 source/Flow/artifact fingerprints, and derivation. Manifest v1 indexes Flows and Evidence and preserves source/derived relationships.
+Evidence records lifecycle, artifact metadata, producer, provenance, optional SHA-256 source/Flow/artifact fingerprints, and derivation. Manifest v1 indexes Flows and Evidence and preserves source/derived relationships. Current source Evidence includes terminal tracks and web PNG screenshots.
 
 ### TerminalTrack v1
 
@@ -172,55 +177,69 @@ Delivered:
 
 ## M6 — Incremental stale/update tracking ✅
 
-**Goal achieved:** DemoWeave can explain why existing Evidence is fresh/stale/missing/unknown, trace that state through rendered derivations into Markdown references, and compute a minimal deterministic regeneration plan before changing anything.
+DemoWeave can explain why existing Evidence is fresh/stale/missing/unknown, trace that state through rendered derivations into Markdown references, and compute a minimal deterministic regeneration plan before changing anything.
 
 Delivered:
 
-- optional explicit `sources` on Flow v1 with roles for implementation/config/fixture/data/asset/other
-- SHA-256 fingerprints for producing Flow definitions, declared source dependencies, source Evidence artifacts, and CLI-rendered derived artifacts
-- backward-compatible preservation of pre-existing Evidence-level source provenance
-- git-commit fallback for older Evidence that predates fingerprints
-- `unknown` state when an old baseline cannot be reached, rather than guessed freshness
-- explicit reason codes for changed/missing artifacts, source dependencies, Flow definitions, declared lifecycle state, and upstream propagation
-- recursive stale/missing/unknown propagation through `derivedFrom`
-- local Markdown link/image resolution to identify documents impacted by affected Evidence
-- `FreshnessReport v1` runtime validation + published JSON Schema
-- `demoweave status [path] [--json]` freshness explanations
-- `demoweave update [path] [--json]` dry-run minimal regeneration plan
-- `demoweave update [path] --apply` selective execution
-- one producing Flow run per affected Flow, followed only by required PNG/GIF renders
-- unknown Evidence excluded from automatic regeneration
-- full-history CI so legacy git baselines can be validated
-- self-dogfood that begins from stale committed evidence, explains the source → Evidence → PNG/GIF → README chain, applies exactly one Flow + two renders, reaches fully fresh state, then runs update again with **zero actions and zero tracked byte churn**
-- hosted Ubuntu + Windows build/test/typecheck and M6 dogfood coverage
+- optional explicit `sources` on Flow v1
+- SHA-256 Flow/source/artifact fingerprints
+- backward-compatible preservation of Evidence-level source provenance
+- git-commit fallback for older Evidence
+- `unknown` instead of guessed freshness when an old baseline cannot be reached
+- explicit stale/missing/unknown reason codes and recursive upstream propagation
+- local Markdown impact detection
+- `FreshnessReport v1`
+- `demoweave status` and dry-run/selective `demoweave update`
+- self-dogfood proving one Flow + two renders repair the stale chain, followed by zero-action/zero-churn update
+- hosted Ubuntu + Windows coverage
 
-M6 deliberately does not infer undocumented source dependencies, rewrite impacted prose automatically, or implement browser capture.
+## M7 — Web driver (Playwright) ✅
+
+**Goal achieved:** DemoWeave can execute the existing semantic Flow v1 against a browser surface and capture screenshot Evidence without adding Playwright-specific operations to the shared contracts.
+
+Delivered:
+
+- `WebDriver` implementing `SurfaceDriver v1` for `web` surfaces
+- Playwright Chromium runtime pinned in the workspace lockfile
+- deterministic fresh browser context per Flow: fixed viewport/device scale, locale, UTC timezone, light color scheme, reduced motion, blocked service workers
+- semantic target mapping for `text`, `label`, `role`, `name`, `testId`, `accessibilityId`, and `automationId`
+- `navigate`, `activate`, `input`, `press`, and deterministic pixel `scroll`
+- supported duration/visible/hidden/text waits
+- visible/hidden/text-contains assertions
+- explicit failures for unsupported terminal-only waits/assertions
+- relative navigation through runtime `--base-url`; no guessed origin or arbitrary app-server startup
+- optional `--headed` local debugging mode
+- HTTP error navigation diagnostics
+- viewport or element PNG screenshot capture with animation/caret suppression
+- atomic screenshot writes under `.demoweave/evidence/artifacts/`
+- `driver/web` Evidence provenance plus the existing M6 Flow/source/artifact fingerprint snapshot
+- `demoweave doctor` Playwright Chromium readiness reporting
+- local HTTP integration tests for success, missing base URL, and HTTP failure behavior
+- built-CLI M7 smoke that launches Chromium, executes a semantic Flow, verifies PNG bytes/provenance/fingerprints/freshness, and validates the project
+- hosted Ubuntu + Windows build/test/typecheck and M7 browser smoke coverage
+
+M7 intentionally does **not** add raw Playwright selectors/scripts to Flow v1, auto-start arbitrary repository dev servers, or implement browser video/interaction GIF recording. Those are separate later concerns.
 
 ---
 
-# Current milestone
+# Current pilot
 
-## M7 — Web driver (Playwright) 🚧
+## P1 — Controlled web fixture 🚧
 
-**Goal:** implement Flow v1 against browser surfaces without changing the platform-neutral Flow/Evidence contracts.
+**Goal:** turn the M7 runtime into the first public browser-evidence documentation proof, analogous to P0 for terminal evidence.
 
-Initial scope:
+P1 should:
 
-- launch/connect to a web surface deterministically
-- `navigate`
-- semantic target resolution for existing interaction target strategies
-- `activate`, `input`, `press`, and `scroll`
-- supported waits/assertions
-- screenshots and bounded viewport recordings as Evidence
-- browser/viewport metadata and useful failure diagnostics
-- deterministic cleanup and path safety
-- provenance/freshness integration using the M6 contracts rather than a separate web-specific stale system
+- use the controlled web fixture rather than an arbitrary external website
+- run the real built DemoWeave CLI against a detected `web` surface
+- capture a meaningful browser screenshot as fingerprinted Evidence
+- use that Evidence in concise example documentation
+- prove freshness/document-impact behavior on the web Evidence path
+- keep the existing Flow v1 / Evidence v1 / Manifest v1 contracts unchanged
+- keep application startup explicit and separate from the Flow
+- remain reproducible on hosted Ubuntu and Windows
 
-Do not embed raw Playwright selectors or scripts into Flow v1. Browser implementation details belong in the web driver.
-
-### P1 — Web fixture
-
-After the driver is stable, generate a hero screenshot, interaction GIF, short video, and example documentation from a controlled web fixture without changing the Flow/Evidence contracts.
+P1 does **not** need to fabricate an interaction GIF or video before a browser recording/composition milestone exists. Static browser Evidence is enough to prove the second surface honestly; animated/tutorial output remains later work.
 
 ---
 
@@ -228,7 +247,7 @@ After the driver is stable, generate a hero screenshot, interaction GIF, short v
 
 ## M8 — Timeline compositor
 
-Compose independent source tracks into polished single-source/split-screen scenes with crop/scale, zoom, titles, transitions, and audio — without OBS.
+Compose independent source tracks into polished single-source/split-screen scenes with crop/scale, zoom, titles, transitions, and audio — without OBS. Browser recording input should be added deliberately before claiming browser GIF/video output.
 
 ## M9 — Full tutorial output
 
@@ -262,7 +281,7 @@ Integrate rather than replace existing stacks: plain Markdown/GitHub, Fumadocs, 
 
 # 1.0 target
 
-DemoWeave 1.0 should provide stable agent workflows and contracts, multi-surface analysis, terminal + web + process/library support, screenshot/GIF/video evidence, arbitrary Markdown support, safe patch/review, incremental stale tracking, lightweight media composition, tutorial output, and an extension path for desktop/mobile/research.
+DemoWeave 1.0 should provide stable agent workflows and contracts, multi-surface analysis, terminal + web + process/library support, screenshot/GIF/video evidence where the required capture/render paths exist, arbitrary Markdown support, safe patch/review, incremental stale tracking, lightweight media composition, tutorial output, and an extension path for desktop/mobile/research.
 
 # Development order
 
@@ -276,9 +295,9 @@ DemoWeave 1.0 should provide stable agent workflows and contracts, multi-surface
 | 6 | ✅ P0 — self-document README | first public-quality dogfood demo |
 | 7 | ✅ M5 — safe Markdown patching | reliable reviewed document edits |
 | 8 | ✅ M6 — stale tracking | living documentation |
-| 9 | **🚧 M7 — web driver** | website support |
-| 10 | P1 — web fixture | second-surface proof |
-| 11 | M8 — compositor | split-screen scenes |
+| 9 | ✅ M7 — web driver | website execution + screenshot Evidence |
+| 10 | **🚧 P1 — web fixture** | second-surface public proof |
+| 11 | M8 — compositor | split-screen scenes / future browser media composition |
 | 12 | M9/M10 — tutorial + QA | YouTube-ready output |
 | 13 | M11 — research/notebook | research repos |
 | 14 | M12 — desktop | native apps |
@@ -290,6 +309,6 @@ DemoWeave 1.0 should provide stable agent workflows and contracts, multi-surface
 
 # Current next step
 
-## NOW: M7 — Playwright web driver
+## NOW: P1 — web fixture pilot
 
-Implement the first browser-backed `SurfaceDriver v1` while keeping Flow v1 semantic and platform-neutral. Start with a controlled fixture and deterministic screenshot evidence; then add interaction/assertion coverage and short viewport recording before Pilot P1.
+Use the shipped M7 Playwright driver on the controlled web fixture, capture the first browser Evidence intended for documentation, wire that Evidence into a concise example doc, and prove the same provenance/freshness/review workflow that P0 established for terminal output.

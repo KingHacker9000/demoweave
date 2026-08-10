@@ -18,7 +18,7 @@ import {
   validateMetadataBindings,
   type FlowFile,
 } from '@demoweave/core';
-import { FlowExecutionError, runFlow } from '@demoweave/drivers';
+import { FlowExecutionError, getWebDriverCapabilities, runFlow } from '@demoweave/drivers';
 import {
   getRendererCapabilities,
   renderEvidence,
@@ -117,6 +117,9 @@ program.command('doctor').description('Check local DemoWeave prerequisites').act
   console.log(`${'OK'.padEnd(8)} renderer PNG  headless SVG rasterization`);
   const ffmpegStatus = renderer.gif ? 'OK' : 'OPTIONAL';
   console.log(`${ffmpegStatus.padEnd(8)} ffmpeg GIF${renderer.ffmpegVersion ? `  ${renderer.ffmpegVersion}` : '  not found; install FFmpeg to enable GIF rendering'}`);
+  const web = await getWebDriverCapabilities();
+  const webStatus = web.chromium ? 'OK' : 'OPTIONAL';
+  console.log(`${webStatus.padEnd(8)} playwright web${web.chromium ? '  Chromium ready' : '  Chromium not installed; run: pnpm --filter @demoweave/drivers exec playwright install chromium'}`);
   if (failedRequired) process.exitCode = 1;
 });
 
@@ -219,12 +222,16 @@ program.command('run')
   .description('Execute a DemoWeave Flow with a compatible surface driver')
   .argument('<flow-id-or-path>', 'Flow id from the manifest or path to a Flow v1 JSON file')
   .option('--project <path>', 'project root', '.')
-  .option('--timeout <ms>', 'per-command timeout in milliseconds', positiveInteger, 30_000)
+  .option('--timeout <ms>', 'default driver action timeout in milliseconds', positiveInteger, 30_000)
+  .option('--base-url <url>', 'base URL for relative web navigation')
+  .option('--headed', 'show the browser window while running web Flows')
   .action(async (reference, options) => {
     try {
       const result = await runFlow(reference, {
         projectRoot: options.project,
         commandTimeoutMs: options.timeout,
+        ...(options.baseUrl ? { baseUrl: options.baseUrl } : {}),
+        headless: !options.headed,
       });
       console.log(`Flow: ${result.flowId}`);
       console.log(`Surface: ${result.surfaceId} (${result.surfaceType})`);
