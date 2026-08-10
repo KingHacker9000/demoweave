@@ -107,6 +107,72 @@
       "derivedFrom": [
         "inspect-project-terminal"
       ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "terminal-web-proof-gif",
+      "kind": "recording",
+      "status": "available",
+      "label": "terminal-web-proof composition (GIF)",
+      "format": "gif",
+      "path": "docs-media/terminal-web-proof.gif",
+      "artifactHash": "sha256:b3a3beb65e634ed680e70e85fec1446d895d7e9a84241d76f58924fcbe3c4678",
+      "mimeType": "image/gif",
+      "producer": {
+        "kind": "renderer",
+        "id": "compositor",
+        "version": "0.0.1"
+      },
+      "provenance": {
+        "sources": [
+          {
+            "path": ".demoweave/timelines/terminal-web-proof.json",
+            "role": "config",
+            "hash": "sha256:a9094559c143627f69b522185321b8da37e552d52437aa87d303d4617c40e98e"
+          },
+          {
+            "path": "fixtures/web/.demoweave/evidence/artifacts/create-project-result.png",
+            "role": "asset",
+            "hash": "sha256:580c70110f55c265d372cbd9f5deda0f12d94ccc0a51ef679b57a9ccef3a1b3d"
+          }
+        ]
+      },
+      "derivedFrom": [
+        "inspect-project-terminal-gif"
+      ]
+    },
+    {
+      "schemaVersion": 1,
+      "id": "terminal-web-proof-mp4",
+      "kind": "recording",
+      "status": "available",
+      "label": "terminal-web-proof composition (MP4)",
+      "format": "mp4",
+      "path": "docs-media/terminal-web-proof.mp4",
+      "artifactHash": "sha256:5ec61b8d4ef089c0d893ec8af865e31350de6201b88d1ec6e8ca1cdb0e3d6b20",
+      "mimeType": "video/mp4",
+      "producer": {
+        "kind": "renderer",
+        "id": "compositor",
+        "version": "0.0.1"
+      },
+      "provenance": {
+        "sources": [
+          {
+            "path": ".demoweave/timelines/terminal-web-proof.json",
+            "role": "config",
+            "hash": "sha256:a9094559c143627f69b522185321b8da37e552d52437aa87d303d4617c40e98e"
+          },
+          {
+            "path": "fixtures/web/.demoweave/evidence/artifacts/create-project-result.png",
+            "role": "asset",
+            "hash": "sha256:580c70110f55c265d372cbd9f5deda0f12d94ccc0a51ef679b57a9ccef3a1b3d"
+          }
+        ]
+      },
+      "derivedFrom": [
+        "inspect-project-terminal-gif"
+      ]
     }
   ]
 }

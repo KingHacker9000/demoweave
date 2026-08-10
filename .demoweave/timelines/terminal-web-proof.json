@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "id": "terminal-web-proof",
+  "canvas": {
+    "width": 1920,
+    "height": 720,
+    "fps": 20,
+    "background": "#0b0d14"
+  },
+  "scenes": [
+    {
+      "id": "proof",
+      "durationMs": 5000,
+      "transition": "cut",
+      "layout": {
+        "type": "split",
+        "direction": "horizontal",
+        "gap": 28,
+        "padding": 36
+      },
+      "panes": [
+        {
+          "id": "terminal",
+          "source": {
+            "kind": "evidence",
+            "evidenceId": "inspect-project-terminal-gif"
+          },
+          "fit": "contain"
+        },
+        {
+          "id": "browser",
+          "source": {
+            "kind": "file",
+            "path": "fixtures/web/.demoweave/evidence/artifacts/create-project-result.png"
+          },
+          "fit": "contain"
+        }
+      ]
+    }
+  ]
+}

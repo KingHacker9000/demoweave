@@ -26,7 +26,7 @@ export type RendererCapabilities = {
   png: true;
   gif: boolean;
   webm: false;
-  mp4: false;
+  mp4: boolean;
   ffmpegVersion?: string;
 };
 
@@ -297,7 +297,7 @@ export async function getRendererCapabilities(
     png: true,
     gif: Boolean(version),
     webm: false,
-    mp4: false,
+    mp4: Boolean(version),
     ...(version ? { ffmpegVersion: version } : {}),
   };
 }

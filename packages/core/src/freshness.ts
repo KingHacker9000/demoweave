@@ -366,6 +366,7 @@ function regenerationPlan(manifest: Manifest, freshness: EvidenceFreshness[]): R
   for (const evidence of [...manifest.evidence].sort((a, b) => a.id.localeCompare(b.id))) {
     if (!staleIds.has(evidence.id) || !evidence.derivedFrom?.length || !evidence.path) continue;
     if (evidence.format !== 'png' && evidence.format !== 'gif') continue;
+    if (evidence.producer && (evidence.producer.kind !== 'renderer' || evidence.producer.id !== 'terminal')) continue;
     const sourceEvidenceId = evidence.derivedFrom[0];
     if (!sourceEvidenceId || byState.get(sourceEvidenceId) === 'unknown') continue;
     actions.push({

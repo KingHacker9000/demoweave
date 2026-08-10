@@ -177,3 +177,26 @@ export {
   snapshotEvidenceArtifact,
   snapshotFlowEvidence,
 } from './fingerprint.js';
+
+export {
+  SingleLayoutSchema,
+  SplitLayoutSchema,
+  TimelineEvidenceSourceSchema,
+  TimelineFileSourceSchema,
+  TimelineLayoutSchema,
+  TimelinePaneSchema,
+  TimelinePlanSchema,
+  TimelineSceneSchema,
+  TimelineSourceSchema,
+} from './timeline.js';
+export type {
+  SingleLayout,
+  SplitLayout,
+  TimelineEvidenceSource,
+  TimelineFileSource,
+  TimelineLayout,
+  TimelinePane,
+  TimelinePlan,
+  TimelineScene,
+  TimelineSource,
+} from './timeline.js';

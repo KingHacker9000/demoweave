@@ -135,6 +135,26 @@ The manifest records `driver/web` provenance. The normal post-Flow snapshot fing
 
 M7 does **not** implement browser interaction GIF/video recording. Do not claim or fabricate animated browser Evidence. That remains later roadmap work.
 
+## Timeline composition workflow
+
+M8 composes existing local Evidence/media through a persistent presentation-only `TimelinePlan v1` under `.demoweave/timelines/`. Timeline plans are separate from Flow v1: Flows capture factual source evidence, while timelines describe canvas dimensions, frame rate, scene duration/order, single or horizontal split layout, pane sources, and `contain`/`cover` fit.
+
+Timeline pane sources may reference either:
+
+- root-project Evidence by `evidenceId`; or
+- a project-relative PNG/GIF file by `path`.
+
+File sources must remain inside the project. URLs, absolute paths, traversal, symlink escapes, and unsupported formats are rejected. Static PNG sources remain static; animated GIF sources retain their animation. Composition requires FFmpeg but does not require a browser, Chromium, OBS, or desktop capture.
+
+Compose through the one public command:
+
+```bash
+demoweave compose <timeline-id-or-path> --format mp4
+demoweave compose <timeline-id-or-path> --format gif
+```
+
+Use `--project <path>` when needed and `--out <project-relative-path>` to override the configured `mediaDir` destination. A successful compose records `<timeline-id>-mp4` or `<timeline-id>-gif` as derived recording Evidence. Root-manifest Evidence sources appear in `derivedFrom`; the timeline file and direct file sources appear as SHA-256 provenance sources. Current freshness analysis can detect those changes, but selective `update --apply` does not yet schedule composition regeneration.
+
 ## Freshness and selective update workflow
 
 Use M6 before manually regenerating existing Evidence or media.
@@ -282,9 +302,9 @@ DemoWeave currently has two executable surface drivers:
 - **terminal** — non-interactive process/pipe execution and renderer-independent TerminalTrack capture;
 - **web** — Playwright Chromium semantic interaction and PNG screenshot capture against an already-running/reachable web application.
 
-The terminal renderer turns TerminalTrack v1 into PNG or GIF without a browser runtime; GIF encoding requires optional FFmpeg. Browser screenshots are already PNG Evidence and are not sent through the terminal renderer.
+The terminal renderer turns TerminalTrack v1 into PNG or GIF without a browser runtime. The M8 compositor turns local PNG/GIF Evidence and project-relative media into deterministic single/split MP4 or GIF scenes. FFmpeg is required for GIF rendering and all timeline composition. Browser screenshots remain static when composed; composition does not turn them into browser recordings.
 
-Interactive PTY input, browser video/GIF recording, desktop capture, native mobile capture, research/notebook drivers, and composed tutorial output are not available yet.
+Interactive PTY input, browser video/GIF recording, desktop capture, native mobile capture, research/notebook drivers, narration, captions, chapters, and full tutorial generation are not available yet.
 
 Current metadata layout:
 
@@ -294,6 +314,8 @@ Current metadata layout:
   project.json              # generated; do not commit
   flows/
     <flow>.json
+  timelines/
+    <timeline>.json
   plans/
     <document-plan>.json
   evidence/
@@ -304,6 +326,8 @@ Current metadata layout:
 docs-media/                  # configured rendered-media directory
   <terminal-evidence-id>.png
   <terminal-evidence-id>.gif
+  <timeline-id>.mp4
+  <timeline-id>.gif
 ```
 
 Published contracts live under `schemas/`:
@@ -314,4 +338,5 @@ Published contracts live under `schemas/`:
 - `manifest.schema.json`
 - `terminal-track.schema.json`
 - `document-plan.schema.json`
+- `timeline.schema.json`
 - `freshness-report.schema.json`

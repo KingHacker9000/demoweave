@@ -82,7 +82,7 @@ try {
   assert.equal(first.applied, true);
   assert.equal(first.actions.length, 3);
   assert.deepEqual(first.after.summary, {
-    fresh: 3,
+    fresh: first.after.evidence.length,
     stale: 0,
     missing: 0,
     unknown: 0,

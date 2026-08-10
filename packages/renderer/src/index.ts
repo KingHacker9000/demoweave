@@ -41,4 +41,24 @@ export type {
 export { createTerminalLayout, renderTerminalSvg } from './svg-renderer.js';
 export { TerminalReplay } from './terminal-replay.js';
 
+export {
+  compileCompositionArguments,
+  compileLayout,
+  composeTimeline,
+  inspectMediaBytes,
+  resolveTimeline,
+} from './compositor.js';
+export type {
+  CompiledLayout,
+  ComposedMedia,
+  ComposeTimelineOptions,
+  CompositionFormat,
+  MediaInfo,
+  PaneRectangle,
+  ResolvedTimeline,
+  ResolvedTimelinePane,
+  ResolvedTimelineScene,
+  ResolvedTimelineSource,
+} from './compositor.js';
+
 export const rendererApiVersion = 1;
