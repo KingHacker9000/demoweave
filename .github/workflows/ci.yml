@@ -71,6 +71,10 @@ jobs:
       - name: Prepare real M10 visual QA packet
         run: |
           node packages/cli/dist/index.js qa prepare terminal-web-proof-mp4 --project . --id terminal-web-proof-review --samples 7
+      - name: Finalize reviewed M10 dogfood report
+        if: runner.os == 'Linux'
+        run: |
+          node scripts/m10-dogfood-review.mjs
       - name: Upload M9 dogfood package
         if: runner.os == 'Linux'
         uses: actions/upload-artifact@v4
@@ -91,6 +95,7 @@ jobs:
           path: |
             .demoweave/cache/qa/terminal-web-proof-review/
             .demoweave/qa/reports/terminal-web-proof-review.json
+            .demoweave/evidence/manifest.json
       - name: Upload fresh root dogfood evidence chain
         if: runner.os == 'Linux'
         uses: actions/upload-artifact@v4
