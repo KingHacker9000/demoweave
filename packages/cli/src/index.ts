@@ -15,13 +15,16 @@ import {
   previewDocumentPlanFile,
   ProjectProfileSchema,
   snapshotEvidenceArtifact,
+  TimelinePlanSchema,
   validateMetadataBindings,
   type FlowFile,
 } from '@demoweave/core';
 import { FlowExecutionError, getWebDriverCapabilities, runFlow } from '@demoweave/drivers';
 import {
+  composeTimeline,
   getRendererCapabilities,
   renderEvidence,
+  resolveTimeline,
   RendererError,
 } from '@demoweave/renderer';
 import { registerUpdateCommand, showFreshness } from './freshness.js';
@@ -41,6 +44,11 @@ function commandAvailable(command: string): { ok: boolean; version?: string } {
 function renderFormat(value: string): 'png' | 'gif' {
   if (value === 'png' || value === 'gif') return value;
   throw new Error(`Unsupported render format: ${value}. Expected png or gif.`);
+}
+
+function compositionFormat(value: string): 'mp4' | 'gif' {
+  if (value === 'mp4' || value === 'gif') return value;
+  throw new Error(`Unsupported composition format: ${value}. Expected mp4 or gif.`);
 }
 
 function formatBytes(bytes: number): string {
@@ -116,7 +124,7 @@ program.command('doctor').description('Check local DemoWeave prerequisites').act
   const renderer = await getRendererCapabilities();
   console.log(`${'OK'.padEnd(8)} renderer PNG  headless SVG rasterization`);
   const ffmpegStatus = renderer.gif ? 'OK' : 'OPTIONAL';
-  console.log(`${ffmpegStatus.padEnd(8)} ffmpeg GIF${renderer.ffmpegVersion ? `  ${renderer.ffmpegVersion}` : '  not found; install FFmpeg to enable GIF rendering'}`);
+  console.log(`${ffmpegStatus.padEnd(8)} ffmpeg media${renderer.ffmpegVersion ? `  ${renderer.ffmpegVersion}` : '  not found; install FFmpeg to enable GIF rendering and timeline composition'}`);
   const web = await getWebDriverCapabilities();
   const webStatus = web.chromium ? 'OK' : 'OPTIONAL';
   console.log(`${webStatus.padEnd(8)} playwright web${web.chromium ? '  Chromium ready' : '  Chromium not installed; run: pnpm --filter @demoweave/drivers exec playwright install chromium'}`);
@@ -129,9 +137,11 @@ program.command('init').description('Initialize DemoWeave metadata in a reposito
   const flowDir = path.join(metadataRoot, 'flows');
   const evidenceDir = path.join(metadataRoot, 'evidence');
   const plansDir = path.join(metadataRoot, 'plans');
+  const timelinesDir = path.join(metadataRoot, 'timelines');
   await fs.mkdir(flowDir, { recursive: true });
   await fs.mkdir(evidenceDir, { recursive: true });
   await fs.mkdir(plansDir, { recursive: true });
+  await fs.mkdir(timelinesDir, { recursive: true });
 
   const configPath = path.join(metadataRoot, 'config.json');
   if (!(await exists(configPath))) {
@@ -152,6 +162,7 @@ program.command('init').description('Initialize DemoWeave metadata in a reposito
   console.log(`Initialized ${repoRelative(process.cwd(), metadataRoot)}`);
   console.log(`Flows: ${repoRelative(process.cwd(), flowDir)}`);
   console.log(`Document plans: ${repoRelative(process.cwd(), plansDir)}`);
+  console.log(`Timelines: ${repoRelative(process.cwd(), timelinesDir)}`);
   console.log(`Evidence manifest: ${repoRelative(process.cwd(), manifestPath)}`);
 });
 
@@ -283,6 +294,36 @@ program.command('render')
     }
   });
 
+program.command('compose')
+  .description('Compose a TimelinePlan from local Evidence and media')
+  .argument('<timeline-id-or-path>', 'TimelinePlan id from .demoweave/timelines or a project-relative TimelinePlan v1 JSON path')
+  .requiredOption('--format <format>', 'output format: mp4 or gif', compositionFormat)
+  .option('--project <path>', 'project root', '.')
+  .option('--out <path>', 'project-relative output path')
+  .action(async (reference, options) => {
+    try {
+      const result = await composeTimeline(reference, {
+        projectRoot: options.project,
+        format: options.format,
+        ...(options.out ? { outputPath: options.out } : {}),
+      });
+      await snapshotEvidenceArtifact(options.project, result.evidenceId);
+      console.log(`Composed: ${result.evidenceId}`);
+      if (result.sourceEvidenceIds.length) console.log(`Derived from: ${result.sourceEvidenceIds.join(', ')}`);
+      console.log(`Format: ${result.format.toUpperCase()}`);
+      console.log(`Dimensions: ${result.width}x${result.height}`);
+      console.log(`Duration: ${(result.durationMs / 1_000).toFixed(2)}s`);
+      console.log(`Frame rate: ${result.framesPerSecond} fps`);
+      console.log(`Frames: ${result.frameCount}`);
+      console.log(`Size: ${formatBytes(result.sizeBytes)}`);
+      console.log(`Output: ${repoRelative(process.cwd(), result.outputPath)}`);
+    } catch (error) {
+      const code = error instanceof RendererError ? error.code : 'COMPOSE_FAILED';
+      console.error(`${code}: ${error instanceof Error ? error.message : String(error)}`);
+      process.exitCode = 1;
+    }
+  });
+
 const docs = program.command('docs').description('Inspect and safely patch Markdown documents');
 
 docs.command('inspect')
@@ -386,7 +427,7 @@ docs.command('discard')
   });
 registerUpdateCommand(program);
 
-program.command('validate').description('Validate DemoWeave project metadata, document plans, and evidence bindings').argument('[path]', 'project path', '.').action(async (input) => {
+program.command('validate').description('Validate DemoWeave project metadata, timeline/document plans, and evidence bindings').argument('[path]', 'project path', '.').action(async (input) => {
   const root = path.resolve(input);
   const projectPath = path.join(root, '.demoweave', 'project.json');
   let failed = false;
@@ -469,6 +510,27 @@ program.command('validate').description('Validate DemoWeave project metadata, do
     console.error('Flow files exist but .demoweave/evidence/manifest.json is missing');
   }
 
+  const timelineDirectory = path.join(root, '.demoweave', 'timelines');
+  let timelineCount = 0;
+  for (const file of await listJsonFiles(timelineDirectory)) {
+    try {
+      const parsed = TimelinePlanSchema.safeParse(JSON.parse(await fs.readFile(file, 'utf8')));
+      if (!parsed.success) {
+        failed = true;
+        for (const issue of parsed.error.issues) {
+          console.error(`${repoRelative(root, file)}:${issue.path.join('.')}: ${issue.message}`);
+        }
+        continue;
+      }
+      await resolveTimeline(repoRelative(root, file), root);
+      timelineCount += 1;
+    } catch (error) {
+      failed = true;
+      const code = error instanceof RendererError ? `${error.code}: ` : '';
+      console.error(`${repoRelative(root, file)}: ${code}${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
   if (!failed) {
     const bindingIssues = validateMetadataBindings(project, flowFiles, manifest);
     if (bindingIssues.length) {
@@ -485,6 +547,7 @@ program.command('validate').description('Validate DemoWeave project metadata, do
   console.log('ProjectProfile v1 is valid.');
   console.log(`Flow v1 files valid: ${flowFiles.length}.`);
   console.log(`DocumentPlan v1 files valid: ${planCount}.`);
+  console.log(`TimelinePlan v1 files valid: ${timelineCount}.`);
   console.log(`Manifest v1: ${manifest ? 'valid' : 'not present'}.`);
   console.log('Metadata bindings are valid.');
 });

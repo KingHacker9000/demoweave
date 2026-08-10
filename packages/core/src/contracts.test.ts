@@ -10,6 +10,7 @@ import {
   FlowSchema,
   TerminalCommandStatusSchema,
   TerminalTrackSchema,
+  TimelinePlanSchema,
   type Flow,
 } from './index.js';
 import { ManifestSchema, normalizeManifest, type Manifest } from './manifest.js';
@@ -287,4 +288,54 @@ test('TerminalTrack v1 validates deterministic ordering and its published schema
   assert.deepEqual(published.properties.events.items.properties.stream.enum, ['input', 'stdout', 'stderr']);
   assert.deepEqual(published.properties.commands.items.properties.status.enum, TerminalCommandStatusSchema.options);
   assert.deepEqual(published.properties.status.enum, TerminalCommandStatusSchema.options);
+});
+
+const timelineFixture = {
+  schemaVersion: 1,
+  id: 'proof',
+  canvas: { width: 1280, height: 720, fps: 12, background: '#0b0d14' },
+  scenes: [{
+    id: 'scene-one',
+    durationMs: 5000,
+    layout: { type: 'single', padding: 36 },
+    panes: [{ id: 'terminal', source: { kind: 'evidence', evidenceId: 'terminal-gif' }, fit: 'contain' }],
+  }],
+} as const;
+
+test('TimelinePlan v1 accepts single and split presentation layouts', () => {
+  assert.equal(TimelinePlanSchema.safeParse(timelineFixture).success, true);
+  assert.equal(TimelinePlanSchema.safeParse({
+    ...timelineFixture,
+    scenes: [{
+      id: 'split-proof',
+      durationMs: 6000,
+      transition: 'cut',
+      layout: { type: 'split', direction: 'horizontal', gap: 28, padding: 36, ratio: 0.45 },
+      panes: [
+        { id: 'terminal', source: { kind: 'evidence', evidenceId: 'terminal-gif' }, fit: 'contain' },
+        { id: 'browser', source: { kind: 'file', path: 'proof.png' }, fit: 'cover' },
+      ],
+    }],
+  }).success, true);
+});
+
+test('TimelinePlan v1 rejects duplicate ids and invalid geometry or versions', () => {
+  assert.equal(TimelinePlanSchema.safeParse({ ...timelineFixture, schemaVersion: 2 }).success, false);
+  assert.equal(TimelinePlanSchema.safeParse({ ...timelineFixture, canvas: { ...timelineFixture.canvas, fps: 0 } }).success, false);
+  assert.equal(TimelinePlanSchema.safeParse({ ...timelineFixture, canvas: { ...timelineFixture.canvas, width: 1279 } }).success, false);
+  assert.equal(TimelinePlanSchema.safeParse({ ...timelineFixture, scenes: [{ ...timelineFixture.scenes[0], durationMs: 0 }] }).success, false);
+  assert.equal(TimelinePlanSchema.safeParse({ ...timelineFixture, scenes: [timelineFixture.scenes[0], timelineFixture.scenes[0]] }).success, false);
+  assert.equal(TimelinePlanSchema.safeParse({
+    ...timelineFixture,
+    scenes: [{ ...timelineFixture.scenes[0], panes: [timelineFixture.scenes[0].panes[0], timelineFixture.scenes[0].panes[0]] }],
+  }).success, false);
+});
+
+test('published TimelinePlan schema exposes the runtime contract shape', async () => {
+  const schema = await readJson('schemas/timeline.schema.json') as any;
+  assert.equal(schema.properties.schemaVersion.const, 1);
+  assert.equal(schema.properties.canvas.properties.width.multipleOf, 2);
+  assert.deepEqual(schema.$defs.pane.properties.fit.enum, ['contain', 'cover']);
+  assert.equal(schema.$defs.layout.oneOf[0].properties.type.const, 'single');
+  assert.equal(schema.$defs.layout.oneOf[1].properties.type.const, 'split');
 });

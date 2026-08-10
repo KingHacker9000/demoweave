@@ -139,6 +139,51 @@ test('missing artifacts are distinguished from unknown baselines', async (contex
   assert.ok(report.evidence[0]?.reasons.some((reason) => reason.code === 'source-baseline-unavailable'));
 });
 
+test('marks compositor Evidence stale without inventing a terminal render action', async (context) => {
+  const root = await fixture(context);
+  const source = Buffer.from('source gif');
+  const composition = Buffer.from('composed gif');
+  const plan = '{"schemaVersion":1}\n';
+  await fs.writeFile(path.join(root, 'docs-media', 'source.gif'), source);
+  await fs.writeFile(path.join(root, 'docs-media', 'composition.gif'), composition);
+  await fs.mkdir(path.join(root, '.demoweave', 'timelines'), { recursive: true });
+  await fs.writeFile(path.join(root, '.demoweave', 'timelines', 'proof.json'), plan);
+  await writeJson(path.join(root, '.demoweave', 'evidence', 'manifest.json'), {
+    schemaVersion: 1,
+    projectProfileVersion: 1,
+    flows: [],
+    evidence: [
+      {
+        schemaVersion: 1,
+        id: 'source-gif',
+        kind: 'recording',
+        status: 'available',
+        format: 'gif',
+        path: 'docs-media/source.gif',
+        artifactHash: hash(source),
+        provenance: { sources: [] },
+      },
+      {
+        schemaVersion: 1,
+        id: 'composition-gif',
+        kind: 'recording',
+        status: 'available',
+        format: 'gif',
+        path: 'docs-media/composition.gif',
+        artifactHash: hash(composition),
+        producer: { kind: 'renderer', id: 'compositor', version: '0.0.1' },
+        provenance: { sources: [{ path: '.demoweave/timelines/proof.json', role: 'config', hash: hash(plan) }] },
+        derivedFrom: ['source-gif'],
+      },
+    ],
+  });
+
+  await fs.writeFile(path.join(root, '.demoweave', 'timelines', 'proof.json'), '{"schemaVersion":1,"changed":true}\n');
+  const report = await analyzeFreshness(root);
+  assert.equal(report.evidence.find((item) => item.evidenceId === 'composition-gif')?.state, 'stale');
+  assert.deepEqual(report.regeneration, []);
+});
+
 test('snapshot helpers persist Flow/source/artifact hashes without changing artifact bytes', async (context) => {
   const root = await fixture(context);
   const source = 'source bytes\n';
