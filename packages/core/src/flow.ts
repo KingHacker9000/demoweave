@@ -124,12 +124,19 @@ export const AssertStepSchema = StepBaseSchema.extend({
   assertion: AssertionSchema,
 }).strict();
 
+export const ArtifactCaptureSchema = z.object({
+  path: z.string().min(1),
+}).strict();
+
 export const CaptureStepSchema = StepBaseSchema.extend({
   type: z.literal('capture'),
   evidenceId: z.string().min(1),
   kind: EvidenceKindSchema,
   target: InteractionTargetSchema.optional(),
-}).strict();
+  artifact: ArtifactCaptureSchema.optional(),
+}).strict().refine((step) => !(step.target && step.artifact), {
+  message: 'capture.target and capture.artifact are mutually exclusive',
+});
 
 export const FlowStepSchema = z.discriminatedUnion('type', [
   RunStepSchema,
@@ -185,5 +192,6 @@ export type FlowSourceDependencyRole = z.infer<typeof FlowSourceDependencyRoleSc
 export type FlowSourceDependency = z.infer<typeof FlowSourceDependencySchema>;
 export type WaitCondition = z.infer<typeof WaitConditionSchema>;
 export type Assertion = z.infer<typeof AssertionSchema>;
+export type ArtifactCapture = z.infer<typeof ArtifactCaptureSchema>;
 export type FlowStep = z.infer<typeof FlowStepSchema>;
 export type Flow = z.infer<typeof FlowSchema>;
