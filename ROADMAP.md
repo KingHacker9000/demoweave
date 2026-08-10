@@ -17,9 +17,10 @@ DemoWeave is **multi-surface by design**. A repository may expose web, CLI, desk
 | M5 — Safe Markdown patching | ✅ Complete | Section-aware plan → preview/review token → atomic apply |
 | M6 — Incremental stale tracking | ✅ Complete | Explainable freshness → minimal selective regeneration → no-change/no-churn |
 | M7 — Web driver (Playwright) | ✅ Complete | Semantic browser Flow execution + fingerprinted PNG screenshot Evidence |
-| **P1 — Web fixture pilot** | **🚧 Current** | Prove the public documentation workflow on a second surface |
+| P1 — Web fixture pilot | ✅ Complete | Committed browser Evidence + reviewed docs + stale/selective-regeneration proof |
+| **M8 — Timeline compositor** | **🚧 Current** | Compose independent Evidence/media into polished deterministic scenes without OBS |
 
-M0/M1 landed in PR #1, M2 in PR #2, M3 in PR #3, M4 in PR #4, Pilot P0 in PR #5, M5 in PR #6, M6 in PR #7, and M7 in PR #8.
+M0/M1 landed in PR #1, M2 in PR #2, M3 in PR #3, M4 in PR #4, Pilot P0 in PR #5, M5 in PR #6, M6 in PR #7, M7 in PR #8, M5 hardening in PR #9, and Pilot P1 in PR #10.
 
 ## Product principles
 
@@ -32,6 +33,7 @@ M0/M1 landed in PR #1, M2 in PR #2, M3 in PR #3, M4 in PR #4, Pilot P0 in PR #5,
 - **One source of truth for demos.** Structured Flows feed evidence, docs, and later animated/tutorial outputs.
 - **Incremental by default.** Provenance should make stale evidence selectively regenerable.
 - **Unknown is not stale.** When a deterministic baseline is unavailable, report uncertainty instead of inventing a conclusion.
+- **Capture and presentation are separate.** Runtime timestamps and source artifacts remain factual; renderers/compositors may derive presentation timing without rewriting evidence.
 - **Claude Code and Codex share the same workflow contracts.**
 - Keep the core lightweight; platform-specific drivers/renderers stay isolated.
 
@@ -53,8 +55,7 @@ SurfaceDriver v1
 Evidence v1 + Manifest v1 + fingerprints
   ↓
 optional renderer
-  ↓
-PNG / GIF (currently terminal renderer)
+  └─ terminal → PNG / GIF
   ↓
 FreshnessReport v1
   ↓
@@ -65,7 +66,7 @@ DocumentPlan v1
 reviewed Markdown patch
 ```
 
-P0 proved the terminal evidence path with DemoWeave itself. M5 added reviewed document editing. M6 closed the freshness loop. M7 proves that the same Flow/Evidence/Manifest/freshness contracts can drive a second surface—Chromium through Playwright—without introducing browser-specific instructions into Flow v1.
+P0 proved the terminal path by making DemoWeave's own README use DemoWeave-generated media. M5 added reviewed document editing. M6 closed the freshness loop. M7 added Chromium as a second execution surface without changing Flow v1. P1 then proved the complete browser screenshot → documentation → stale source → impacted document → selective regeneration → no-churn loop on a committed standalone fixture.
 
 ## Established contracts
 
@@ -77,11 +78,11 @@ Deterministic repository facts: components, ecosystems, manifests, workspaces, e
 
 Platform-neutral semantic steps such as `run`, `navigate`, `activate`, `input`, `press`, `scroll`, `wait`, `assert`, and `capture`. Terminal run steps may declare `expectedExitCodes`; omission means `[0]`. Flows may also declare project-relative source dependencies that materially determine their captured result.
 
-M7 deliberately reuses this contract. Raw Playwright selectors, browser launch flags, origins, and implementation scripts do not belong in Flow v1.
+Raw Playwright selectors, browser launch flags, origins, application-start commands, recorder commands, and renderer/compositor details do not belong in Flow v1.
 
 ### Evidence v1 / Manifest v1
 
-Evidence records lifecycle, artifact metadata, producer, provenance, optional SHA-256 source/Flow/artifact fingerprints, and derivation. Manifest v1 indexes Flows and Evidence and preserves source/derived relationships. Current source Evidence includes terminal tracks and web PNG screenshots.
+Evidence records lifecycle, artifact metadata, producer, provenance, optional SHA-256 source/Flow/artifact fingerprints, and derivation. Manifest v1 indexes Flows and Evidence and preserves source/derived relationships. Current source Evidence includes terminal tracks and web PNG screenshots; terminal PNG/GIF outputs are derived Evidence.
 
 ### TerminalTrack v1
 
@@ -131,7 +132,7 @@ Deterministic freshness output for Evidence and document impact. Evidence is cla
 - assertions, waits, timeouts, expected non-zero exits
 - `demoweave run <flow-id-or-path>`
 - TerminalTrack v1
-- atomic evidence/manifest writes with provenance
+- atomic Evidence/Manifest writes with provenance
 - committed self-dogfood Flow
 
 ## M4 — Lightweight media renderer ✅
@@ -161,19 +162,19 @@ Agents can inspect arbitrary Markdown, declare intentional section-level changes
 
 Delivered:
 
-- deterministic source-position section inspection with preamble support, nested paths, duplicate-safe IDs, ATX heading handling, and fenced-code awareness
-- SHA-256 target base hashes plus LF/CRLF/trailing-newline facts
+- maintained mdast parser source positions; original-source splicing rather than Markdown reserialization
+- preamble support, nested paths, duplicate-safe section IDs, fenced-code awareness
+- byte-preserving untouched ranges including UTF-8 BOM handling and LF/CRLF/CR-only consistency
 - DocumentPlan v1 runtime validation + published JSON Schema
-- `preserve`, body-only `edit`, whole-section `replace`, anchored `create`, and reasoned `remove`
-- exact source splicing rather than Markdown reserialization
-- overlap/preserve/selector/create-anchor/path/symlink safety checks
-- complete candidate + unified diff + deterministic `review-v1` token
+- `preserve`, direct-body `edit`, whole-subtree `replace`, anchored `create`, and reasoned `remove`
+- overlap/preserve/selector/path/symlink safety checks
+- maintained unified diff + deterministic `review-v1` token
 - stale target/changed plan/candidate rejection
-- same-directory temporary file + atomic rename apply
+- same-directory atomic apply with permission preservation
 - safe plan discard
 - `demoweave docs inspect|preview|apply|discard`
 - shared Claude/Codex skill using inspect → plan → preview → approval → apply
-- Ubuntu + Windows M5 dogfood proving reviewed apply and stale re-apply rejection
+- Ubuntu + Windows dogfood and hardening coverage
 
 ## M6 — Incremental stale/update tracking ✅
 
@@ -183,75 +184,158 @@ Delivered:
 
 - optional explicit `sources` on Flow v1
 - SHA-256 Flow/source/artifact fingerprints
-- backward-compatible preservation of Evidence-level source provenance
-- git-commit fallback for older Evidence
-- `unknown` instead of guessed freshness when an old baseline cannot be reached
-- explicit stale/missing/unknown reason codes and recursive upstream propagation
-- local Markdown impact detection
+- backward-compatible Evidence source provenance + git fallback for older Evidence
+- `unknown` instead of guessed freshness when a baseline cannot be reached
+- stale/missing/unknown reason codes and recursive upstream propagation
+- Markdown impact detection
 - `FreshnessReport v1`
 - `demoweave status` and dry-run/selective `demoweave update`
-- self-dogfood proving one Flow + two renders repair the stale chain, followed by zero-action/zero-churn update
+- terminal self-dogfood proving one Flow + two renders repair a stale chain followed by zero-action/zero-churn update
+- P1 runtime-context passthrough for web regeneration via invocation-scoped `--base-url` / `--headed`
 - hosted Ubuntu + Windows coverage
 
 ## M7 — Web driver (Playwright) ✅
 
-**Goal achieved:** DemoWeave can execute the existing semantic Flow v1 against a browser surface and capture screenshot Evidence without adding Playwright-specific operations to the shared contracts.
+DemoWeave can execute the existing semantic Flow v1 against a browser surface and capture screenshot Evidence without adding Playwright-specific operations to the shared contracts.
 
 Delivered:
 
-- `WebDriver` implementing `SurfaceDriver v1` for `web` surfaces
+- `WebDriver` implementing `SurfaceDriver v1` for `web`
 - Playwright Chromium runtime pinned in the workspace lockfile
-- deterministic fresh browser context per Flow: fixed viewport/device scale, locale, UTC timezone, light color scheme, reduced motion, blocked service workers
-- semantic target mapping for `text`, `label`, `role`, `name`, `testId`, `accessibilityId`, and `automationId`
-- `navigate`, `activate`, `input`, `press`, and deterministic pixel `scroll`
-- supported duration/visible/hidden/text waits
-- visible/hidden/text-contains assertions
-- explicit failures for unsupported terminal-only waits/assertions
-- relative navigation through runtime `--base-url`; no guessed origin or arbitrary app-server startup
-- optional `--headed` local debugging mode
-- HTTP error navigation diagnostics
-- viewport or element PNG screenshot capture with animation/caret suppression
-- atomic screenshot writes under `.demoweave/evidence/artifacts/`
-- `driver/web` Evidence provenance plus the existing M6 Flow/source/artifact fingerprint snapshot
-- `demoweave doctor` Playwright Chromium readiness reporting
-- local HTTP integration tests for success, missing base URL, and HTTP failure behavior
-- built-CLI M7 smoke that launches Chromium, executes a semantic Flow, verifies PNG bytes/provenance/fingerprints/freshness, and validates the project
-- hosted Ubuntu + Windows build/test/typecheck and M7 browser smoke coverage
+- deterministic browser context: viewport/device scale, locale, UTC timezone, light scheme, reduced motion, blocked service workers
+- semantic target mapping for `text`, `label`, `role`, `name`, `testId`, `accessibilityId`, `automationId`
+- semantic navigate/activate/input/press/scroll, supported waits/assertions
+- relative navigation through runtime `--base-url`; optional `--headed`
+- HTTP navigation diagnostics
+- viewport/element PNG screenshot capture with animation/caret suppression
+- atomic screenshot Evidence + driver/web provenance + M6 fingerprints
+- Playwright readiness in `doctor`
+- local + hosted browser smoke coverage on Ubuntu and Windows
 
-M7 intentionally does **not** add raw Playwright selectors/scripts to Flow v1, auto-start arbitrary repository dev servers, or implement browser video/interaction GIF recording. Those are separate later concerns.
+M7 intentionally does **not** auto-start arbitrary applications or implement browser video/GIF recording.
+
+## P1 — Controlled web fixture ✅
+
+P1 made `fixtures/web` a standalone deterministic Next.js project and used the public DemoWeave workflow against it rather than relying on an ephemeral test page.
+
+Delivered:
+
+- standalone npm/lockfile-backed fixture with explicit production build/start commands
+- polished deterministic 1280×720 project dashboard with semantic controls and no external assets
+- detected surface `web-fixture-web` / Next.js
+- committed semantic `create-project` Flow with only material UI implementation files declared as sources
+- real `driver/web` screenshot Evidence `create-project-result`
+- concise fixture README that embeds the captured artifact
+- README change created through the M5 inspect → DocumentPlan → preview/review token → apply workflow
+- fresh baseline proven before mutation
+- controlled source mutation producing an exact `source-changed` reason and `README.md` document impact
+- minimal regeneration containing exactly one web Flow run
+- invocation-scoped `update --apply --base-url ...` integration for relative web navigation
+- selective screenshot repair while README prose remains untouched
+- second update with zero actions and zero tracked-byte churn
+- committed cross-platform P1 smoke using a disposable copy of the real fixture
+- hosted Ubuntu + Windows validation
+
+P1 remains screenshot-only. Browser interaction recording was not fabricated or implied.
 
 ---
 
-# Current pilot
+# Current milestone
 
-## P1 — Controlled web fixture 🚧
+## M8 — Timeline compositor 🚧
 
-**Goal:** turn the M7 runtime into the first public browser-evidence documentation proof, analogous to P0 for terminal evidence.
+**Goal:** compose independent DemoWeave Evidence/media sources into polished deterministic scenes without recording the desktop and without coupling capture logic to presentation logic.
 
-P1 should:
+The first M8 vertical slice should prove composition using artifacts DemoWeave already knows how to produce. A strong dogfood scene is an animated terminal source beside the static P1 browser screenshot: motion comes from the terminal presentation, while the browser pane remains explicitly a screenshot rather than pretending to be a browser recording.
 
-- use the controlled web fixture rather than an arbitrary external website
-- run the real built DemoWeave CLI against a detected `web` surface
-- capture a meaningful browser screenshot as fingerprinted Evidence
-- use that Evidence in concise example documentation
-- prove freshness/document-impact behavior on the web Evidence path
-- keep the existing Flow v1 / Evidence v1 / Manifest v1 contracts unchanged
-- keep application startup explicit and separate from the Flow
-- remain reproducible on hosted Ubuntu and Windows
+### M8 architectural requirements
 
-P1 does **not** need to fabricate an interaction GIF or video before a browser recording/composition milestone exists. Static browser Evidence is enough to prove the second surface honestly; animated/tutorial output remains later work.
+```text
+Evidence / media sources
+        ↓
+Timeline / Scene plan
+        ↓
+source decoders / presentation tracks
+        ↓
+layout + crop/fit/scale + overlays
+        ↓
+deterministic frames
+        ↓
+FFmpeg encoder
+        ↓
+composed GIF / MP4 Evidence
+```
+
+- Keep **capture**, **presentation**, and **composition** separate.
+- No OBS, Electron, desktop recording, or Chromium just to composite existing assets.
+- Reference existing Evidence IDs where possible rather than arbitrary untracked files.
+- Preserve source provenance through `derivedFrom` relationships.
+- Do not mutate source Evidence.
+- The compositor must be deterministic given the same inputs and plan, apart from documented encoder/platform limits.
+- Use one controlled canvas with explicit output dimensions and frame rate.
+- Start with useful layouts: single-source and two-pane split.
+- Support predictable fit/contain/cover/crop behavior without silently distorting sources.
+- Support simple text/title overlays only where they materially help a scene.
+- Keep transitions minimal and deterministic; a hard cut and one simple fade are enough initially.
+- Audio plumbing may be represented internally if it does not complicate the slice, but narration/TTS belongs to M9.
+- Do **not** claim browser interaction video. A static browser screenshot inside a composed video is still a static browser screenshot.
+
+### M8 contract direction
+
+M8 may introduce a small internal/published `Timeline` or `ScenePlan` contract if needed. It should describe presentation and composition, not surface automation. Do not put layout/timeline fields into Flow v1.
+
+A plan should be able to express, at minimum:
+
+- output canvas width/height and frame rate
+- total duration or scene durations
+- source reference by Evidence ID
+- source start/end/presentation window where meaningful
+- one-pane or split layout
+- fit/crop policy
+- optional title/text overlay
+- simple scene ordering/transition
+
+Avoid designing the full M9 tutorial language in advance.
+
+### M8 first dogfood target
+
+Produce a short polished composition from existing real DemoWeave artifacts, for example:
+
+```text
+┌──────────────────────────────┬──────────────────────────────┐
+│                              │                              │
+│  animated terminal evidence  │   P1 browser screenshot     │
+│                              │                              │
+└──────────────────────────────┴──────────────────────────────┘
+```
+
+A concise title may identify what is being shown. The output should demonstrate that independent evidence tracks can be composed without capturing a literal desktop.
+
+### M8 acceptance criteria
+
+1. Composition plan is separate from Flow v1 and source Evidence.
+2. Existing terminal Evidence/media and image/screenshot Evidence can be resolved safely by Evidence ID.
+3. At least one deterministic single-source layout and one deterministic split layout work.
+4. Sources preserve aspect ratio with explicit fit/crop semantics.
+5. Rendering is headless and requires no browser/OBS for composition.
+6. FFmpeg is invoked through argument arrays, not shell command strings.
+7. Missing/invalid Evidence and unsupported formats fail structurally.
+8. Temporary frames/intermediates are cleaned up on success and failure.
+9. A composed output is recorded as derived Evidence with all source Evidence in `derivedFrom`.
+10. Source/plan/artifact fingerprints are sufficient for later freshness integration without inventing dependencies.
+11. A real committed dogfood composition is generated from DemoWeave's existing terminal + P1 browser artifacts.
+12. The dogfood output is visually reviewed for readability, clipping, aspect ratio, pacing, and file size.
+13. Same-input composition is semantically deterministic; repeated no-change generation does not create unexplained manifest churn.
+14. Ubuntu and Windows hosted CI exercise the core compositor path.
+15. Browser recording, narration, chapters, full tutorial authoring, and visual-QA automation remain explicitly out of scope.
 
 ---
 
 # Later milestones
 
-## M8 — Timeline compositor
-
-Compose independent source tracks into polished single-source/split-screen scenes with crop/scale, zoom, titles, transitions, and audio — without OBS. Browser recording input should be added deliberately before claiming browser GIF/video output.
-
 ## M9 — Full tutorial output
 
-Generate YouTube-ready MP4, thumbnail, captions, chapters, title, and description. Narration/TTS remains an optional adapter.
+Generate YouTube-ready MP4, thumbnail, captions, chapters, title, and description. Narration/TTS remains an optional adapter. Browser recording input should be added deliberately before any tutorial claims depend on browser motion.
 
 ## M10 — Visual QA
 
@@ -296,8 +380,8 @@ DemoWeave 1.0 should provide stable agent workflows and contracts, multi-surface
 | 7 | ✅ M5 — safe Markdown patching | reliable reviewed document edits |
 | 8 | ✅ M6 — stale tracking | living documentation |
 | 9 | ✅ M7 — web driver | website execution + screenshot Evidence |
-| 10 | **🚧 P1 — web fixture** | second-surface public proof |
-| 11 | M8 — compositor | split-screen scenes / future browser media composition |
+| 10 | ✅ P1 — web fixture | second-surface public proof |
+| 11 | **🚧 M8 — compositor** | independent evidence → polished scenes |
 | 12 | M9/M10 — tutorial + QA | YouTube-ready output |
 | 13 | M11 — research/notebook | research repos |
 | 14 | M12 — desktop | native apps |
@@ -309,6 +393,6 @@ DemoWeave 1.0 should provide stable agent workflows and contracts, multi-surface
 
 # Current next step
 
-## NOW: P1 — web fixture pilot
+## NOW: M8 — timeline compositor
 
-Use the shipped M7 Playwright driver on the controlled web fixture, capture the first browser Evidence intended for documentation, wire that Evidence into a concise example doc, and prove the same provenance/freshness/review workflow that P0 established for terminal output.
+Build the smallest composition layer that can take existing DemoWeave Evidence/media, place it on a controlled timeline/canvas, and render a polished single/split scene without OBS or desktop capture. Dogfood it by combining the existing terminal presentation with the P1 web screenshot, preserve derivation/provenance, and stop before tutorial/narration/browser-recording work.
