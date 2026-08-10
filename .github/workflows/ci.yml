@@ -58,3 +58,17 @@ jobs:
           node scripts/m5-dogfood-smoke.mjs
           node packages/cli/dist/index.js validate .
           node scripts/p1-web-fixture-smoke.mjs
+      - name: Build real M9 dogfood tutorial package
+        run: |
+          node packages/cli/dist/index.js tutorial build demoweave-overview --project .
+          node packages/cli/dist/index.js validate .
+      - name: Upload M9 dogfood package
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: m9-demoweave-overview
+          if-no-files-found: error
+          retention-days: 7
+          path: |
+            docs-media/tutorials/demoweave-overview/
+            .demoweave/evidence/manifest.json
