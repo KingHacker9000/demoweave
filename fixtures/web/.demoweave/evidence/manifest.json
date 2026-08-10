@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "projectProfileVersion": 1,
+  "flows": [
+    {
+      "id": "create-project",
+      "path": ".demoweave/flows/create-project.json",
+      "surfaceId": "web-fixture-web"
+    }
+  ],
+  "evidence": [
+    {
+      "schemaVersion": 1,
+      "id": "create-project-result",
+      "kind": "screenshot",
+      "status": "available",
+      "format": "png",
+      "path": ".demoweave/evidence/artifacts/create-project-result.png",
+      "artifactHash": "sha256:580c70110f55c265d372cbd9f5deda0f12d94ccc0a51ef679b57a9ccef3a1b3d",
+      "mimeType": "image/png",
+      "producer": {
+        "kind": "driver",
+        "id": "web",
+        "version": "0.0.1"
+      },
+      "provenance": {
+        "flowId": "create-project",
+        "stepId": "capture-created-project",
+        "surfaceId": "web-fixture-web",
+        "gitCommit": "a05738b95fa9f1c028582038c6796ce25bd534fe",
+        "flowHash": "sha256:a90ab7fc901693cdd3c9c7e0d506ef676a06cd250567e09accd08f78f29fa284",
+        "sources": [
+          {
+            "path": "app/globals.css",
+            "role": "implementation",
+            "hash": "sha256:f4af64a18382c552912f68c4d31b7e724b5d103950db11aad9f69a6966e68f16"
+          },
+          {
+            "path": "app/layout.tsx",
+            "role": "implementation",
+            "hash": "sha256:16212e2a32dbf153349edd9440540f1453bc591f2514cd02de2f12705d4b2763"
+          },
+          {
+            "path": "app/page.tsx",
+            "role": "implementation",
+            "hash": "sha256:67d2c2810c65c86be4a5f277b7c60615f88d337d96f90217a24256c6802ff921"
+          }
+        ]
+      }
+    }
+  ]
+}

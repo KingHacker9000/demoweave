@@ -9,6 +9,23 @@ import {
 import { runFlow } from '@demoweave/drivers';
 import { renderEvidence } from '@demoweave/renderer';
 
+export interface UpdateRuntimeOptions {
+  baseUrl?: string;
+  headed?: boolean;
+}
+
+interface UpdateActionDependencies {
+  runFlow: typeof runFlow;
+  renderEvidence: typeof renderEvidence;
+  snapshotEvidenceArtifact: typeof snapshotEvidenceArtifact;
+}
+
+const defaultDependencies: UpdateActionDependencies = {
+  runFlow,
+  renderEvidence,
+  snapshotEvidenceArtifact,
+};
+
 function stateMarker(state: string): string {
   if (state === 'fresh') return 'FRESH';
   if (state === 'stale') return 'STALE';
@@ -47,20 +64,29 @@ export async function showFreshness(projectRoot: string, json = false): Promise<
   return report;
 }
 
-async function applyAction(root: string, action: RegenerationAction): Promise<void> {
+export async function applyRegenerationAction(
+  root: string,
+  action: RegenerationAction,
+  runtime: UpdateRuntimeOptions = {},
+  dependencies: UpdateActionDependencies = defaultDependencies,
+): Promise<void> {
   if (action.kind === 'run-flow') {
-    const result = await runFlow(action.flowId, { projectRoot: root });
+    const result = await dependencies.runFlow(action.flowId, {
+      projectRoot: root,
+      ...(runtime.baseUrl ? { baseUrl: runtime.baseUrl } : {}),
+      ...(runtime.headed ? { headless: false } : {}),
+    });
     if (result.status !== 'passed') {
       throw new Error(`Flow ${action.flowId} failed: ${result.error?.message ?? 'unknown execution error'}`);
     }
     return;
   }
-  const rendered = await renderEvidence(action.sourceEvidenceId, {
+  const rendered = await dependencies.renderEvidence(action.sourceEvidenceId, {
     projectRoot: root,
     format: action.format,
     outputPath: action.outputPath,
   });
-  if (rendered.evidenceId) await snapshotEvidenceArtifact(root, rendered.evidenceId);
+  if (rendered.evidenceId) await dependencies.snapshotEvidenceArtifact(root, rendered.evidenceId);
 }
 
 export function registerUpdateCommand(program: Command): void {
@@ -68,6 +94,8 @@ export function registerUpdateCommand(program: Command): void {
     .description('Explain and selectively regenerate stale DemoWeave evidence')
     .argument('[path]', 'project path', '.')
     .option('--apply', 'execute the computed minimal regeneration plan')
+    .option('--base-url <url>', 'base URL for relative web navigation during regeneration')
+    .option('--headed', 'show the browser window while regenerating web Evidence')
     .option('--json', 'print the before/after report as JSON')
     .action(async (input, options) => {
       const root = path.resolve(input);
@@ -84,7 +112,10 @@ export function registerUpdateCommand(program: Command): void {
 
         const applied: RegenerationAction[] = [];
         for (const action of before.regeneration) {
-          await applyAction(root, action);
+          await applyRegenerationAction(root, action, {
+            ...(options.baseUrl ? { baseUrl: options.baseUrl } : {}),
+            ...(options.headed ? { headed: true } : {}),
+          });
           applied.push(action);
         }
         const after = await analyzeFreshness(root);
