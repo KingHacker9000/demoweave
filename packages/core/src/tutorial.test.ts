@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { TutorialPlanSchema } from './tutorial.js';
+import { TutorialPlanSchema, tutorialOutputEvidenceIds } from './tutorial.js';
 
 function validPlan() {
   return {
@@ -43,13 +43,15 @@ test('rejects unsupported schema versions and invalid stable ids', () => {
   assert.equal(TutorialPlanSchema.safeParse({ ...validPlan(), id: 'Demo Weave' }).success, false);
 });
 
-test('rejects source Evidence that collides with generated tutorial video Evidence', () => {
-  const collision = validPlan();
-  collision.id = 'proof';
-  collision.video.evidenceId = 'proof-video';
-  const parsed = TutorialPlanSchema.safeParse(collision);
-  assert.equal(parsed.success, false);
-  if (!parsed.success) assert.match(parsed.error.issues[0]?.message ?? '', /collides with the generated tutorial video Evidence id/);
+test('rejects source Evidence that collides with any generated tutorial Evidence id', () => {
+  for (const generatedId of Object.values(tutorialOutputEvidenceIds('proof'))) {
+    const collision = validPlan();
+    collision.id = 'proof';
+    collision.video.evidenceId = generatedId;
+    const parsed = TutorialPlanSchema.safeParse(collision);
+    assert.equal(parsed.success, false, generatedId);
+    if (!parsed.success) assert.match(parsed.error.issues[0]?.message ?? '', /collides with a generated tutorial Evidence id/);
+  }
 });
 
 test('rejects duplicate, overlapping, or reversed caption cues', () => {
