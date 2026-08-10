@@ -8,7 +8,7 @@
       "id": "edit-review-state",
       "type": "edit",
       "selector": {
-        "sectionId": "section-m5-dogfood-review-state-1-8802f58d"
+        "sectionId": "section:m5-dogfood/review-state"
       },
       "markdown": "\nThe reviewed patch was applied successfully in the disposable CI working tree.\n"
     }

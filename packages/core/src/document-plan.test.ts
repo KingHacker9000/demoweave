@@ -2,289 +2,413 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import test, { type TestContext } from 'node:test';
+import test from 'node:test';
 import {
-  DocumentPatchError,
+  DocumentPlanError,
   DocumentPlanSchema,
-  applyDocumentPlan,
-  discardDocumentPlan,
-  hashDocumentSource,
+  applyDocumentPlanFile,
+  canonicalDocumentPlan,
+  discardDocumentPlanFile,
+  inspectMarkdown,
   inspectMarkdownFile,
-  inspectMarkdownSource,
-  previewDocumentPlan,
+  parseDocumentPlan,
+  previewDocument,
+  previewDocumentPlanFile,
+  type DocumentOperation,
+  type DocumentPlan,
 } from './index.js';
 
-const repository = path.resolve(process.cwd(), '../..');
+function planFor(source: string, operations: DocumentOperation[], target = 'README.md'): DocumentPlan {
+  return parseDocumentPlan({
+    schemaVersion: 1,
+    id: 'document-test',
+    targetPath: target,
+    baseHash: inspectMarkdown(source, target).baseHash,
+    operations,
+  });
+}
 
-async function fixture(context: TestContext): Promise<string> {
+function expectCode(code: string): (error: unknown) => boolean {
+  return (error) => error instanceof DocumentPlanError && error.code === code;
+}
+
+async function projectFixture(context: test.TestContext, source = '# Demo\n\nOld body.\n'): Promise<string> {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'demoweave-docs-'));
   context.after(() => fs.rm(root, { recursive: true, force: true }));
   await fs.mkdir(path.join(root, '.demoweave', 'plans'), { recursive: true });
-  await fs.mkdir(path.join(root, 'docs'), { recursive: true });
+  await fs.writeFile(path.join(root, 'README.md'), source);
   return root;
 }
 
-async function writePlan(root: string, name: string, value: unknown): Promise<string> {
-  const relative = `.demoweave/plans/${name}.json`;
-  await fs.writeFile(path.join(root, relative), `${JSON.stringify(value, null, 2)}\n`);
+async function writePlan(root: string, plan: DocumentPlan, name = 'readme.json'): Promise<string> {
+  const relative = `.demoweave/plans/${name}`;
+  await fs.writeFile(path.join(root, ...relative.split('/')), `${JSON.stringify(plan, null, 2)}\n`);
   return relative;
 }
 
-function errorCode(error: unknown): string | undefined {
-  return error instanceof DocumentPatchError ? error.code : undefined;
-}
-
-test('inspects ATX sections deterministically, ignores fenced pseudo-headings, and disambiguates duplicates', () => {
+test('inspection produces deterministic hierarchy-based ids and ignores fenced pseudo-headings', () => {
   const source = [
-    'Preamble',
-    '# Overview',
-    'intro',
+    'Preamble with a table:',
+    '',
+    '| A | B |',
+    '| - | - |',
+    '| 1 | 2 |',
+    '',
+    '# Project',
+    '',
     '```md',
-    '# Not a real heading',
+    '# not a heading',
+    '## neither is this',
     '```',
+    '',
     '## Usage',
-    'first',
-    '### Nested',
-    'nested',
+    '',
+    '## API',
+    '### Usage',
+    '',
+    '<div>',
+    '# HTML text',
+    '</div>',
+    '',
     '## Usage',
-    'second',
+    '### Café 🚀',
     '',
   ].join('\n');
-  const first = inspectMarkdownSource('README.md', source);
-  const second = inspectMarkdownSource('README.md', source);
-  assert.deepEqual(second, first);
-  assert.equal(first.sections.length, 5);
-  assert.equal(first.sections[0]?.id, 'preamble');
-  assert.deepEqual(first.sections.slice(1).map((section) => section.heading), ['Overview', 'Usage', 'Nested', 'Usage']);
-  const usage = first.sections.filter((section) => section.heading === 'Usage');
-  assert.equal(usage.length, 2);
-  assert.notEqual(usage[0]?.id, usage[1]?.id);
-  assert.deepEqual(usage[0]?.headingPath, ['Overview', 'Usage']);
-  assert.deepEqual(usage[1]?.headingPath, ['Overview', 'Usage']);
-  assert.equal(usage[0]?.occurrence, 1);
-  assert.equal(usage[1]?.occurrence, 2);
-  assert.equal(first.sections.some((section) => section.heading === 'Not a real heading'), false);
+  const inspection = inspectMarkdown(source, 'docs/guide.md');
+
+  assert.equal(inspection.targetPath, 'docs/guide.md');
+  assert.equal(inspection.newline, 'lf');
+  assert.equal(inspection.trailingNewline, true);
+  assert.deepEqual(inspection.sections.map((section) => section.id), [
+    'preamble',
+    'section:project',
+    'section:project/usage',
+    'section:project/api',
+    'section:project/api/usage',
+    'section:project/usage~2',
+    'section:project/usage~2/café',
+  ]);
+  assert.deepEqual(inspection.sections.at(-1)?.headingPath, ['Project', 'Usage', 'Café 🚀']);
+  assert.equal(inspection.sections.some((section) => section.heading === 'not a heading'), false);
+  assert.equal(source.slice(
+    inspection.sections[1]!.headingRange!.start.offset,
+    inspection.sections[1]!.headingRange!.end.offset,
+  ), '# Project');
 });
 
-test('reports CRLF/no-trailing-newline and supports headingless, Unicode-heading, and empty sections', () => {
-  const crlf = inspectMarkdownSource('docs/guide.md', '# A\r\nbody\r\n# B');
+test('inspection covers ATX levels, empty sections, Unicode, no headings, CRLF, and no trailing newline', () => {
+  const levels = inspectMarkdown('# A\n## B\n### C\n#### D\n##### E\n###### F', 'README.md');
+  assert.deepEqual(levels.sections.slice(1).map((section) => section.level), [1, 2, 3, 4, 5, 6]);
+  assert.equal(levels.trailingNewline, false);
+  assert.equal(levels.sections.at(-1)?.directBodyRange.start.offset, levels.sections.at(-1)?.directBodyRange.end.offset);
+
+  const noHeadings = inspectMarkdown('Unicode only: مرحبا 世界', 'notes.markdown');
+  assert.equal(noHeadings.sections.length, 1);
+  assert.equal(noHeadings.sections[0]?.id, 'preamble');
+  assert.equal(noHeadings.sections[0]?.subtreeRange.end.offset, 'Unicode only: مرحبا 世界'.length);
+  assert.equal(noHeadings.newline, 'none');
+
+  const crlf = inspectMarkdown('# A\r\n\r\nBody\r\n', 'README.md');
   assert.equal(crlf.newline, 'crlf');
-  assert.equal(crlf.trailingNewline, false);
-  assert.equal(crlf.sections.length, 3);
-
-  const plain = inspectMarkdownSource('notes.md', 'plain unicode π text');
-  assert.equal(plain.newline, 'none');
-  assert.equal(plain.sections.length, 1);
-  assert.equal(plain.sections[0]?.id, 'preamble');
-  assert.equal(plain.sections[0]?.end, 'plain unicode π text'.length);
-
-  const unicode = inspectMarkdownSource('unicode.md', '# ಕನ್ನಡ ಶೀರ್ಷಿಕೆ\n\n## 空の節\n# Next\nbody\n');
-  assert.deepEqual(unicode.sections.slice(1).map((section) => section.heading), ['ಕನ್ನಡ ಶೀರ್ಷಿಕೆ', '空の節', 'Next']);
-  const empty = unicode.sections.find((section) => section.heading === '空の節')!;
-  assert.equal(unicode.targetPath, 'unicode.md');
-  assert.equal(unicode.sections.some((section) => section.id.includes('heading')), false);
-  assert.equal(unicode.sections.find((section) => section.heading === 'Next')?.start, empty.end);
-  assert.equal(unicode.sections[0]?.start, 0);
+  assert.equal(crlf.trailingNewline, true);
+  assert.deepEqual(crlf.sections[1]?.directBodyRange, {
+    start: { offset: 5, line: 2, column: 1 },
+    end: { offset: 13, line: 4, column: 1 },
+  });
 });
 
-test('previews preserve/edit/create operations without mutating the target, then applies only the reviewed candidate', async (context) => {
-  const root = await fixture(context);
-  const source = 'Preface\n# Alpha\nalpha body\n# Beta\nbeta body\n# Gamma\ngamma body\n';
-  const target = path.join(root, 'README.md');
-  await fs.writeFile(target, source);
-  const inspection = await inspectMarkdownFile(root, 'README.md');
-  const alpha = inspection.sections.find((section) => section.heading === 'Alpha')!;
-  const beta = inspection.sections.find((section) => section.heading === 'Beta')!;
-  const gamma = inspection.sections.find((section) => section.heading === 'Gamma')!;
-  const planPath = await writePlan(root, 'readme', {
-    schemaVersion: 1,
-    id: 'readme-refinement',
-    targetPath: 'README.md',
-    baseHash: inspection.baseHash,
-    operations: [
-      { id: 'keep-alpha', type: 'preserve', selector: { sectionId: alpha.id } },
-      { id: 'edit-beta', type: 'edit', selector: { sectionId: beta.id }, markdown: 'new beta body\n' },
-      { id: 'add-delta', type: 'create', anchor: { sectionId: gamma.id }, position: 'before', markdown: '# Delta\ndelta body\n' },
-    ],
-  });
+test('edit replaces only direct body and preserves nested section bytes', () => {
+  const source = '# Guide\n\n## Install\n\nOld intro.\n\n### Linux\n\napt install demo\n\n### Windows\n\nwinget install demo\n\n## Usage\n\nRun it.\n';
+  const linuxAndAfter = source.slice(source.indexOf('### Linux'));
+  const plan = planFor(source, [{
+    id: 'edit-install-intro',
+    type: 'edit',
+    selector: { sectionId: 'section:guide/install' },
+    markdown: '\nNew intro.\n\n',
+  }]);
+  const preview = previewDocument(plan, source);
 
-  const preview = await previewDocumentPlan(root, planPath);
-  assert.equal(await fs.readFile(target, 'utf8'), source);
-  assert.match(preview.reviewToken, /^review-v1:[0-9a-f]{64}$/);
-  assert.equal((await previewDocumentPlan(root, planPath)).reviewToken, preview.reviewToken);
-  assert.match(preview.diff, /^--- a\/README\.md\n\+\+\+ b\/README\.md\n@@/);
-  assert.equal(preview.candidate, 'Preface\n# Alpha\nalpha body\n# Beta\nnew beta body\n# Delta\ndelta body\n# Gamma\ngamma body\n');
-
-  const result = await applyDocumentPlan(root, planPath, preview.reviewToken);
-  assert.equal(result.beforeHash, inspection.baseHash);
-  assert.equal(result.afterHash, hashDocumentSource(preview.candidate));
-  assert.equal(await fs.readFile(target, 'utf8'), preview.candidate);
+  assert.match(preview.candidate, /## Install\n\nNew intro\.\n\n### Linux/);
+  assert.equal(preview.candidate.slice(preview.candidate.indexOf('### Linux')), linuxAndAfter);
+  assert.match(preview.unifiedDiff, /-Old intro\./);
+  assert.match(preview.unifiedDiff, /\+New intro\./);
 });
 
-test('replace and reasoned remove splice exact source ranges', async (context) => {
-  const root = await fixture(context);
-  const source = '# One\none\n# Two\ntwo\n# Three\nthree\n';
-  await fs.writeFile(path.join(root, 'docs', 'guide.md'), source);
-  const inspection = await inspectMarkdownFile(root, 'docs/guide.md');
-  const one = inspection.sections.find((section) => section.heading === 'One')!;
-  const two = inspection.sections.find((section) => section.heading === 'Two')!;
-  const three = inspection.sections.find((section) => section.heading === 'Three')!;
-  const planPath = await writePlan(root, 'guide', {
+test('replace changes the full subtree while remove requires a reason', () => {
+  const source = '# Guide\n\n## Old\n\nText\n\n### Child\n\nNested\n\n## Keep\n\nExact\n';
+  const replaced = previewDocument(planFor(source, [{
+    id: 'replace-old',
+    type: 'replace',
+    selector: { sectionId: 'section:guide/old' },
+    markdown: '## New\n\nReplacement\n\n',
+  }]), source).candidate;
+  assert.equal(replaced, '# Guide\n\n## New\n\nReplacement\n\n## Keep\n\nExact\n');
+
+  const removed = previewDocument(planFor(source, [{
+    id: 'remove-old',
+    type: 'remove',
+    selector: { sectionId: 'section:guide/old' },
+    reason: 'Obsolete section',
+  }]), source).candidate;
+  assert.equal(removed, '# Guide\n\n## Keep\n\nExact\n');
+  assert.equal(DocumentPlanSchema.safeParse({
     schemaVersion: 1,
-    id: 'guide-update',
-    targetPath: 'docs/guide.md',
-    baseHash: inspection.baseHash,
-    operations: [
-      { id: 'keep-one', type: 'preserve', selector: { sectionId: one.id } },
-      { id: 'replace-two', type: 'replace', selector: { sectionId: two.id }, markdown: '# Second\nreplacement\n' },
-      { id: 'remove-three', type: 'remove', selector: { sectionId: three.id }, reason: 'obsolete section' },
-    ],
-  });
-  const preview = await previewDocumentPlan(root, planPath);
-  assert.equal(preview.candidate, '# One\none\n# Second\nreplacement\n');
+    id: 'bad-remove',
+    targetPath: 'README.md',
+    baseHash: inspectMarkdown(source, 'README.md').baseHash,
+    operations: [{ id: 'remove', type: 'remove', selector: { sectionId: 'section:guide/old' }, reason: '   ' }],
+  }).success, false);
 });
 
-test('rejects overlapping parent/child edits, conflicting create anchors, and preserve violations', async (context) => {
-  const root = await fixture(context);
-  const source = '# Parent\nbody\n## Child\nchild\n# End\nend\n';
-  await fs.writeFile(path.join(root, 'README.md'), source);
-  const inspection = await inspectMarkdownFile(root, 'README.md');
-  const parent = inspection.sections.find((section) => section.heading === 'Parent')!;
-  const child = inspection.sections.find((section) => section.heading === 'Child')!;
-  const end = inspection.sections.find((section) => section.heading === 'End')!;
-
-  const overlapping = await writePlan(root, 'overlap', {
-    schemaVersion: 1,
-    id: 'overlap',
-    targetPath: 'README.md',
-    baseHash: inspection.baseHash,
-    operations: [
-      { id: 'edit-parent', type: 'edit', selector: { sectionId: parent.id }, markdown: 'parent replacement\n' },
-      { id: 'edit-child', type: 'edit', selector: { sectionId: child.id }, markdown: 'child replacement\n' },
-    ],
-  });
-  await assert.rejects(() => previewDocumentPlan(root, overlapping), (error: unknown) => errorCode(error) === 'OVERLAPPING_OPERATIONS');
-
-  const creates = await writePlan(root, 'creates', {
-    schemaVersion: 1,
-    id: 'creates',
-    targetPath: 'README.md',
-    baseHash: inspection.baseHash,
-    operations: [
-      { id: 'create-a', type: 'create', anchor: { sectionId: end.id }, position: 'before', markdown: '# A\n' },
-      { id: 'create-b', type: 'create', anchor: { sectionId: end.id }, position: 'before', markdown: '# B\n' },
-    ],
-  });
-  await assert.rejects(() => previewDocumentPlan(root, creates), (error: unknown) => errorCode(error) === 'OVERLAPPING_OPERATIONS' || errorCode(error) === 'CONFLICTING_ANCHOR');
-
-  const preserve = await writePlan(root, 'preserve', {
-    schemaVersion: 1,
-    id: 'preserve',
-    targetPath: 'README.md',
-    baseHash: inspection.baseHash,
-    operations: [
-      { id: 'keep-child', type: 'preserve', selector: { sectionId: child.id } },
-      { id: 'edit-parent', type: 'edit', selector: { sectionId: parent.id }, markdown: 'parent replacement\n' },
-    ],
-  });
-  await assert.rejects(() => previewDocumentPlan(root, preserve), (error: unknown) => errorCode(error) === 'PRESERVE_CONFLICT' || errorCode(error) === 'OVERLAPPING_OPERATIONS');
-});
-
-test('apply rejects missing/wrong review tokens, changed plans, and stale targets', async (context) => {
-  const root = await fixture(context);
-  const target = path.join(root, 'README.md');
-  const source = '# A\nold\n';
-  await fs.writeFile(target, source);
-  const inspection = await inspectMarkdownFile(root, 'README.md');
-  const section = inspection.sections.find((item) => item.heading === 'A')!;
-  const planPath = await writePlan(root, 'review', {
-    schemaVersion: 1,
-    id: 'review',
-    targetPath: 'README.md',
-    baseHash: inspection.baseHash,
-    operations: [{ id: 'edit', type: 'edit', selector: { sectionId: section.id }, markdown: 'new\n' }],
-  });
-  const preview = await previewDocumentPlan(root, planPath);
-
-  await assert.rejects(() => applyDocumentPlan(root, planPath, ''), (error: unknown) => errorCode(error) === 'REVIEW_REQUIRED');
-  await assert.rejects(() => applyDocumentPlan(root, planPath, 'review-v1:bad'), (error: unknown) => errorCode(error) === 'REVIEW_MISMATCH');
-
-  const changedPlan = JSON.parse(await fs.readFile(path.join(root, planPath), 'utf8')) as any;
-  changedPlan.operations[0].markdown = 'different\n';
-  await fs.writeFile(path.join(root, planPath), `${JSON.stringify(changedPlan, null, 2)}\n`);
-  await assert.rejects(() => applyDocumentPlan(root, planPath, preview.reviewToken), (error: unknown) => errorCode(error) === 'REVIEW_MISMATCH');
-
-  changedPlan.operations[0].markdown = 'new\n';
-  await fs.writeFile(path.join(root, planPath), `${JSON.stringify(changedPlan, null, 2)}\n`);
-  await fs.writeFile(target, '# A\nchanged externally\n');
-  await assert.rejects(() => applyDocumentPlan(root, planPath, preview.reviewToken), (error: unknown) => errorCode(error) === 'STALE_BASE');
-});
-
-test('discard deletes valid or malformed plans and leaves the document byte-for-byte unchanged', async (context) => {
-  const root = await fixture(context);
-  const source = '# Keep\nunchanged\n';
-  const target = path.join(root, 'README.md');
-  await fs.writeFile(target, source);
-  const inspection = await inspectMarkdownFile(root, 'README.md');
-  const section = inspection.sections.find((item) => item.heading === 'Keep')!;
-  const planPath = await writePlan(root, 'discard-me', {
-    schemaVersion: 1,
-    id: 'discard-me',
-    targetPath: 'README.md',
-    baseHash: inspection.baseHash,
-    operations: [{ id: 'keep', type: 'preserve', selector: { sectionId: section.id } }],
-  });
-  await discardDocumentPlan(root, planPath);
-  await assert.rejects(() => fs.access(path.join(root, planPath)));
-  assert.equal(await fs.readFile(target, 'utf8'), source);
-
-  const malformed = '.demoweave/plans/malformed.json';
-  await fs.writeFile(path.join(root, malformed), '{ definitely not json');
-  await discardDocumentPlan(root, malformed);
-  await assert.rejects(() => fs.access(path.join(root, malformed)));
-  assert.equal(await fs.readFile(target, 'utf8'), source);
-});
-
-test('rejects path traversal and symlink targets', async (context) => {
-  const root = await fixture(context);
-  await fs.writeFile(path.join(root, 'README.md'), '# Safe\n');
-  await assert.rejects(() => inspectMarkdownFile(root, '../outside.md'), (error: unknown) => errorCode(error) === 'PATH_OUTSIDE_PROJECT');
-  await assert.rejects(() => previewDocumentPlan(root, '../plan.json'), (error: unknown) => errorCode(error) === 'PATH_OUTSIDE_PROJECT');
-
-  if (process.platform !== 'win32') {
-    const outsideRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'demoweave-outside-'));
-    context.after(() => fs.rm(outsideRoot, { recursive: true, force: true }));
-    const outside = path.join(outsideRoot, 'outside.md');
-    await fs.writeFile(outside, '# Outside\n');
-    await fs.symlink(outside, path.join(root, 'docs', 'linked.md'));
-    await assert.rejects(() => inspectMarkdownFile(root, 'docs/linked.md'), (error: unknown) => errorCode(error) === 'SYMLINK_REJECTED');
+test('create supports before, after, document start, and document end anchors', () => {
+  const source = '# A\n\nA body.\n\n# B\n\nB body.\n';
+  const cases: Array<[DocumentOperation, string]> = [
+    [{ id: 'before', type: 'create', anchor: { sectionId: 'section:b' }, position: 'before', markdown: '# X\n\n' }, '# A\n\nA body.\n\n# X\n\n# B\n\nB body.\n'],
+    [{ id: 'after', type: 'create', anchor: { sectionId: 'section:a' }, position: 'after', markdown: '# X\n\n' }, '# A\n\nA body.\n\n# X\n\n# B\n\nB body.\n'],
+    [{ id: 'start', type: 'create', anchor: { kind: 'document-start' }, markdown: 'Intro\n\n' }, 'Intro\n\n# A\n\nA body.\n\n# B\n\nB body.\n'],
+    [{ id: 'end', type: 'create', anchor: { kind: 'document-end' }, markdown: '\n# C\n' }, '# A\n\nA body.\n\n# B\n\nB body.\n\n# C\n'],
+  ];
+  for (const [operation, expected] of cases) {
+    assert.equal(previewDocument(planFor(source, [operation]), source).candidate, expected);
   }
 });
 
-test('DocumentPlan v1 runtime schema and published JSON Schema expose all five operations', async () => {
-  const sample = {
-    schemaVersion: 1,
-    id: 'schema-test',
-    targetPath: 'README.md',
-    baseHash: `sha256:${'a'.repeat(64)}`,
-    operations: [
-      { id: 'p', type: 'preserve', selector: { sectionId: 'preamble' } },
-      { id: 'e', type: 'edit', selector: { sectionId: 'section-a' }, markdown: '' },
-      { id: 'r', type: 'replace', selector: { sectionId: 'section-b' }, markdown: '# B\n' },
-      { id: 'c', type: 'create', anchor: { sectionId: 'section-b' }, position: 'after', markdown: '# C\n' },
-      { id: 'x', type: 'remove', selector: { sectionId: 'section-c' }, reason: 'obsolete' },
-    ],
-  };
-  assert.equal(DocumentPlanSchema.safeParse(sample).success, true);
-  assert.equal(DocumentPlanSchema.safeParse({ ...sample, operations: [...sample.operations, sample.operations[0]] }).success, false);
+test('plans reject duplicate ids, unknown selectors, destructive overlap, preserve conflicts, and duplicate insertion points', () => {
+  const source = '# Guide\n\nIntro\n\n## Child\n\nNested\n';
   assert.equal(DocumentPlanSchema.safeParse({
-    ...sample,
-    operations: [{ id: 'x', type: 'remove', selector: { sectionId: 'section-c' }, reason: '   ' }],
+    schemaVersion: 1,
+    id: 'duplicates',
+    targetPath: 'README.md',
+    baseHash: inspectMarkdown(source, 'README.md').baseHash,
+    operations: [
+      { id: 'same', type: 'preserve', selector: { sectionId: 'section:guide' } },
+      { id: 'same', type: 'preserve', selector: { sectionId: 'section:guide/child' } },
+    ],
   }).success, false);
+  assert.equal(DocumentPlanSchema.safeParse({
+    schemaVersion: 1,
+    id: 'missing-selector',
+    targetPath: 'README.md',
+    baseHash: inspectMarkdown(source, 'README.md').baseHash,
+    operations: [{ id: 'edit', type: 'edit', markdown: 'Changed' }],
+  }).success, false);
+  assert.throws(() => parseDocumentPlan({ schemaVersion: 2 }), expectCode('UNSUPPORTED_DOCUMENT_PLAN_VERSION'));
 
+  assert.throws(() => previewDocument(planFor(source, [{ id: 'missing', type: 'edit', selector: { sectionId: 'section:nope' }, markdown: '' }]), source), expectCode('UNKNOWN_DOCUMENT_SECTION'));
+  assert.throws(() => previewDocument(planFor(source, [{
+    id: 'bad-anchor',
+    type: 'create',
+    anchor: { sectionId: 'section:nope' },
+    position: 'after',
+    markdown: '# New\n',
+  }]), source), expectCode('UNKNOWN_DOCUMENT_SECTION'));
+  assert.throws(() => previewDocument(planFor(source, [
+    { id: 'replace-parent', type: 'replace', selector: { sectionId: 'section:guide' }, markdown: '# New\n' },
+    { id: 'remove-child', type: 'remove', selector: { sectionId: 'section:guide/child' }, reason: 'Covered' },
+  ]), source), expectCode('DOCUMENT_PLAN_CONFLICT'));
+  assert.throws(() => previewDocument(planFor(source, [
+    { id: 'keep-guide', type: 'preserve', selector: { sectionId: 'section:guide' } },
+    { id: 'edit-child', type: 'edit', selector: { sectionId: 'section:guide/child' }, markdown: '\nChanged\n' },
+  ]), source), expectCode('PRESERVED_SECTION_CONFLICT'));
+  assert.throws(() => previewDocument(planFor(source, [
+    { id: 'one', type: 'create', anchor: { kind: 'document-end' }, markdown: '\nOne' },
+    { id: 'two', type: 'create', anchor: { kind: 'document-end' }, markdown: '\nTwo' },
+  ]), source), expectCode('DOCUMENT_PLAN_CONFLICT'));
+
+  const preserved = previewDocument(planFor(source, [{
+    id: 'keep-guide',
+    type: 'preserve',
+    selector: { sectionId: 'section:guide' },
+  }]), source);
+  assert.equal(preserved.candidate, source);
+  assert.equal(preserved.operations[0]?.changed, false);
+  assert.equal(preserved.unifiedDiff, '(no changes)\n');
+});
+
+test('CRLF insertion is normalized while untouched bytes and trailing-newline state are preserved', () => {
+  const source = '# A\r\n\r\nOld\r\n\r\n# B\r\n\r\n| A | B |\r\n| - | - |\r\n| 1 | 2 |';
+  const untouched = source.slice(source.indexOf('# B'));
+  const preview = previewDocument(planFor(source, [{
+    id: 'edit-a',
+    type: 'edit',
+    selector: { sectionId: 'section:a' },
+    markdown: '\nNew\n\n',
+  }]), source);
+  assert.equal(preview.inspection.newline, 'crlf');
+  assert.equal(preview.candidate.includes('\n') && !preview.candidate.includes('\r\n'), false);
+  assert.equal(preview.candidate.slice(preview.candidate.indexOf('# B')), untouched);
+  assert.equal(preview.candidate.endsWith('\n'), false);
+});
+
+test('CR-only inspection reports correct points and edits direct body without changing nested bytes', () => {
+  const source = '# Title\rbody\r## Child\rtext\r';
+  const inspection = inspectMarkdown(source, 'README.md');
+  const title = inspection.sections.find((section) => section.id === 'section:title')!;
+  const child = inspection.sections.find((section) => section.id === 'section:title/child')!;
+
+  assert.equal(inspection.newline, 'cr');
+  assert.deepEqual(title.headingRange, {
+    start: { offset: 0, line: 1, column: 1 },
+    end: { offset: 7, line: 1, column: 8 },
+  });
+  assert.deepEqual(title.directBodyRange, {
+    start: { offset: 8, line: 2, column: 1 },
+    end: { offset: 13, line: 3, column: 1 },
+  });
+  assert.deepEqual(child.headingRange, {
+    start: { offset: 13, line: 3, column: 1 },
+    end: { offset: 21, line: 3, column: 9 },
+  });
+  assert.deepEqual(child.directBodyRange, {
+    start: { offset: 22, line: 4, column: 1 },
+    end: { offset: 27, line: 5, column: 1 },
+  });
+
+  const untouchedChild = source.slice(child.subtreeRange.start.offset, child.subtreeRange.end.offset);
+  const preview = previewDocument(planFor(source, [{
+    id: 'edit-title',
+    type: 'edit',
+    selector: { sectionId: title.id },
+    markdown: 'new\n',
+  }]), source);
+
+  assert.equal(preview.candidate, '# Title\rnew\r## Child\rtext\r');
+  assert.equal(preview.candidate.includes('\n'), false);
+  assert.equal(preview.candidate.slice(preview.candidate.indexOf('## Child')), untouchedChild);
+});
+
+test('filesystem inspect, preview, and apply preserve a UTF-8 BOM during an unrelated edit', async (context) => {
+  const source = '\uFEFF# Title\n\nIntro stays.\n\n## Later\n\nOld body.\n\n## Tail\n\nTail stays.\n';
+  const root = await projectFixture(context, source);
+  const target = path.join(root, 'README.md');
+  const originalBytes = await fs.readFile(target);
+  assert.deepEqual([...originalBytes.subarray(0, 3)], [0xef, 0xbb, 0xbf]);
+
+  const inspection = await inspectMarkdownFile(root, 'README.md');
+  const later = inspection.sections.find((section) => section.id === 'section:title/later')!;
+  assert.equal(inspection.sections[0]?.subtreeRange.start.offset, 0);
+  assert.equal(inspection.sections[0]?.subtreeRange.end.offset, 0);
+  assert.equal(inspection.sections[1]?.headingRange?.start.offset, 0);
+  assert.equal(inspection.baseHash, planFor(source, [{
+    id: 'keep-title',
+    type: 'preserve',
+    selector: { sectionId: 'section:title' },
+  }]).baseHash);
+
+  const plan = planFor(source, [{
+    id: 'edit-later',
+    type: 'edit',
+    selector: { sectionId: later.id },
+    markdown: '\nNew body.\n\n',
+  }]);
+  const planPath = await writePlan(root, plan, 'bom.json');
+  const firstPreview = await previewDocumentPlanFile(root, planPath);
+  const secondPreview = await previewDocumentPlanFile(root, planPath);
+  assert.equal(firstPreview.inspection.baseHash, secondPreview.inspection.baseHash);
+  assert.equal(firstPreview.candidateHash, secondPreview.candidateHash);
+  assert.equal(firstPreview.reviewToken, secondPreview.reviewToken);
+  assert.equal(firstPreview.candidate.charCodeAt(0), 0xfeff);
+
+  const beforeRange = Buffer.from(source.slice(0, later.directBodyRange.start.offset));
+  const afterRange = Buffer.from(source.slice(later.directBodyRange.end.offset));
+  assert.deepEqual(Buffer.from(firstPreview.candidate.slice(0, later.directBodyRange.start.offset)), beforeRange);
+  assert.deepEqual(Buffer.from(firstPreview.candidate.slice(-source.slice(later.directBodyRange.end.offset).length)), afterRange);
+
+  await applyDocumentPlanFile(root, planPath, firstPreview.reviewToken);
+  const appliedBytes = await fs.readFile(target);
+  assert.deepEqual([...appliedBytes.subarray(0, 3)], [0xef, 0xbb, 0xbf]);
+  assert.deepEqual(appliedBytes.subarray(0, beforeRange.length), beforeRange);
+  assert.deepEqual(appliedBytes.subarray(appliedBytes.length - afterRange.length), afterRange);
+  await assert.rejects(previewDocumentPlanFile(root, planPath), expectCode('STALE_BASE'));
+});
+
+test('review tokens bind canonical semantic plan and candidate, not JSON property order', () => {
+  const source = '# Demo\n\nOld\n';
+  const first = planFor(source, [{ id: 'edit', type: 'edit', selector: { sectionId: 'section:demo' }, markdown: '\nNew\n' }]);
+  const reordered = parseDocumentPlan({
+    operations: [{ markdown: '\nNew\n', selector: { sectionId: 'section:demo' }, type: 'edit', id: 'edit' }],
+    baseHash: first.baseHash,
+    targetPath: first.targetPath,
+    id: first.id,
+    schemaVersion: 1,
+  });
+  const changed = { ...first, operations: [{ ...first.operations[0]!, markdown: '\nDifferent\n' }] };
+  assert.equal(canonicalDocumentPlan(first), canonicalDocumentPlan(reordered));
+  assert.equal(previewDocument(first, source).reviewToken, previewDocument(reordered, source).reviewToken);
+  assert.notEqual(previewDocument(first, source).reviewToken, previewDocument(changed, source).reviewToken);
+});
+
+test('filesystem preview is non-mutating, apply requires the token, writes atomically, and refuses stale targets', async (context) => {
+  const source = '# Demo\n\nOld body.\n';
+  const root = await projectFixture(context, source);
+  const target = path.join(root, 'README.md');
+  if (process.platform !== 'win32') await fs.chmod(target, 0o640);
+  const initialMode = (await fs.stat(target)).mode & 0o777;
+  const plan = planFor(source, [{ id: 'edit', type: 'edit', selector: { sectionId: 'section:demo' }, markdown: '\nNew body.\n' }]);
+  const planPath = await writePlan(root, plan);
+
+  const preview = await previewDocumentPlanFile(root, planPath);
+  assert.equal(await fs.readFile(target, 'utf8'), source);
+  await assert.rejects(applyDocumentPlanFile(root, planPath, 'review-v1:wrong'), expectCode('REVIEW_MISMATCH'));
+  const applied = await applyDocumentPlanFile(root, planPath, preview.reviewToken);
+  assert.equal(applied.changed, true);
+  assert.equal(await fs.readFile(target, 'utf8'), '# Demo\n\nNew body.\n');
+  assert.equal((await fs.stat(target)).mode & 0o777, initialMode);
+  assert.equal((await fs.readdir(root)).some((name) => name.includes('.tmp')), false);
+
+  await fs.writeFile(target, `${source}changed`);
+  await assert.rejects(previewDocumentPlanFile(root, planPath), expectCode('STALE_BASE'));
+  await assert.rejects(applyDocumentPlanFile(root, planPath, preview.reviewToken), expectCode('STALE_BASE'));
+});
+
+test('discard removes only the plan and fails clearly when it is missing', async (context) => {
+  const source = '# Demo\n\nOld body.\n';
+  const root = await projectFixture(context, source);
+  const planPath = await writePlan(root, planFor(source, [{ id: 'keep', type: 'preserve', selector: { sectionId: 'section:demo' } }]));
+  const target = path.join(root, 'README.md');
+  const before = await fs.readFile(target);
+  assert.equal(await discardDocumentPlanFile(root, planPath), planPath);
+  await assert.rejects(fs.access(path.join(root, ...planPath.split('/'))));
+  assert.deepEqual(await fs.readFile(target), before);
+  await assert.rejects(discardDocumentPlanFile(root, planPath), expectCode('DOCUMENT_PLAN_NOT_FOUND'));
+});
+
+test('target and plan traversal, absolute paths, Windows variants, and symlink escape are rejected', async (context) => {
+  const root = await projectFixture(context);
+  for (const unsafe of ['../README.md', '..\\README.md', '/tmp/README.md', 'C:\\temp\\README.md']) {
+    await assert.rejects(inspectMarkdownFile(root, unsafe), expectCode('UNSAFE_DOCUMENT_TARGET'));
+    await assert.rejects(previewDocumentPlanFile(root, unsafe), expectCode('UNSAFE_PLAN_PATH'));
+  }
+
+  const outside = await fs.mkdtemp(path.join(os.tmpdir(), 'demoweave-outside-'));
+  context.after(() => fs.rm(outside, { recursive: true, force: true }));
+  await fs.writeFile(path.join(outside, 'secret.md'), '# Secret\n');
+  await fs.writeFile(path.join(outside, 'plan.json'), '{}\n');
+  try {
+    await fs.symlink(path.join(outside, 'secret.md'), path.join(root, 'escaped.md'));
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'EPERM') {
+      context.skip('This Windows environment does not permit symlink creation');
+      return;
+    }
+    throw error;
+  }
+  await assert.rejects(inspectMarkdownFile(root, 'escaped.md'), expectCode('UNSAFE_DOCUMENT_TARGET'));
+  try {
+    await fs.symlink(path.join(outside, 'plan.json'), path.join(root, '.demoweave', 'plans', 'escaped.json'));
+    await assert.rejects(previewDocumentPlanFile(root, '.demoweave/plans/escaped.json'), expectCode('UNSAFE_PLAN_PATH'));
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'EPERM') throw error;
+  }
+});
+
+test('published DocumentPlan schema mirrors the runtime operation contract', async () => {
+  const repository = path.resolve(process.cwd(), '../..');
   const published = JSON.parse(await fs.readFile(path.join(repository, 'schemas', 'document-plan.schema.json'), 'utf8')) as any;
   assert.equal(published.properties.schemaVersion.const, 1);
-  assert.equal(published.$defs.operation.oneOf.length, 5);
-  assert.deepEqual(published.$defs.operation.oneOf.map((item: any) => item.properties.type.const), ['preserve', 'edit', 'replace', 'create', 'remove']);
-  assert.equal(published.$defs.operation.oneOf[4].properties.reason.pattern, '\\S');
+  assert.equal(published.properties.baseHash.pattern, '^sha256:[a-f0-9]{64}$');
+  assert.deepEqual(published.$defs.operation.oneOf.map((branch: any) => branch.properties.type.const), [
+    'preserve', 'edit', 'replace', 'create', 'create', 'remove',
+  ]);
+  assert.equal(published.$defs.operation.oneOf.at(-1).properties.reason.pattern, '\\S');
 });

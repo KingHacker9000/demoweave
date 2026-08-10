@@ -2,14 +2,22 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://demoweave.dev/schemas/document-plan.schema.json",
   "title": "DemoWeave DocumentPlan v1",
+  "description": "A deterministic plan for reviewed, source-preserving Markdown changes. Operation ids must be unique; this is additionally enforced by runtime validation.",
   "type": "object",
   "additionalProperties": false,
   "required": ["schemaVersion", "id", "targetPath", "baseHash", "operations"],
   "properties": {
     "schemaVersion": { "const": 1 },
     "id": { "type": "string", "minLength": 1 },
-    "targetPath": { "type": "string", "minLength": 1 },
-    "baseHash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "targetPath": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Portable project-relative target path. Runtime validation rejects absolute paths, traversal, and symlink escape."
+    },
+    "baseHash": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
     "operations": {
       "type": "array",
       "minItems": 1,
@@ -22,7 +30,11 @@
       "additionalProperties": false,
       "required": ["sectionId"],
       "properties": {
-        "sectionId": { "type": "string", "minLength": 1 }
+        "sectionId": {
+          "type": "string",
+          "minLength": 1,
+          "description": "A deterministic section id emitted by docs inspect."
+        }
       }
     },
     "operation": {
@@ -56,7 +68,7 @@
             "id": { "type": "string", "minLength": 1 },
             "type": { "const": "replace" },
             "selector": { "$ref": "#/$defs/selector" },
-            "markdown": { "type": "string" }
+            "markdown": { "type": "string", "minLength": 1 }
           }
         },
         {
@@ -68,6 +80,22 @@
             "type": { "const": "create" },
             "anchor": { "$ref": "#/$defs/selector" },
             "position": { "enum": ["before", "after"] },
+            "markdown": { "type": "string", "minLength": 1 }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "type", "anchor", "markdown"],
+          "properties": {
+            "id": { "type": "string", "minLength": 1 },
+            "type": { "const": "create" },
+            "anchor": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["kind"],
+              "properties": { "kind": { "enum": ["document-start", "document-end"] } }
+            },
             "markdown": { "type": "string", "minLength": 1 }
           }
         },

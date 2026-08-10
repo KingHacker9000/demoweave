@@ -20,7 +20,7 @@ try {
   assert.equal(inspection.status, 0, inspection.stderr);
   const inspected = JSON.parse(inspection.stdout);
   assert.equal(inspected.baseHash, 'sha256:e9c43f6fff1fdc388df338065f4a3c7b6f64e7d4fecbd427f1c2a93ffc597400');
-  assert.ok(inspected.sections.some((section) => section.id === 'section-m5-dogfood-review-state-1-8802f58d'));
+  assert.ok(inspected.sections.some((section) => section.id === 'section:m5-dogfood/review-state'));
 
   const preview = run(['docs', 'preview', planRelative, '--json']);
   assert.equal(preview.status, 0, preview.stderr);

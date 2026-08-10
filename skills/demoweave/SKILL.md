@@ -208,9 +208,9 @@ Create the plan under `.demoweave/plans/`, using the exact `baseHash` and sectio
 Supported operations:
 
 - `preserve` — assert that a selected section must remain untouched;
-- `edit` — replace only the selected section body while preserving its heading line;
+- `edit` — replace only the selected section's direct body while preserving its heading and nested child sections;
 - `replace` — replace the selected section's complete source range;
-- `create` — insert exact Markdown `before` or `after` a selected anchor;
+- `create` — insert exact Markdown `before` or `after` a selected anchor, or at document start/end;
 - `remove` — remove a selected section and include a non-empty reason.
 
 Example:

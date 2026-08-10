@@ -4,75 +4,139 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
+import { inspectMarkdown } from '@demoweave/core';
 
 const cli = path.join(process.cwd(), 'dist', 'index.js');
+
+async function fixture(context: test.TestContext, source = '# Demo\n\nOld body.\n'): Promise<string> {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'demoweave-cli-docs-'));
+  context.after(() => fs.rm(root, { recursive: true, force: true }));
+  await fs.mkdir(path.join(root, '.demoweave', 'plans'), { recursive: true });
+  await fs.writeFile(path.join(root, 'README.md'), source);
+  return root;
+}
 
 function run(args: string[]) {
   return spawnSync(process.execPath, [cli, ...args], { encoding: 'utf8' });
 }
 
-test('docs inspect -> preview -> reviewed apply works through the built CLI', async (context) => {
-  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'demoweave-cli-docs-'));
-  context.after(() => fs.rm(root, { recursive: true, force: true }));
-  await fs.mkdir(path.join(root, '.demoweave', 'plans'), { recursive: true });
-  const source = '# Intro\nold body\n# Keep\nuntouched\n';
-  await fs.writeFile(path.join(root, 'README.md'), source);
-
-  const inspected = run(['docs', 'inspect', 'README.md', '--project', root, '--json']);
-  assert.equal(inspected.status, 0, inspected.stderr);
-  const inspection = JSON.parse(inspected.stdout) as any;
-  const intro = inspection.sections.find((section: any) => section.heading === 'Intro');
-  assert.ok(intro?.id);
-
-  const planPath = path.join(root, '.demoweave', 'plans', 'readme.json');
-  await fs.writeFile(planPath, `${JSON.stringify({
+async function writePlan(root: string, source: string, name = 'readme.json'): Promise<string> {
+  const relative = `.demoweave/plans/${name}`;
+  const plan = {
     schemaVersion: 1,
-    id: 'cli-readme',
+    id: 'improve-readme',
     targetPath: 'README.md',
-    baseHash: inspection.baseHash,
-    operations: [{ id: 'edit-intro', type: 'edit', selector: { sectionId: intro.id }, markdown: 'new body\n' }],
-  }, null, 2)}\n`);
+    baseHash: inspectMarkdown(source, 'README.md').baseHash,
+    operations: [{
+      id: 'edit-demo',
+      type: 'edit',
+      selector: { sectionId: 'section:demo' },
+      markdown: '\nNew body.\n',
+    }],
+  };
+  await fs.writeFile(path.join(root, ...relative.split('/')), `${JSON.stringify(plan, null, 2)}\n`);
+  return relative;
+}
 
-  const previewed = run(['docs', 'preview', '.demoweave/plans/readme.json', '--project', root, '--json']);
-  assert.equal(previewed.status, 0, previewed.stderr);
-  const preview = JSON.parse(previewed.stdout) as any;
-  assert.match(preview.reviewToken, /^review-v1:[0-9a-f]{64}$/);
-  assert.match(preview.diff, /-old body/);
-  assert.match(preview.diff, /\+new body/);
-  assert.equal(await fs.readFile(path.join(root, 'README.md'), 'utf8'), source);
+test('docs inspect provides concise human output and structured agent JSON', async (context) => {
+  const root = await fixture(context, 'Before\n\n# Demo\n\nBody\n');
+  const human = run(['docs', 'inspect', 'README.md', '--project', root]);
+  assert.equal(human.status, 0, human.stderr);
+  assert.match(human.stdout, /Document: README\.md/);
+  assert.match(human.stdout, /Content hash: sha256:[a-f0-9]{64}/);
+  assert.match(human.stdout, /preamble/);
+  assert.match(human.stdout, /section:demo/);
 
-  const applied = run(['docs', 'apply', '.demoweave/plans/readme.json', '--project', root, '--review', preview.reviewToken]);
-  assert.equal(applied.status, 0, applied.stderr);
-  assert.match(applied.stdout, /Applied plan: cli-readme/);
-  assert.equal(await fs.readFile(path.join(root, 'README.md'), 'utf8'), '# Intro\nnew body\n# Keep\nuntouched\n');
+  const json = run(['docs', 'inspect', 'README.md', '--project', root, '--json']);
+  assert.equal(json.status, 0, json.stderr);
+  const parsed = JSON.parse(json.stdout);
+  assert.equal(parsed.targetPath, 'README.md');
+  assert.equal(parsed.sections[1].heading, 'Demo');
+  assert.equal(parsed.sections[1].directBodyRange.start.line, 4);
+  assert.equal(String(parsed.baseHash).startsWith('sha256:'), true);
+  assert.equal(JSON.stringify(parsed).includes(root), false);
 });
 
-test('docs apply refuses an unreviewed candidate and docs discard never mutates the target', async (context) => {
-  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'demoweave-cli-docs-safety-'));
-  context.after(() => fs.rm(root, { recursive: true, force: true }));
-  await fs.mkdir(path.join(root, '.demoweave', 'plans'), { recursive: true });
-  const source = '# Safe\nbody\n';
-  await fs.writeFile(path.join(root, 'README.md'), source);
+test('docs preview is deterministic and non-mutating, apply requires its exact token', async (context) => {
+  const source = '# Demo\n\nOld body.\n';
+  const root = await fixture(context, source);
+  const planPath = await writePlan(root, source);
 
-  const inspected = run(['docs', 'inspect', 'README.md', '--project', root, '--json']);
-  assert.equal(inspected.status, 0, inspected.stderr);
-  const inspection = JSON.parse(inspected.stdout) as any;
-  const section = inspection.sections.find((item: any) => item.heading === 'Safe');
-  await fs.writeFile(path.join(root, '.demoweave', 'plans', 'safe.json'), `${JSON.stringify({
-    schemaVersion: 1,
-    id: 'safe-plan',
-    targetPath: 'README.md',
-    baseHash: inspection.baseHash,
-    operations: [{ id: 'keep', type: 'preserve', selector: { sectionId: section.id } }],
-  }, null, 2)}\n`);
+  const first = run(['docs', 'preview', planPath, '--project', root]);
+  const second = run(['docs', 'preview', planPath, '--project', root]);
+  assert.equal(first.status, 0, first.stderr);
+  assert.equal(second.status, 0, second.stderr);
+  assert.equal(first.stdout, second.stdout);
+  assert.match(first.stdout, /Document plan: improve-readme/);
+  assert.match(first.stdout, /Operations:\n  ~ edit Demo/);
+  assert.match(first.stdout, /-Old body\./);
+  assert.match(first.stdout, /\+New body\./);
+  assert.equal(await fs.readFile(path.join(root, 'README.md'), 'utf8'), source);
+  const token = first.stdout.match(/Review token:\s*(review-v1:[a-f0-9]{64})/)?.[1];
+  assert.ok(token);
 
-  const wrong = run(['docs', 'apply', '.demoweave/plans/safe.json', '--project', root, '--review', 'review-v1:not-reviewed']);
-  assert.notEqual(wrong.status, 0);
-  assert.match(wrong.stderr, /REVIEW_MISMATCH/);
+  const candidate = run(['docs', 'preview', planPath, '--project', root, '--candidate']);
+  assert.match(candidate.stdout, /Candidate:\n# Demo\n\nNew body\./);
+
+  const wrong = run(['docs', 'apply', planPath, '--project', root, '--review', 'review-v1:bad']);
+  assert.equal(wrong.status, 1);
+  assert.match(wrong.stderr, /REVIEW_MISMATCH:/);
   assert.equal(await fs.readFile(path.join(root, 'README.md'), 'utf8'), source);
 
-  const discarded = run(['docs', 'discard', '.demoweave/plans/safe.json', '--project', root]);
+  const applied = run(['docs', 'apply', planPath, '--project', root, '--review', token]);
+  assert.equal(applied.status, 0, applied.stderr);
+  assert.match(applied.stdout, /Applied document plan: improve-readme/);
+  assert.match(applied.stdout, /CHANGED\s+edit Demo/);
+  assert.equal(await fs.readFile(path.join(root, 'README.md'), 'utf8'), '# Demo\n\nNew body.\n');
+});
+
+test('docs apply refuses stale documents and changed plans after preview', async (context) => {
+  const source = '# Demo\n\nOld body.\n';
+  const root = await fixture(context, source);
+  const planPath = await writePlan(root, source);
+  const preview = run(['docs', 'preview', planPath, '--project', root, '--json']);
+  assert.equal(preview.status, 0, preview.stderr);
+  const token = JSON.parse(preview.stdout).reviewToken as string;
+
+  const planFile = path.join(root, ...planPath.split('/'));
+  const changedPlan = JSON.parse(await fs.readFile(planFile, 'utf8'));
+  changedPlan.operations[0].markdown = '\nDifferent body.\n';
+  await fs.writeFile(planFile, `${JSON.stringify(changedPlan, null, 2)}\n`);
+  const planMismatch = run(['docs', 'apply', planPath, '--project', root, '--review', token]);
+  assert.equal(planMismatch.status, 1);
+  assert.match(planMismatch.stderr, /REVIEW_MISMATCH:/);
+
+  await writePlan(root, source);
+  await fs.writeFile(path.join(root, 'README.md'), `${source}Changed externally.\n`);
+  const stale = run(['docs', 'apply', planPath, '--project', root, '--review', token]);
+  assert.equal(stale.status, 1);
+  assert.match(stale.stderr, /STALE_BASE:/);
+});
+
+test('docs discard deletes only the plan and traversal errors are non-zero', async (context) => {
+  const source = '# Demo\n\nOld body.\n';
+  const root = await fixture(context, source);
+  const planPath = await writePlan(root, source);
+  const targetBefore = await fs.readFile(path.join(root, 'README.md'));
+  const discarded = run(['docs', 'discard', planPath, '--project', root]);
   assert.equal(discarded.status, 0, discarded.stderr);
-  assert.equal(await fs.readFile(path.join(root, 'README.md'), 'utf8'), source);
-  await assert.rejects(() => fs.access(path.join(root, '.demoweave', 'plans', 'safe.json')));
+  assert.match(discarded.stdout, /Discarded document plan/);
+  await assert.rejects(fs.access(path.join(root, ...planPath.split('/'))));
+  assert.deepEqual(await fs.readFile(path.join(root, 'README.md')), targetBefore);
+
+  const missing = run(['docs', 'discard', planPath, '--project', root]);
+  assert.equal(missing.status, 1);
+  assert.match(missing.stderr, /DOCUMENT_PLAN_NOT_FOUND:/);
+  const traversal = run(['docs', 'inspect', '..\\secret.md', '--project', root, '--json']);
+  assert.equal(traversal.status, 1);
+  assert.match(traversal.stderr, /UNSAFE_DOCUMENT_TARGET:/);
+});
+
+test('init creates the normal DocumentPlan directory', async (context) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'demoweave-cli-init-docs-'));
+  context.after(() => fs.rm(root, { recursive: true, force: true }));
+  const initialized = run(['init', root]);
+  assert.equal(initialized.status, 0, initialized.stderr);
+  assert.match(initialized.stdout, /Document plans:/);
+  assert.equal((await fs.stat(path.join(root, '.demoweave', 'plans'))).isDirectory(), true);
 });

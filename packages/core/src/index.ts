@@ -95,6 +95,57 @@ export {
   TerminalTrackSchema,
   TerminalTrackStatusSchema,
 } from './terminal-track.js';
+
+export {
+  CreateDocumentOperationSchema,
+  DocumentAnchorSchema,
+  DocumentNewlineSchema,
+  DocumentOperationSchema,
+  DocumentPatchError,
+  DocumentPlanError,
+  DocumentPlanSchema,
+  DocumentSectionSchema,
+  EditDocumentOperationSchema,
+  MarkdownDocumentInspectionSchema,
+  PreserveDocumentOperationSchema,
+  RemoveDocumentOperationSchema,
+  ReplaceDocumentOperationSchema,
+  SectionSelectorSchema,
+  applyDocumentPlan,
+  applyDocumentPlanFile,
+  canonicalDocumentPlan,
+  createUnifiedDiff,
+  discardDocumentPlan,
+  discardDocumentPlanFile,
+  hashDocumentSource,
+  inspectMarkdown,
+  inspectMarkdownFile,
+  inspectMarkdownSource,
+  normalizeProjectRelativePath,
+  parseDocumentPlan,
+  previewDocument,
+  previewDocumentPlan,
+  previewDocumentPlanFile,
+  resolveProjectFile,
+  validateDocumentPlanFile,
+} from './document-plan.js';
+export type {
+  DocumentAnchor,
+  DocumentApplyResult,
+  DocumentNewline,
+  DocumentOperation,
+  DocumentOperationSummary,
+  DocumentPlan,
+  DocumentPlanIssue,
+  DocumentPreview,
+  DocumentSection,
+  MarkdownDocumentInspection,
+  MarkdownInspection,
+  MarkdownSection,
+  SectionSelector,
+  SourcePoint,
+  SourceRange,
+} from './document-plan.js';
 export type {
   TerminalCommand,
   TerminalCommandStatus,
@@ -103,47 +154,6 @@ export type {
   TerminalTrack,
   TerminalTrackStatus,
 } from './terminal-track.js';
-
-export {
-  DocumentNewlineSchema,
-  DocumentPatchError,
-  DocumentSectionSchema,
-  MarkdownDocumentInspectionSchema,
-  hashDocumentSource,
-  inspectMarkdownFile,
-  inspectMarkdownSource,
-  resolveProjectFile,
-} from './markdown-document.js';
-export type {
-  DocumentNewline,
-  DocumentSection,
-  MarkdownDocumentInspection,
-} from './markdown-document.js';
-
-export {
-  CreateDocumentOperationSchema,
-  DocumentOperationSchema,
-  DocumentPlanSchema,
-  EditDocumentOperationSchema,
-  PreserveDocumentOperationSchema,
-  RemoveDocumentOperationSchema,
-  ReplaceDocumentOperationSchema,
-  SectionSelectorSchema,
-  applyDocumentPlan,
-  createUnifiedDiff,
-  discardDocumentPlan,
-  previewDocumentPlan,
-  validateDocumentPlanFile,
-} from './document-plan.js';
-export type {
-  DocumentApplyResult,
-  DocumentOperation,
-  DocumentOperationSummary,
-  DocumentPlan,
-  DocumentPreview,
-  SectionSelector,
-} from './document-plan.js';
-
 export {
   DocumentImpactSchema,
   EvidenceFreshnessSchema,
