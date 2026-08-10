@@ -1,6 +1,7 @@
 import path from 'node:path';
 import type { Command } from 'commander';
 import { buildTutorial, RendererError } from '@demoweave/renderer';
+import { registerQaCommand } from './qa-command.js';
 
 function repoRelative(root: string, target: string): string {
   return path.relative(root, target).replaceAll(path.sep, '/') || '.';
@@ -38,4 +39,6 @@ export function registerTutorialCommand(program: Command): void {
         process.exitCode = 1;
       }
     });
+
+  registerQaCommand(program);
 }
