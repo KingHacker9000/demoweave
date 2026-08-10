@@ -223,7 +223,9 @@ export type {
 
 export {
   VisualQACategorySchema,
+  VisualQAContactSheetSchema,
   VisualQAFindingSchema,
+  VisualQAPacketSchema,
   VisualQAReportSchema,
   VisualQASampleContextSchema,
   VisualQASampleSchema,
@@ -236,7 +238,9 @@ export {
 } from './visual-qa.js';
 export type {
   VisualQACategory,
+  VisualQAContactSheet,
   VisualQAFinding,
+  VisualQAPacket,
   VisualQAReport,
   VisualQASample,
   VisualQASampleContext,
