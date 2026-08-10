@@ -1,6 +1,6 @@
 # DemoWeave Roadmap
 
-DemoWeave is an agent-native documentation studio for software repositories. Claude Code or Codex supplies the reasoning; DemoWeave supplies deterministic project inspection, workflow execution, evidence capture, rendering, freshness analysis, document patching, validation, and provenance.
+DemoWeave is an agent-native documentation studio for software repositories. Claude Code or Codex supplies the reasoning; DemoWeave supplies deterministic project inspection, workflow execution, evidence capture, rendering, composition, tutorial packaging, freshness analysis, document patching, validation, and provenance.
 
 DemoWeave is **multi-surface by design**. A repository may expose web, CLI, desktop, mobile, libraries/SDKs, notebooks, research pipelines, services, and generated artifacts at the same time.
 
@@ -18,9 +18,10 @@ DemoWeave is **multi-surface by design**. A repository may expose web, CLI, desk
 | M6 — Incremental stale tracking | ✅ Complete | Explainable freshness → minimal selective regeneration → no-change/no-churn |
 | M7 — Web driver (Playwright) | ✅ Complete | Semantic browser Flow execution + fingerprinted PNG screenshot Evidence |
 | P1 — Web fixture pilot | ✅ Complete | Committed browser Evidence + reviewed docs + stale/selective-regeneration proof |
-| **M8 — Timeline compositor** | **🚧 Current** | Compose independent Evidence/media into polished deterministic scenes without OBS |
+| M8 — Timeline compositor | ✅ Complete | `TimelinePlan v1`; local Evidence/media → deterministic split/single MP4/GIF without OBS |
+| **M9 — Tutorial output** | **🚧 Current** | Package existing MP4 Evidence into video + thumbnail + captions + chapters + upload metadata |
 
-M0/M1 landed in PR #1, M2 in PR #2, M3 in PR #3, M4 in PR #4, Pilot P0 in PR #5, M5 in PR #6, M6 in PR #7, M7 in PR #8, M5 hardening in PR #9, and Pilot P1 in PR #10.
+M0/M1 landed in PR #1, M2 in PR #2, M3 in PR #3, M4 in PR #4, Pilot P0 in PR #5, M5 in PR #6, M6 in PR #7, M7 in PR #8, M5 hardening in PR #9, Pilot P1 in PR #10, and M8 in PR #11. M9 is being developed in draft PR #12.
 
 ## Product principles
 
@@ -30,10 +31,11 @@ M0/M1 landed in PR #1, M2 in PR #2, M3 in PR #3, M4 in PR #4, Pilot P0 in PR #5,
 - **Preserve good existing documentation.** Patch intentionally instead of regenerating blindly.
 - **README.md and arbitrary Markdown are first-class targets.** `/docs` is not special.
 - **No OBS requirement.** Capture the smallest useful surface directly and compose later.
-- **One source of truth for demos.** Structured Flows feed evidence, docs, and later animated/tutorial outputs.
+- **One source of truth for demos.** Structured Flows feed evidence, docs, composition, and tutorial outputs.
 - **Incremental by default.** Provenance should make stale evidence selectively regenerable.
 - **Unknown is not stale.** When a deterministic baseline is unavailable, report uncertainty instead of inventing a conclusion.
-- **Capture and presentation are separate.** Runtime timestamps and source artifacts remain factual; renderers/compositors may derive presentation timing without rewriting evidence.
+- **Capture and presentation are separate.** Runtime artifacts stay factual; renderers/compositors/tutorial packagers derive presentation without rewriting what happened.
+- **Agent-authored narrative stays agent-authored.** DemoWeave validates/packages captions, chapters, titles, and descriptions; it does not secretly invoke an LLM.
 - **Claude Code and Codex share the same workflow contracts.**
 - Keep the core lightweight; platform-specific drivers/renderers stay isolated.
 
@@ -53,20 +55,24 @@ SurfaceDriver v1
   └─ web/Playwright → screenshot Evidence
   ↓
 Evidence v1 + Manifest v1 + fingerprints
-  ↓
-optional renderer
-  └─ terminal → PNG / GIF
+  ├─ terminal renderer → PNG / GIF
+  └─ TimelinePlan v1 → composed MP4 / GIF
+                         ↓
+                    TutorialPlan v1
+                         ↓
+          MP4 + thumbnail + SRT/VTT
+          + chapters + description + metadata
   ↓
 FreshnessReport v1
   ↓
-minimal selective update
+minimal selective update where supported
   ↓
 DocumentPlan v1
   ↓
 reviewed Markdown patch
 ```
 
-P0 proved the terminal path by making DemoWeave's own README use DemoWeave-generated media. M5 added reviewed document editing. M6 closed the freshness loop. M7 added Chromium as a second execution surface without changing Flow v1. P1 then proved the complete browser screenshot → documentation → stale source → impacted document → selective regeneration → no-churn loop on a committed standalone fixture.
+P0 proved the terminal path by making DemoWeave's own README use DemoWeave-generated media. M5 added reviewed document editing. M6 closed the freshness loop. M7 added Chromium as a second execution surface without changing Flow v1. P1 proved the browser screenshot → documentation → stale source → impacted document → selective regeneration → no-churn loop. M8 then proved that independent terminal/browser artifacts can be composed into polished media without recording a literal desktop or requiring OBS.
 
 ## Established contracts
 
@@ -78,11 +84,11 @@ Deterministic repository facts: components, ecosystems, manifests, workspaces, e
 
 Platform-neutral semantic steps such as `run`, `navigate`, `activate`, `input`, `press`, `scroll`, `wait`, `assert`, and `capture`. Terminal run steps may declare `expectedExitCodes`; omission means `[0]`. Flows may also declare project-relative source dependencies that materially determine their captured result.
 
-Raw Playwright selectors, browser launch flags, origins, application-start commands, recorder commands, and renderer/compositor details do not belong in Flow v1.
+Raw Playwright selectors, browser launch flags, origins, application-start commands, recorder commands, renderer/compositor details, timeline layout, and tutorial metadata do not belong in Flow v1.
 
 ### Evidence v1 / Manifest v1
 
-Evidence records lifecycle, artifact metadata, producer, provenance, optional SHA-256 source/Flow/artifact fingerprints, and derivation. Manifest v1 indexes Flows and Evidence and preserves source/derived relationships. Current source Evidence includes terminal tracks and web PNG screenshots; terminal PNG/GIF outputs are derived Evidence.
+Evidence records lifecycle, artifact metadata, producer, provenance, optional SHA-256 source/Flow/artifact fingerprints, and derivation. Manifest v1 indexes Flows and Evidence and preserves source/derived relationships. Current source Evidence includes terminal tracks and web PNG screenshots; renderers/compositors/tutorial packaging add derived image/recording/text/result Evidence.
 
 ### TerminalTrack v1
 
@@ -94,7 +100,15 @@ Agent-authored, deterministic Markdown change plans bound to an exact target con
 
 ### FreshnessReport v1
 
-Deterministic freshness output for Evidence and document impact. Evidence is classified as `fresh`, `stale`, `missing`, or `unknown` with explicit reason codes. The report also contains impacted Markdown and the currently supported minimal regeneration plan.
+Deterministic freshness output for Evidence and document impact. Evidence is classified as `fresh`, `stale`, `missing`, or `unknown` with explicit reason codes. The report also contains impacted Markdown and the currently supported minimal regeneration plan. Derived compositor/tutorial outputs participate in freshness propagation even when no automatic rebuild action exists yet.
+
+### TimelinePlan v1
+
+Presentation-only composition contract. A timeline has an explicit canvas, FPS/background, ordered cut scenes, single/horizontal-split layouts, pane sources, padding/gap/ratio, and `contain`/`cover` fit. Sources are root Evidence IDs or safe project-relative PNG/GIF files. Raw FFmpeg filters are not part of the plan.
+
+### TutorialPlan v1
+
+Current M9 contract for packaging existing MP4 Evidence. The agent supplies title/description/language/tags, explicit caption text/timing, chapters, and thumbnail presentation. DemoWeave validates project-local source Evidence and timing, then packages deterministic sidecars. TutorialPlan does not automate a surface and does not belong in Flow v1.
 
 ---
 
@@ -238,108 +252,122 @@ Delivered:
 
 P1 remains screenshot-only. Browser interaction recording was not fabricated or implied.
 
+## M8 — Timeline compositor ✅
+
+M8 proved that presentation can sit above source capture: independent terminal/browser artifacts are composed without recording a desktop, requiring OBS, or leaking FFmpeg syntax into Flow v1.
+
+Delivered:
+
+- published `TimelinePlan v1` under `.demoweave/timelines/`
+- explicit canvas width/height/FPS/background and ordered cut scenes
+- deterministic single and horizontal split layouts with padding/gap/ratio
+- `contain` and center-cropped `cover` with no aspect-ratio distortion
+- root Evidence sources plus safe project-relative PNG/GIF file sources
+- traversal/absolute-path/symlink-escape protection and media-byte validation
+- static PNG looping and real animated GIF playback
+- FFmpeg composition through argument arrays with `shell: false`
+- MP4 and GIF output
+- composed `renderer/compositor` Evidence with source/plan/artifact fingerprints and root source IDs in `derivedFrom`
+- freshness propagation without inventing unsupported compose regeneration actions
+- real dogfood `terminal-web-proof`: animated terminal Evidence beside the static P1 browser screenshot
+- committed 1920×720, 5-second, 20-fps MP4/GIF proof
+- visual review for readability, clipping, aspect ratio, pacing, flicker, final frame, and file size
+- same-input no-churn proof
+- Windows-path/junction hardening
+- hosted Ubuntu + Windows compositor smoke coverage
+
+The browser pane in that composition remains a screenshot. M8 did not add browser recording.
+
 ---
 
 # Current milestone
 
-## M8 — Timeline compositor 🚧
+## M9 — Tutorial output 🚧
 
-**Goal:** compose independent DemoWeave Evidence/media sources into polished deterministic scenes without recording the desktop and without coupling capture logic to presentation logic.
+**Goal:** turn an existing verified MP4 Evidence source into an upload-oriented tutorial package while preserving the agent/tool boundary.
 
-The first M8 vertical slice should prove composition using artifacts DemoWeave already knows how to produce. A strong dogfood scene is an animated terminal source beside the static P1 browser screenshot: motion comes from the terminal presentation, while the browser pane remains explicitly a screenshot rather than pretending to be a browser recording.
+M9 is packaging, not a hidden authoring model. Claude Code/Codex (or another agent/user) chooses the narrative and writes exact titles/descriptions/captions/chapters. DemoWeave validates those choices against the real video, derives presentation artifacts, records provenance, and keeps the package reproducible.
 
-### M8 architectural requirements
-
-```text
-Evidence / media sources
-        ↓
-Timeline / Scene plan
-        ↓
-source decoders / presentation tracks
-        ↓
-layout + crop/fit/scale + overlays
-        ↓
-deterministic frames
-        ↓
-FFmpeg encoder
-        ↓
-composed GIF / MP4 Evidence
-```
-
-- Keep **capture**, **presentation**, and **composition** separate.
-- No OBS, Electron, desktop recording, or Chromium just to composite existing assets.
-- Reference existing Evidence IDs where possible rather than arbitrary untracked files.
-- Preserve source provenance through `derivedFrom` relationships.
-- Do not mutate source Evidence.
-- The compositor must be deterministic given the same inputs and plan, apart from documented encoder/platform limits.
-- Use one controlled canvas with explicit output dimensions and frame rate.
-- Start with useful layouts: single-source and two-pane split.
-- Support predictable fit/contain/cover/crop behavior without silently distorting sources.
-- Support simple text/title overlays only where they materially help a scene.
-- Keep transitions minimal and deterministic; a hard cut and one simple fade are enough initially.
-- Audio plumbing may be represented internally if it does not complicate the slice, but narration/TTS belongs to M9.
-- Do **not** claim browser interaction video. A static browser screenshot inside a composed video is still a static browser screenshot.
-
-### M8 contract direction
-
-M8 may introduce a small internal/published `Timeline` or `ScenePlan` contract if needed. It should describe presentation and composition, not surface automation. Do not put layout/timeline fields into Flow v1.
-
-A plan should be able to express, at minimum:
-
-- output canvas width/height and frame rate
-- total duration or scene durations
-- source reference by Evidence ID
-- source start/end/presentation window where meaningful
-- one-pane or split layout
-- fit/crop policy
-- optional title/text overlay
-- simple scene ordering/transition
-
-Avoid designing the full M9 tutorial language in advance.
-
-### M8 first dogfood target
-
-Produce a short polished composition from existing real DemoWeave artifacts, for example:
+### M9 pipeline
 
 ```text
-┌──────────────────────────────┬──────────────────────────────┐
-│                              │                              │
-│  animated terminal evidence  │   P1 browser screenshot     │
-│                              │                              │
-└──────────────────────────────┴──────────────────────────────┘
+existing MP4 Evidence
+        +
+agent-authored TutorialPlan v1
+        ↓
+project/path + timing validation
+        ↓
+FFmpeg frame extraction + ffprobe
+        ↓
+SVG/resvg thumbnail treatment
+        +
+SRT / WebVTT / chapters / description / metadata
+        ↓
+renderer/tutorial Evidence + provenance
 ```
 
-A concise title may identify what is being shown. The output should demonstrate that independent evidence tracks can be composed without capturing a literal desktop.
+### M9 current scope
 
-### M8 acceptance criteria
+- persistent `TutorialPlan v1` under `.demoweave/tutorials/`
+- source by root-project MP4 Evidence ID
+- title, description, language, optional tags
+- explicit caption IDs/text/start/end timing
+- explicit chapter titles/start timing
+- thumbnail timestamp, size, fit/background, optional title/subtitle
+- project-local source/output path safety
+- FFmpeg + ffprobe capability checks
+- real-frame thumbnail extraction
+- deterministic SVG/resvg text treatment instead of FFmpeg system-font drawtext
+- byte-preserved source MP4 in the package
+- SRT + WebVTT caption sidecars
+- chapter text + description-with-chapters
+- YouTube-oriented JSON metadata file (no upload API call)
+- all outputs recorded as `renderer/tutorial` Evidence derived from the source MP4
+- TutorialPlan SHA-256 provenance for plan-dependent outputs
+- existing freshness propagation with no automatic tutorial rebuild action yet
 
-1. Composition plan is separate from Flow v1 and source Evidence.
-2. Existing terminal Evidence/media and image/screenshot Evidence can be resolved safely by Evidence ID.
-3. At least one deterministic single-source layout and one deterministic split layout work.
-4. Sources preserve aspect ratio with explicit fit/crop semantics.
-5. Rendering is headless and requires no browser/OBS for composition.
-6. FFmpeg is invoked through argument arrays, not shell command strings.
-7. Missing/invalid Evidence and unsupported formats fail structurally.
-8. Temporary frames/intermediates are cleaned up on success and failure.
-9. A composed output is recorded as derived Evidence with all source Evidence in `derivedFrom`.
-10. Source/plan/artifact fingerprints are sufficient for later freshness integration without inventing dependencies.
-11. A real committed dogfood composition is generated from DemoWeave's existing terminal + P1 browser artifacts.
-12. The dogfood output is visually reviewed for readability, clipping, aspect ratio, pacing, and file size.
-13. Same-input composition is semantically deterministic; repeated no-change generation does not create unexplained manifest churn.
-14. Ubuntu and Windows hosted CI exercise the core compositor path.
-15. Browser recording, narration, chapters, full tutorial authoring, and visual-QA automation remain explicitly out of scope.
+### M9 dogfood target
+
+The checked-in `.demoweave/tutorials/demoweave-overview.json` uses the real M8 `terminal-web-proof-mp4` Evidence and should generate:
+
+```text
+docs-media/tutorials/demoweave-overview/
+  demoweave-overview.mp4
+  demoweave-overview-thumbnail.png
+  demoweave-overview.srt
+  demoweave-overview.vtt
+  demoweave-overview-chapters.txt
+  demoweave-overview-description.txt
+  demoweave-overview-youtube.json
+```
+
+The source video currently contains animated terminal Evidence beside a static browser screenshot. M9 must describe that honestly. It must not call the browser pane recorded browser interaction.
+
+### M9 acceptance criteria
+
+1. `TutorialPlan v1` is separate from Flow v1 and TimelinePlan v1.
+2. Source MP4 Evidence resolves safely inside the project; traversal, absolute paths, symlink escapes, missing Evidence, and wrong formats fail structurally.
+3. Source Evidence IDs cannot collide with deterministic tutorial output Evidence IDs.
+4. `ffprobe` validates positive video dimensions/duration; thumbnail/caption/chapter timing outside the source duration is rejected.
+5. The thumbnail comes from a real source frame and is rendered headlessly with deterministic presentation semantics.
+6. SRT and WebVTT timestamps/text are deterministic and derived exactly from agent-authored caption cues.
+7. Chapter, description, and YouTube-oriented metadata files are deterministic and contain no invented prose beyond the TutorialPlan.
+8. The package MP4 preserves the existing source-video bytes; M9 does not fabricate a new recording.
+9. Every package file is represented as derived Evidence with artifact hash, `renderer/tutorial` producer metadata, source MP4 derivation, and TutorialPlan provenance where appropriate.
+10. Existing freshness analysis detects changed source MP4, changed TutorialPlan, or changed output bytes without inventing unsupported automatic tutorial rebuild actions.
+11. Same-input package generation produces no unexplained file/manifest churn on a single platform.
+12. A real `demoweave-overview` dogfood package is generated from committed M8 Evidence and reviewed for thumbnail legibility, caption timing/content, chapters, description/metadata accuracy, dimensions, duration, and file size.
+13. Hosted Ubuntu and Windows pass full build/tests/typecheck plus the real M9 package path.
+14. README and shared `SKILL.md` describe tutorial packaging accurately and continue to state that browser recording, narration/TTS, publishing/upload integration, and M10 visual QA are unavailable.
+15. M10 work is not started inside the M9 implementation PR.
 
 ---
 
 # Later milestones
 
-## M9 — Full tutorial output
-
-Generate YouTube-ready MP4, thumbnail, captions, chapters, title, and description. Narration/TTS remains an optional adapter. Browser recording input should be added deliberately before any tutorial claims depend on browser motion.
-
 ## M10 — Visual QA
 
-Agent-review sampled frames for readability, secrets, clipping, broken/loading states, dead time, and narration/visual mismatch. Structured beats should allow partial re-recording.
+Agent-review sampled frames for readability, secrets, clipping, broken/loading states, dead time, and narration/visual mismatch. Structured beats should allow partial re-recording. This should consume real renderer/compositor/tutorial outputs rather than introduce another capture stack.
 
 ## M11 — Research / notebook driver
 
@@ -381,18 +409,19 @@ DemoWeave 1.0 should provide stable agent workflows and contracts, multi-surface
 | 8 | ✅ M6 — stale tracking | living documentation |
 | 9 | ✅ M7 — web driver | website execution + screenshot Evidence |
 | 10 | ✅ P1 — web fixture | second-surface public proof |
-| 11 | **🚧 M8 — compositor** | independent evidence → polished scenes |
-| 12 | M9/M10 — tutorial + QA | YouTube-ready output |
-| 13 | M11 — research/notebook | research repos |
-| 14 | M12 — desktop | native apps |
-| 15 | M13 — mobile | Android/iOS |
-| 16 | M14/M15 — ecosystem | plugins/publishers |
-| 17 | 1.0 hardening | public stable release |
+| 11 | ✅ M8 — compositor | independent evidence → polished scenes |
+| 12 | **🚧 M9 — tutorial output** | MP4 Evidence → upload-oriented package |
+| 13 | M10 — visual QA | sampled-frame and presentation review |
+| 14 | M11 — research/notebook | research repos |
+| 15 | M12 — desktop | native apps |
+| 16 | M13 — mobile | Android/iOS |
+| 17 | M14/M15 — ecosystem | plugins/publishers |
+| 18 | 1.0 hardening | public stable release |
 
 ---
 
 # Current next step
 
-## NOW: M8 — timeline compositor
+## NOW: M9 — tutorial output
 
-Build the smallest composition layer that can take existing DemoWeave Evidence/media, place it on a controlled timeline/canvas, and render a polished single/split scene without OBS or desktop capture. Dogfood it by combining the existing terminal presentation with the P1 web screenshot, preserve derivation/provenance, and stop before tutorial/narration/browser-recording work.
+Finish the deterministic TutorialPlan package path around existing MP4 Evidence, prove it with the real `demoweave-overview` dogfood package, review the generated thumbnail/captions/chapters/metadata, keep narration/TTS/browser-recording/publishing explicitly out of scope, and stop before M10 automated visual QA.
