@@ -1,0 +1,120 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://demoweave.dev/schemas/visual-qa.schema.json",
+  "title": "DemoWeave VisualQAReport v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "id", "source", "sampling", "signals", "verdict", "findings"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "id": { "$ref": "#/$defs/stableId" },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["evidenceId", "path", "format", "artifactHash", "width", "height"],
+      "properties": {
+        "evidenceId": { "$ref": "#/$defs/stableId" },
+        "path": { "$ref": "#/$defs/projectPath" },
+        "format": { "enum": ["png", "gif", "mp4"] },
+        "artifactHash": { "$ref": "#/$defs/hash" },
+        "width": { "type": "integer", "minimum": 1, "maximum": 16384 },
+        "height": { "type": "integer", "minimum": 1, "maximum": 16384 },
+        "durationMs": { "$ref": "#/$defs/timestamp" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "format": { "enum": ["gif", "mp4"] } }, "required": ["format"] },
+          "then": { "required": ["durationMs"], "properties": { "durationMs": { "type": "integer", "minimum": 1, "maximum": 86400000 } } }
+        },
+        {
+          "if": { "properties": { "format": { "const": "png" } }, "required": ["format"] },
+          "then": { "not": { "required": ["durationMs"] } }
+        }
+      ]
+    },
+    "sampling": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["strategy", "requestedCount", "samples"],
+      "properties": {
+        "strategy": { "const": "uniform" },
+        "requestedCount": { "type": "integer", "minimum": 1, "maximum": 20 },
+        "samples": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 40,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "atMs", "path", "artifactHash", "width", "height"],
+            "properties": {
+              "id": { "$ref": "#/$defs/stableId" },
+              "atMs": { "$ref": "#/$defs/timestamp" },
+              "path": { "$ref": "#/$defs/projectPath" },
+              "artifactHash": { "$ref": "#/$defs/hash" },
+              "width": { "type": "integer", "minimum": 1, "maximum": 16384 },
+              "height": { "type": "integer", "minimum": 1, "maximum": 16384 },
+              "context": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "sceneIds": { "type": "array", "items": { "$ref": "#/$defs/stableId" } },
+                  "captionIds": { "type": "array", "items": { "$ref": "#/$defs/stableId" } }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "signals": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "kind", "startMs", "endMs"],
+        "properties": {
+          "id": { "$ref": "#/$defs/stableId" },
+          "kind": { "enum": ["black-range", "freeze-range"] },
+          "startMs": { "$ref": "#/$defs/timestamp" },
+          "endMs": { "$ref": "#/$defs/timestamp" }
+        }
+      }
+    },
+    "verdict": { "enum": ["pending", "pass", "needs-changes"] },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "severity", "category", "message"],
+        "properties": {
+          "id": { "$ref": "#/$defs/stableId" },
+          "severity": { "enum": ["info", "warning", "error"] },
+          "category": { "enum": ["readability", "clipping", "loading-state", "secret", "dead-time", "caption-mismatch", "composition", "text-overlap", "flicker", "other"] },
+          "message": { "type": "string", "minLength": 1, "maxLength": 1000 },
+          "sampleId": { "$ref": "#/$defs/stableId" },
+          "startMs": { "$ref": "#/$defs/timestamp" },
+          "endMs": { "$ref": "#/$defs/timestamp" },
+          "recommendation": { "type": "string", "minLength": 1, "maxLength": 1000 }
+        },
+        "allOf": [
+          {
+            "if": { "anyOf": [{ "required": ["startMs"] }, { "required": ["endMs"] }] },
+            "then": { "required": ["startMs", "endMs"] }
+          }
+        ]
+      }
+    }
+  },
+  "$defs": {
+    "stableId": { "type": "string", "minLength": 1, "pattern": "^[a-z0-9]+(?:[a-z0-9-]*[a-z0-9])?$" },
+    "timestamp": { "type": "integer", "minimum": 0, "maximum": 86400000 },
+    "hash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "projectPath": {
+      "type": "string",
+      "minLength": 1,
+      "not": { "pattern": "^(?:/|[A-Za-z]:[\\\\/]|//)|(?:^|[\\\\/])\\.\\.(?:[\\\\/]|$)" }
+    }
+  }
+}
