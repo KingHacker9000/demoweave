@@ -87,7 +87,7 @@ test('prepares MP4 samples with timeline context and deterministic media signals
     scenes: [{
       id: 'scene-proof',
       durationMs: 5000,
-      transition: { type: 'cut' },
+      transition: 'cut',
       layout: { type: 'single', padding: 0 },
       panes: [{ id: 'pane', source: { kind: 'file', path: 'media/source.png' }, fit: 'contain' }],
     }],
