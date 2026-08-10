@@ -270,7 +270,7 @@ async function resolveMediaSource(
 }
 
 export async function resolveTimeline(reference: string, projectRoot = '.'): Promise<ResolvedTimeline> {
-  const root = path.resolve(projectRoot);
+  const root = await fs.realpath(path.resolve(projectRoot));
   const planPath = await resolvePlanPath(reference, root);
   const planBytes = await fs.readFile(planPath);
   let input: unknown;
@@ -448,7 +448,7 @@ function composedEvidence(
 }
 
 export async function composeTimeline(reference: string, options: ComposeTimelineOptions): Promise<ComposedMedia> {
-  const root = path.resolve(options.projectRoot ?? '.');
+  const root = await fs.realpath(path.resolve(options.projectRoot ?? '.'));
   const timeline = await resolveTimeline(reference, root);
   const version = await ffmpegVersion(options.ffmpegPath, options.processRunner);
   if (!version) {
