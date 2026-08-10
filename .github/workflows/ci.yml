@@ -59,6 +59,10 @@ jobs:
           node scripts/m5-dogfood-smoke.mjs
           node packages/cli/dist/index.js validate .
           node scripts/p1-web-fixture-smoke.mjs
+      - name: Refresh real root composition for downstream M9/M10 dogfood
+        run: |
+          node packages/cli/dist/index.js compose terminal-web-proof --format mp4 --project .
+          node packages/cli/dist/index.js status .
       - name: Build real M9 dogfood tutorial package
         run: |
           node packages/cli/dist/index.js tutorial build demoweave-overview --project .
