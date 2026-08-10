@@ -16,6 +16,7 @@ import {
   ProjectProfileSchema,
   snapshotEvidenceArtifact,
   TimelinePlanSchema,
+  TutorialPlanSchema,
   validateMetadataBindings,
   type FlowFile,
 } from '@demoweave/core';
@@ -25,16 +26,19 @@ import {
   getRendererCapabilities,
   renderEvidence,
   resolveTimeline,
+  resolveTutorial,
   RendererError,
 } from '@demoweave/renderer';
 import { registerUpdateCommand, showFreshness } from './freshness.js';
+import { registerTutorialCommand } from './tutorial-command.js';
 
 const program = new Command();
 program.name('demoweave').description('Agent-native documentation tooling for software repositories').version('0.0.1');
 
 function commandAvailable(command: string): { ok: boolean; version?: string } {
   if (command === 'node') return { ok: true, version: `v${process.versions.node}` };
-  const result = spawnSync(command, ['--version'], { encoding: 'utf8', shell: false, windowsHide: true });
+  const versionArgs = command === 'ffprobe' ? ['-version'] : ['--version'];
+  const result = spawnSync(command, versionArgs, { encoding: 'utf8', shell: false, windowsHide: true });
   return {
     ok: result.status === 0,
     version: (result.stdout || result.stderr || '').trim().split('\n')[0] || undefined,
@@ -112,6 +116,7 @@ program.command('doctor').description('Check local DemoWeave prerequisites').act
     ['node', true],
     ['git', true],
     ['pnpm', false],
+    ['ffprobe', false],
   ] as const;
   let failedRequired = false;
   console.log('DemoWeave doctor\n');
@@ -124,7 +129,7 @@ program.command('doctor').description('Check local DemoWeave prerequisites').act
   const renderer = await getRendererCapabilities();
   console.log(`${'OK'.padEnd(8)} renderer PNG  headless SVG rasterization`);
   const ffmpegStatus = renderer.gif ? 'OK' : 'OPTIONAL';
-  console.log(`${ffmpegStatus.padEnd(8)} ffmpeg media${renderer.ffmpegVersion ? `  ${renderer.ffmpegVersion}` : '  not found; install FFmpeg to enable GIF rendering and timeline composition'}`);
+  console.log(`${ffmpegStatus.padEnd(8)} ffmpeg media${renderer.ffmpegVersion ? `  ${renderer.ffmpegVersion}` : '  not found; install FFmpeg to enable GIF rendering and timeline/tutorial media'}`);
   const web = await getWebDriverCapabilities();
   const webStatus = web.chromium ? 'OK' : 'OPTIONAL';
   console.log(`${webStatus.padEnd(8)} playwright web${web.chromium ? '  Chromium ready' : '  Chromium not installed; run: pnpm --filter @demoweave/drivers exec playwright install chromium'}`);
@@ -138,10 +143,12 @@ program.command('init').description('Initialize DemoWeave metadata in a reposito
   const evidenceDir = path.join(metadataRoot, 'evidence');
   const plansDir = path.join(metadataRoot, 'plans');
   const timelinesDir = path.join(metadataRoot, 'timelines');
+  const tutorialsDir = path.join(metadataRoot, 'tutorials');
   await fs.mkdir(flowDir, { recursive: true });
   await fs.mkdir(evidenceDir, { recursive: true });
   await fs.mkdir(plansDir, { recursive: true });
   await fs.mkdir(timelinesDir, { recursive: true });
+  await fs.mkdir(tutorialsDir, { recursive: true });
 
   const configPath = path.join(metadataRoot, 'config.json');
   if (!(await exists(configPath))) {
@@ -163,6 +170,7 @@ program.command('init').description('Initialize DemoWeave metadata in a reposito
   console.log(`Flows: ${repoRelative(process.cwd(), flowDir)}`);
   console.log(`Document plans: ${repoRelative(process.cwd(), plansDir)}`);
   console.log(`Timelines: ${repoRelative(process.cwd(), timelinesDir)}`);
+  console.log(`Tutorials: ${repoRelative(process.cwd(), tutorialsDir)}`);
   console.log(`Evidence manifest: ${repoRelative(process.cwd(), manifestPath)}`);
 });
 
@@ -426,8 +434,9 @@ docs.command('discard')
     }
   });
 registerUpdateCommand(program);
+registerTutorialCommand(program);
 
-program.command('validate').description('Validate DemoWeave project metadata, timeline/document plans, and evidence bindings').argument('[path]', 'project path', '.').action(async (input) => {
+program.command('validate').description('Validate DemoWeave project metadata, tutorial/timeline/document plans, and evidence bindings').argument('[path]', 'project path', '.').action(async (input) => {
   const root = path.resolve(input);
   const projectPath = path.join(root, '.demoweave', 'project.json');
   let failed = false;
@@ -531,6 +540,27 @@ program.command('validate').description('Validate DemoWeave project metadata, ti
     }
   }
 
+  const tutorialDirectory = path.join(root, '.demoweave', 'tutorials');
+  let tutorialCount = 0;
+  for (const file of await listJsonFiles(tutorialDirectory)) {
+    try {
+      const parsed = TutorialPlanSchema.safeParse(JSON.parse(await fs.readFile(file, 'utf8')));
+      if (!parsed.success) {
+        failed = true;
+        for (const issue of parsed.error.issues) {
+          console.error(`${repoRelative(root, file)}:${issue.path.join('.')}: ${issue.message}`);
+        }
+        continue;
+      }
+      await resolveTutorial(repoRelative(root, file), root);
+      tutorialCount += 1;
+    } catch (error) {
+      failed = true;
+      const code = error instanceof RendererError ? `${error.code}: ` : '';
+      console.error(`${repoRelative(root, file)}: ${code}${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
   if (!failed) {
     const bindingIssues = validateMetadataBindings(project, flowFiles, manifest);
     if (bindingIssues.length) {
@@ -548,6 +578,7 @@ program.command('validate').description('Validate DemoWeave project metadata, ti
   console.log(`Flow v1 files valid: ${flowFiles.length}.`);
   console.log(`DocumentPlan v1 files valid: ${planCount}.`);
   console.log(`TimelinePlan v1 files valid: ${timelineCount}.`);
+  console.log(`TutorialPlan v1 files valid: ${tutorialCount}.`);
   console.log(`Manifest v1: ${manifest ? 'valid' : 'not present'}.`);
   console.log('Metadata bindings are valid.');
 });

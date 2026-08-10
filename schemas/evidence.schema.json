@@ -13,7 +13,7 @@
     },
     "status": { "enum": ["planned", "available", "stale", "missing", "failed"] },
     "label": { "type": "string", "minLength": 1 },
-    "format": { "enum": ["png", "jpeg", "webp", "gif", "webm", "mp4", "svg", "json", "csv", "txt", "md", "ansi", "html"] },
+    "format": { "enum": ["png", "jpeg", "webp", "gif", "webm", "mp4", "svg", "json", "csv", "txt", "md", "ansi", "html", "srt", "vtt"] },
     "path": { "type": "string", "minLength": 1 },
     "artifactHash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
     "mimeType": { "type": "string", "minLength": 1 },

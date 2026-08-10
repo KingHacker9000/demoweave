@@ -200,3 +200,23 @@ export type {
   TimelineScene,
   TimelineSource,
 } from './timeline.js';
+
+export {
+  TutorialCaptionCueSchema,
+  TutorialChapterSchema,
+  TutorialMetadataSchema,
+  TutorialOutputKeySchema,
+  TutorialPlanSchema,
+  TutorialThumbnailSchema,
+  TutorialVideoSourceSchema,
+  tutorialOutputEvidenceIds,
+} from './tutorial.js';
+export type {
+  TutorialCaptionCue,
+  TutorialChapter,
+  TutorialMetadata,
+  TutorialOutputKey,
+  TutorialPlan,
+  TutorialThumbnail,
+  TutorialVideoSource,
+} from './tutorial.js';

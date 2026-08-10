@@ -61,4 +61,19 @@ export type {
   ResolvedTimelineSource,
 } from './compositor.js';
 
+export {
+  buildTutorial,
+  probeTutorialVideo,
+  renderChapters,
+  renderDescription,
+  renderSrt,
+  renderVtt,
+  resolveTutorial,
+} from './tutorial.js';
+export type {
+  TutorialBuildOptions,
+  TutorialBuildResult,
+  VideoProbe,
+} from './tutorial.js';
+
 export const rendererApiVersion = 1;
