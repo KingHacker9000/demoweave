@@ -55,3 +55,4 @@ jobs:
           node packages/cli/dist/index.js render inspect-project-terminal --format gif
           node scripts/m5-dogfood-smoke.mjs
           node packages/cli/dist/index.js validate .
+          node scripts/p1-web-fixture-smoke.mjs

@@ -1,0 +1,117 @@
+{
+  "schemaVersion": 1,
+  "id": "create-project",
+  "title": "Create a project",
+  "description": "Create a deterministic project and capture the finished dashboard state.",
+  "surfaceId": "web-fixture-web",
+  "sources": [
+    {
+      "path": "app/globals.css",
+      "role": "implementation"
+    },
+    {
+      "path": "app/layout.tsx",
+      "role": "implementation"
+    },
+    {
+      "path": "app/page.tsx",
+      "role": "implementation"
+    }
+  ],
+  "steps": [
+    {
+      "id": "open-dashboard",
+      "type": "navigate",
+      "destination": "/"
+    },
+    {
+      "id": "new-project-ready",
+      "type": "wait",
+      "condition": {
+        "kind": "visible",
+        "target": {
+          "strategy": "accessibilityId",
+          "value": "New project"
+        }
+      }
+    },
+    {
+      "id": "open-project-form",
+      "type": "activate",
+      "target": {
+        "strategy": "accessibilityId",
+        "value": "New project"
+      }
+    },
+    {
+      "id": "project-form-ready",
+      "type": "wait",
+      "condition": {
+        "kind": "visible",
+        "target": {
+          "strategy": "testId",
+          "value": "project-form"
+        }
+      }
+    },
+    {
+      "id": "enter-project-name",
+      "type": "input",
+      "target": {
+        "strategy": "label",
+        "value": "Project name",
+        "exact": true
+      },
+      "value": "Launch Demo",
+      "clear": true
+    },
+    {
+      "id": "create-project",
+      "type": "activate",
+      "target": {
+        "strategy": "accessibilityId",
+        "value": "Create project"
+      }
+    },
+    {
+      "id": "created-result-ready",
+      "type": "wait",
+      "condition": {
+        "kind": "visible",
+        "target": {
+          "strategy": "automationId",
+          "value": "project-result"
+        }
+      }
+    },
+    {
+      "id": "created-result-text",
+      "type": "assert",
+      "assertion": {
+        "kind": "textContains",
+        "target": {
+          "strategy": "automationId",
+          "value": "project-result"
+        },
+        "value": "Launch Demo"
+      }
+    },
+    {
+      "id": "created-card-visible",
+      "type": "assert",
+      "assertion": {
+        "kind": "visible",
+        "target": {
+          "strategy": "testId",
+          "value": "created-project"
+        }
+      }
+    },
+    {
+      "id": "capture-created-project",
+      "type": "capture",
+      "evidenceId": "create-project-result",
+      "kind": "screenshot"
+    }
+  ]
+}
