@@ -4,6 +4,29 @@ const StableIdSchema = z.string().min(1).regex(/^[a-z0-9]+(?:[a-z0-9-]*[a-z0-9])
 const ColorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Expected a six-digit hex color');
 const TimestampSchema = z.number().int().nonnegative().max(86_400_000);
 
+export const TutorialOutputKeySchema = z.enum([
+  'video',
+  'thumbnail',
+  'captions-srt',
+  'captions-vtt',
+  'chapters',
+  'description',
+  'metadata',
+]);
+export type TutorialOutputKey = z.infer<typeof TutorialOutputKeySchema>;
+
+export function tutorialOutputEvidenceIds(tutorialId: string): Record<TutorialOutputKey, string> {
+  return {
+    video: `${tutorialId}-video`,
+    thumbnail: `${tutorialId}-thumbnail`,
+    'captions-srt': `${tutorialId}-captions-srt`,
+    'captions-vtt': `${tutorialId}-captions-vtt`,
+    chapters: `${tutorialId}-chapters`,
+    description: `${tutorialId}-description`,
+    metadata: `${tutorialId}-metadata`,
+  };
+}
+
 export const TutorialVideoSourceSchema = z.object({
   evidenceId: StableIdSchema,
 }).strict();
@@ -53,11 +76,12 @@ export const TutorialPlanSchema = z.object({
   captions: z.array(TutorialCaptionCueSchema).min(1),
   chapters: z.array(TutorialChapterSchema).min(1),
 }).strict().superRefine((plan, ctx) => {
-  if (plan.video.evidenceId === `${plan.id}-video`) {
+  const generatedIds = Object.values(tutorialOutputEvidenceIds(plan.id));
+  if (generatedIds.includes(plan.video.evidenceId)) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       path: ['video', 'evidenceId'],
-      message: `Source Evidence id ${plan.video.evidenceId} collides with the generated tutorial video Evidence id`,
+      message: `Source Evidence id ${plan.video.evidenceId} collides with a generated tutorial Evidence id`,
     });
   }
 
