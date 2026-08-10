@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "id": "demoweave-overview",
+  "video": {
+    "evidenceId": "terminal-web-proof-mp4"
+  },
+  "metadata": {
+    "title": "DemoWeave: Runtime Evidence for Agent-Authored Docs",
+    "description": "DemoWeave separates agent reasoning from deterministic repository inspection, runtime evidence, presentation, and documentation updates.",
+    "language": "en",
+    "tags": [
+      "documentation",
+      "developer-tools",
+      "ai-agents"
+    ]
+  },
+  "thumbnail": {
+    "atMs": 2500,
+    "width": 1280,
+    "height": 720,
+    "fit": "cover",
+    "background": "#0b0d14",
+    "title": "DemoWeave",
+    "subtitle": "Runtime evidence for agent-authored docs"
+  },
+  "captions": [
+    {
+      "id": "evidence",
+      "startMs": 0,
+      "endMs": 2300,
+      "text": "DemoWeave grounds agent-authored documentation in captured runtime evidence."
+    },
+    {
+      "id": "composition",
+      "startMs": 2400,
+      "endMs": 4900,
+      "text": "Independent terminal and browser evidence can be composed without recording the desktop."
+    }
+  ],
+  "chapters": [
+    {
+      "startMs": 0,
+      "title": "Evidence-driven documentation"
+    }
+  ]
+}
