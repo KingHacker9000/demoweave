@@ -76,4 +76,16 @@ export type {
   VideoProbe,
 } from './tutorial.js';
 
+export {
+  finalizeVisualQa,
+  hashVisualQaPacket,
+  prepareVisualQa,
+} from './visual-qa.js';
+export type {
+  FinalizeVisualQaOptions,
+  FinalizeVisualQaResult,
+  PrepareVisualQaOptions,
+  PrepareVisualQaResult,
+} from './visual-qa.js';
+
 export const rendererApiVersion = 1;

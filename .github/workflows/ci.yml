@@ -40,7 +40,7 @@ jobs:
       - run: pnpm build
       - run: pnpm test
       - run: pnpm typecheck
-      - name: Smoke test built CLI, web driver, freshness, rendering, composition, tutorial packaging, and Markdown review
+      - name: Smoke test built CLI, web driver, freshness, rendering, composition, tutorial packaging, visual QA, and Markdown review
         run: |
           node packages/cli/dist/index.js --help
           node packages/cli/dist/index.js doctor
@@ -55,13 +55,26 @@ jobs:
           node packages/cli/dist/index.js render inspect-project-terminal --format gif
           node scripts/m8-compositor-smoke.mjs
           node scripts/m9-tutorial-smoke.mjs
+          node scripts/m10-visual-qa-smoke.mjs
           node scripts/m5-dogfood-smoke.mjs
           node packages/cli/dist/index.js validate .
           node scripts/p1-web-fixture-smoke.mjs
+      - name: Refresh real root composition for downstream M9/M10 dogfood
+        run: |
+          node packages/cli/dist/index.js compose terminal-web-proof --format mp4 --project .
+          node packages/cli/dist/index.js compose terminal-web-proof --format gif --project .
+          node packages/cli/dist/index.js status .
       - name: Build real M9 dogfood tutorial package
         run: |
           node packages/cli/dist/index.js tutorial build demoweave-overview --project .
           node packages/cli/dist/index.js validate .
+      - name: Prepare real M10 visual QA packet
+        run: |
+          node packages/cli/dist/index.js qa prepare terminal-web-proof-mp4 --project . --id terminal-web-proof-review --samples 7
+      - name: Finalize reviewed M10 dogfood report
+        if: runner.os == 'Linux'
+        run: |
+          node scripts/m10-dogfood-review.mjs
       - name: Upload M9 dogfood package
         if: runner.os == 'Linux'
         uses: actions/upload-artifact@v4
@@ -72,3 +85,28 @@ jobs:
           path: |
             docs-media/tutorials/demoweave-overview/
             .demoweave/evidence/manifest.json
+      - name: Upload M10 visual QA packet
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: m10-terminal-web-proof-review
+          if-no-files-found: error
+          retention-days: 7
+          path: |
+            .demoweave/cache/qa/terminal-web-proof-review/
+            .demoweave/qa/reports/terminal-web-proof-review.json
+            .demoweave/evidence/manifest.json
+      - name: Upload fresh root dogfood evidence chain
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: m10-fresh-root-evidence
+          if-no-files-found: error
+          retention-days: 7
+          path: |
+            .demoweave/evidence/artifacts/inspect-project-terminal.terminal.json
+            .demoweave/evidence/manifest.json
+            docs-media/inspect-project-terminal.png
+            docs-media/inspect-project-terminal.gif
+            docs-media/terminal-web-proof.mp4
+            docs-media/terminal-web-proof.gif

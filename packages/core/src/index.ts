@@ -220,3 +220,34 @@ export type {
   TutorialThumbnail,
   TutorialVideoSource,
 } from './tutorial.js';
+
+export {
+  VisualQACategorySchema,
+  VisualQAContactSheetSchema,
+  VisualQAFindingSchema,
+  VisualQAPacketSchema,
+  VisualQAReportSchema,
+  VisualQASampleContextSchema,
+  VisualQASampleSchema,
+  VisualQASamplingSchema,
+  VisualQASeveritySchema,
+  VisualQASignalKindSchema,
+  VisualQASignalSchema,
+  VisualQASourceSchema,
+  VisualQAVerdictSchema,
+} from './visual-qa.js';
+export type {
+  VisualQACategory,
+  VisualQAContactSheet,
+  VisualQAFinding,
+  VisualQAPacket,
+  VisualQAReport,
+  VisualQASample,
+  VisualQASampleContext,
+  VisualQASampling,
+  VisualQASeverity,
+  VisualQASignal,
+  VisualQASignalKind,
+  VisualQASource,
+  VisualQAVerdict,
+} from './visual-qa.js';
