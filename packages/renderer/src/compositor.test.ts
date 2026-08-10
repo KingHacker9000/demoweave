@@ -71,6 +71,17 @@ test('inspects real PNG and animated GIF dimensions and timing', async () => {
   assert.ok((gif.durationMs ?? 0) >= 4_900 && (gif.durationMs ?? 0) <= 5_100);
 });
 
+test('normalizes Windows extended paths into project-relative provenance', async (context) => {
+  if (process.platform !== 'win32') {
+    context.skip('Windows realpath normalization');
+    return;
+  }
+  const root = await projectFixture(context, singlePlan({ kind: 'file', path: 'fixtures/browser.png' }));
+  const resolved = await resolveTimeline('proof', root);
+  assert.equal(resolved.projectPlanPath, '.demoweave/timelines/proof.json');
+  assert.equal(resolved.scenes[0]?.panes[0]?.resolved.projectPath, 'fixtures/browser.png');
+});
+
 test('resolves Evidence GIF and project-relative PNG with hashes', async (context) => {
   const plan = TimelinePlanSchema.parse({
     ...singlePlan(),

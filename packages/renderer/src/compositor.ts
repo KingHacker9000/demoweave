@@ -73,8 +73,14 @@ function sha256(data: Buffer): `sha256:${string}` {
   return `sha256:${createHash('sha256').update(data).digest('hex')}`;
 }
 
+function ordinaryWindowsPath(target: string): string {
+  if (target.startsWith('\\\\?\\UNC\\')) return `\\\\${target.slice(8)}`;
+  if (target.startsWith('\\\\?\\')) return target.slice(4);
+  return target;
+}
+
 function repositoryPath(root: string, target: string): string {
-  return path.relative(root, target).split(path.sep).join('/');
+  return path.relative(ordinaryWindowsPath(root), ordinaryWindowsPath(target)).split(path.sep).join('/');
 }
 
 function unsafePortablePath(value: string): boolean {
