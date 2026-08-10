@@ -135,7 +135,9 @@ node packages/cli/dist/index.js run <web-flow-id-or-path> \
 
 The web driver currently implements the existing semantic Flow actions for navigation, activation, text input, key presses, scrolling, supported waits/assertions, and `capture` with `kind: "screenshot"`. Targets stay platform-neutral (`text`, `label`, `role`, `name`, `testId`, `accessibilityId`, or `automationId`); raw Playwright selectors do not belong in Flow v1.
 
-Screenshot capture writes `.demoweave/evidence/artifacts/<evidence-id>.png`, records `driver/web` provenance in the manifest, and uses the same M6 Flow/source/artifact fingerprinting as terminal Evidence. Browser video/interaction GIF capture is intentionally not part of M7.
+Screenshot capture writes `.demoweave/evidence/artifacts/<evidence-id>.png`, records `driver/web` provenance in the manifest, and uses the same M6 Flow/source/artifact fingerprinting as terminal Evidence. Browser video/interaction GIF capture is intentionally not implemented yet.
+
+For a complete committed browser dogfood example, see the [P1 web fixture](fixtures/web/README.md): DemoWeave detects the standalone Next.js app, executes a semantic `create-project` Flow, captures the real result as screenshot Evidence, links it from the fixture README, and proves stale-source → impacted-document → selective regeneration → no-churn behavior.
 
 ## Keep evidence fresh
 
@@ -157,6 +159,13 @@ Apply only that computed plan when wanted:
 
 ```bash
 node packages/cli/dist/index.js update . --apply
+```
+
+If a stale web Flow uses relative navigation, keep its application running and supply the runtime origin when applying the plan:
+
+```bash
+node packages/cli/dist/index.js update . --apply \
+  --base-url http://127.0.0.1:3000
 ```
 
 A stale source Evidence item schedules one run of its producing Flow when the required runtime context is available; affected terminal PNG/GIF derivations are then selectively re-rendered. Unknown baselines are reported rather than guessed and are not automatically regenerated. If everything is fresh, `update --apply` executes zero actions, so unchanged evidence and documents are not churned.
@@ -209,9 +218,9 @@ The versioned JSON contracts live in [`schemas/`](schemas/).
 
 ## Project status
 
-DemoWeave is in active development. **M0–M7 and Pilot P0 are complete:** the project can inspect multi-ecosystem repositories; execute terminal and Playwright-backed web Flows; capture fingerprinted terminal or browser screenshot Evidence; render terminal PNG/GIF media; explain and selectively refresh stale evidence; dogfood artifacts in its own README; and safely review/apply section-aware Markdown changes.
+DemoWeave is in active development. **M0–M7 plus Pilots P0 and P1 are complete:** the project can inspect multi-ecosystem repositories; execute terminal and Playwright-backed web Flows; capture fingerprinted terminal or browser screenshot Evidence; render terminal PNG/GIF media; explain and selectively refresh stale evidence; use those artifacts in reviewed Markdown documentation; and prove the same provenance/freshness/no-churn loop on both terminal and web surfaces.
 
-**Pilot P1 is next:** use the controlled web fixture to produce the first real browser Evidence intended for public documentation and prove the second-surface documentation workflow. Browser recording/composition remains later roadmap work rather than being implied by M7.
+**M8 is current:** build the first lightweight timeline compositor over independent evidence/media sources. Browser screenshot capture is available today; browser interaction recording remains a separate capability and will not be implied by composition alone.
 
 See [ROADMAP.md](ROADMAP.md) for milestone boundaries and future surface drivers.
 
@@ -223,7 +232,7 @@ pnpm test
 pnpm typecheck
 ```
 
-CI installs Chromium and runs build, full tests, typecheck, a built-CLI M7 browser smoke, M6 stale/no-churn dogfood, terminal execution/rendering, and the reviewed M5 Markdown dogfood workflow on Ubuntu and Windows.
+CI installs Chromium and runs build, full tests, typecheck, the low-level M7 browser smoke, M6 stale/no-churn dogfood, terminal execution/rendering, the reviewed M5 Markdown dogfood workflow, and the complete P1 committed-web-fixture capture/freshness/selective-regeneration smoke on Ubuntu and Windows.
 
 ## License
 
