@@ -102,6 +102,21 @@ function belongsToNestedProject(candidate: string, nestedRoots: string[]): boole
   return nestedRoots.some((projectRoot) => portable === projectRoot || portable.startsWith(`${projectRoot}/`));
 }
 
+function hasAndroidLauncher(manifest: string): boolean {
+  const application = manifest.match(/<application\b[^>]*>([\s\S]*?)<\/application\s*>/i)?.[1];
+  if (!application) return false;
+  for (const component of application.matchAll(/<(activity|activity-alias)\b([^>]*)>([\s\S]*?)<\/\1\s*>/gi)) {
+    if (/\bandroid:exported\s*=\s*["']false["']/i.test(component[2] ?? '')) continue;
+    for (const filter of (component[3] ?? '').matchAll(/<intent-filter\b[^>]*>([\s\S]*?)<\/intent-filter\s*>/gi)) {
+      const contents = filter[1] ?? '';
+      const main = /<action\b[^>]*\bandroid:name\s*=\s*["']android\.intent\.action\.MAIN["'][^>]*\/?>/i.test(contents);
+      const launcher = /<category\b[^>]*\bandroid:name\s*=\s*["']android\.intent\.category\.LAUNCHER["'][^>]*\/?>/i.test(contents);
+      if (main && launcher) return true;
+    }
+  }
+  return false;
+}
+
 function slug(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'surface';
 }
@@ -624,6 +639,33 @@ export async function analyzeProject(input = '.'): Promise<ProjectProfile> {
   }
 
   const nestedProjects = await nestedDemoWeaveProjectRoots(root);
+  const androidManifests = await fg(['src/main/AndroidManifest.xml', '**/src/main/AndroidManifest.xml'], {
+    cwd: root,
+    ignore: IGNORE,
+    onlyFiles: true,
+    unique: true,
+  });
+  for (const manifest of androidManifests
+    .map(portablePath)
+    .filter((file) => !belongsToNestedProject(file, nestedProjects))
+    .sort()) {
+    const contents = await fs.readFile(path.join(root, manifest), 'utf8');
+    if (!hasAndroidLauncher(contents)) continue;
+    const suffix = '/src/main/AndroidManifest.xml';
+    const surfaceRoot = manifest === 'src/main/AndroidManifest.xml' ? '.' : manifest.slice(0, -suffix.length);
+    if (!frameworks.some((item) => item.name === 'Android' && item.root === surfaceRoot)) {
+      frameworks.push({ name: 'Android', root: surfaceRoot });
+    }
+    if (!surfaces.some((surface) => surface.type === 'mobile' && surface.root === surfaceRoot)) {
+      addSurface({
+        id: slug(surfaceRoot === '.' ? 'mobile-android' : `mobile-android-${surfaceRoot}`),
+        type: 'mobile',
+        root: surfaceRoot,
+        framework: 'Android',
+        label: 'Android',
+      });
+    }
+  }
   const winFormsScripts = sourceFiles
     .filter((file) => (file.endsWith('.ps1') || file.endsWith('.cs')) && !belongsToNestedProject(file, nestedProjects))
     .sort();

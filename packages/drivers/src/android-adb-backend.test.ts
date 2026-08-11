@@ -84,6 +84,10 @@ test('parses UIAutomator hierarchy and maps portable semantic targets', () => {
   assert.equal(androidNodeMatchesTarget(button, { strategy: 'text', value: 'Create' }), true);
   assert.equal(androidNodeMatchesTarget(resultNode, { strategy: 'name', value: 'Project result' }), true);
   assert.equal(androidNodeMatchesTarget(resultNode, { strategy: 'text', value: 'Project', exact: false }), true);
+  assert.equal(androidNodeMatchesTarget(input, { strategy: 'automationId', value: 'project', exact: false }), false);
+
+  const encoded = parseAndroidUiHierarchy(HIERARCHY.replace('Demo Project created', 'Demo &amp; Project &quot;created&quot;'));
+  assert.equal(encoded.find((node) => node.resourceId.endsWith('/result'))?.text, 'Demo & Project "created"');
 });
 
 test('selects the only ready Android device or requires an explicit id when ambiguous', async () => {
@@ -113,6 +117,10 @@ test('reports missing/offline devices and unavailable adb explicitly', async () 
   const offline = new FakeAdbRunner();
   offline.devices = 'List of devices attached\nemulator-5554\toffline\n';
   assert.equal((await new AndroidAdbBackend({ runner: offline }).probe(context(), { platform: 'android', deviceId: 'emulator-5554' })).reason, 'MOBILE_DEVICE_UNAVAILABLE');
+
+  const unauthorized = new FakeAdbRunner();
+  unauthorized.devices = 'List of devices attached\nR58M123\tunauthorized\n';
+  assert.equal((await new AndroidAdbBackend({ runner: unauthorized }).probe(context(), { platform: 'android', deviceId: 'R58M123' })).reason, 'MOBILE_DEVICE_UNAVAILABLE');
 
   const unavailable: AdbRunner = { run: async () => ({ exitCode: null, stdout: Buffer.alloc(0), stderr: 'spawn adb ENOENT' }) };
   assert.equal((await new AndroidAdbBackend({ runner: unavailable }).probe(context(), { platform: 'android' })).reason, 'ADB_UNAVAILABLE');
@@ -169,7 +177,7 @@ test('supports conservative text input, key presses, waits/assertions, and seman
     id: 'actions',
     surfaceId: 'mobile-app',
     steps: [
-      { id: 'input', type: 'input', target: { strategy: 'automationId', value: 'project_name' }, value: 'Demo Project', clear: false },
+      { id: 'input', type: 'input', target: { strategy: 'automationId', value: 'project_name' }, value: 'Demo Project', clear: true },
       { id: 'press', type: 'press', key: 'Enter' },
       { id: 'wait', type: 'wait', condition: { kind: 'visible', target: { strategy: 'automationId', value: 'result' } }, timeoutMs: 200 },
       { id: 'assert', type: 'assert', assertion: { kind: 'textContains', target: { strategy: 'automationId', value: 'result' }, value: 'Demo Project' } },
@@ -182,6 +190,7 @@ test('supports conservative text input, key presses, waits/assertions, and seman
     assert.equal(response.status, 'passed', `${step.id}: ${response.error?.message ?? ''}`);
   }
   assert.ok(runner.calls.some((args) => args.join(' ').includes('shell input text Demo%sProject')));
+  assert.ok(runner.calls.some((args) => args.join(' ').includes('shell input keyevent KEYCODE_MOVE_END')));
   assert.ok(runner.calls.some((args) => args.join(' ').includes('shell input keyevent KEYCODE_ENTER')));
   assert.ok(runner.calls.some((args) => args.join(' ').includes('shell input swipe')));
 });
@@ -209,4 +218,51 @@ test('rejects unsafe text and ambiguous semantic targets', async () => {
   }).steps[0]!;
   const ambiguous = await backend.execute(activate as never, context(), { platform: 'android', deviceId: 'emulator-5554' });
   assert.equal(ambiguous.error?.code, 'TARGET_AMBIGUOUS');
+
+  const missing = FlowSchema.parse({
+    schemaVersion: 1,
+    id: 'missing',
+    surfaceId: 'mobile-app',
+    steps: [{ id: 'activate', type: 'activate', target: { strategy: 'automationId', value: 'missing_button' } }],
+  }).steps[0]!;
+  const notFound = await backend.execute(missing as never, context(), { platform: 'android', deviceId: 'emulator-5554' });
+  assert.equal(notFound.error?.code, 'TARGET_NOT_FOUND');
+});
+
+test('translates semantic content scroll directions into bounded opposing finger gestures', async () => {
+  const runner = new FakeAdbRunner();
+  const backend = new AndroidAdbBackend({ runner });
+  await backend.open(context(), { platform: 'android', deviceId: 'emulator-5554' });
+  const steps = FlowSchema.parse({
+    schemaVersion: 1,
+    id: 'scroll-directions',
+    surfaceId: 'mobile-app',
+    steps: [
+      { id: 'down', type: 'scroll', direction: 'down', amount: 300 },
+      { id: 'up', type: 'scroll', direction: 'up', amount: 300 },
+      { id: 'right', type: 'scroll', direction: 'right', amount: 300 },
+      { id: 'left', type: 'scroll', direction: 'left', amount: 300 },
+    ],
+  }).steps;
+  for (const step of steps) assert.equal((await backend.execute(step as never, context(), { platform: 'android' })).status, 'passed');
+  const swipes = runner.calls.filter((args) => args.includes('swipe')).map((args) => args.slice(-5, -1).map(Number));
+  assert.ok(swipes[0]![1]! > swipes[0]![3]!, 'scroll down swipes the finger upward');
+  assert.ok(swipes[1]![1]! < swipes[1]![3]!, 'scroll up swipes the finger downward');
+  assert.ok(swipes[2]![0]! > swipes[2]![2]!, 'scroll right swipes the finger left');
+  assert.ok(swipes[3]![0]! < swipes[3]![2]!, 'scroll left swipes the finger right');
+});
+
+test('cleans up the device hierarchy after reads and close', async () => {
+  const runner = new FakeAdbRunner();
+  const backend = new AndroidAdbBackend({ runner });
+  await backend.open(context(), { platform: 'android', deviceId: 'emulator-5554' });
+  const step = FlowSchema.parse({
+    schemaVersion: 1,
+    id: 'cleanup',
+    surfaceId: 'mobile-app',
+    steps: [{ id: 'activate', type: 'activate', target: { strategy: 'automationId', value: 'create_button' } }],
+  }).steps[0]!;
+  await backend.execute(step as never, context(), { platform: 'android' });
+  await backend.close();
+  assert.ok(runner.calls.filter((args) => args.join(' ').includes('shell rm -f /sdcard/demoweave-uia-')).length >= 2);
 });

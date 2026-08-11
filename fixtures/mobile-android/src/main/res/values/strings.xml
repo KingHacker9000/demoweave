@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">DemoWeave Mobile Fixture</string>
+    <string name="title">DemoWeave Mobile Fixture</string>
+    <string name="subtitle">A deterministic native Android proof.</string>
+    <string name="project_name_label">Project name</string>
+    <string name="project_name_hint">Enter a project name</string>
+    <string name="create">Create</string>
+    <string name="create_project_description">Create project</string>
+    <string name="result_description">Project creation result</string>
+    <string name="result_template">%1$s created</string>
+</resources>

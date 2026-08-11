@@ -134,6 +134,7 @@ export async function executeFlow(
       flowPath: relativeFlowPath,
       platform: options.mobilePlatform,
       deviceId: options.mobileDeviceId,
+      actionTimeoutMs: options.commandTimeoutMs,
     }),
   ];
   const driver = drivers.find((candidate) => candidate.supports(surface));

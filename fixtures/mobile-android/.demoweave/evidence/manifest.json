@@ -1,0 +1,83 @@
+{
+  "schemaVersion": 1,
+  "projectProfileVersion": 1,
+  "flows": [
+    {
+      "id": "create-project",
+      "path": ".demoweave/flows/create-project.json",
+      "surfaceId": "mobile-android"
+    }
+  ],
+  "evidence": [
+    {
+      "schemaVersion": 1,
+      "id": "create-project-result",
+      "kind": "screenshot",
+      "status": "available",
+      "label": "Native Android project creation result",
+      "format": "png",
+      "path": ".demoweave/evidence/artifacts/create-project-result.png",
+      "artifactHash": "sha256:60f71380eed6b22b976848c4303e75b567a7eaaa3d6884a4b6c4446220906ba9",
+      "mimeType": "image/png",
+      "producer": {
+        "kind": "driver",
+        "id": "mobile/android-adb",
+        "version": "0.0.1"
+      },
+      "provenance": {
+        "flowId": "create-project",
+        "stepId": "capture-device",
+        "surfaceId": "mobile-android",
+        "gitCommit": "0a1fee0cd2b7f981093518624836139bf19333eb",
+        "flowHash": "sha256:2c77da04b155c26a750f5d7c218ec19b71e5e1994712c59661474d225066f114",
+        "sources": [
+          {
+            "path": "build.gradle",
+            "role": "config",
+            "hash": "sha256:9c97cfd92d382b9a3436d3e7b89b54fbb5d2763fb8f3237d7fa1b6b7a9e41031"
+          },
+          {
+            "path": "src/main/AndroidManifest.xml",
+            "role": "config",
+            "hash": "sha256:eafc65dd2bc226d760dc8a228d28f9dcffafb412ed9a8583e9a6175f1a0aae98"
+          },
+          {
+            "path": "src/main/java/dev/demoweave/fixture/MainActivity.java",
+            "role": "implementation",
+            "hash": "sha256:e02eb23f4ec026359040bf55a6d3a54348aebdffeed1bd9ae1d0492fcc2fe0c5"
+          },
+          {
+            "path": "src/main/res/drawable/field_background.xml",
+            "role": "asset",
+            "hash": "sha256:2f391b4a2f6aa5fbc6c908d9ebc0b562f10b9e0242310e4937d9edda7117cc5e"
+          },
+          {
+            "path": "src/main/res/drawable/result_background.xml",
+            "role": "asset",
+            "hash": "sha256:bf782fe47098c5391a53ff21a5413f16ab626bc9a2046cb31756d33c7efb55b2"
+          },
+          {
+            "path": "src/main/res/layout/activity_main.xml",
+            "role": "implementation",
+            "hash": "sha256:6647fa071e9d725f2f33d1e5c8abca4f8cae096bf2ed5d29f634793e3512d538"
+          },
+          {
+            "path": "src/main/res/values/colors.xml",
+            "role": "asset",
+            "hash": "sha256:d1b2f10e901687544abf3b9ce7a9aacaa034ca5b74dca1df46207db8ca11e345"
+          },
+          {
+            "path": "src/main/res/values/strings.xml",
+            "role": "data",
+            "hash": "sha256:0bad2a0a99257cc8d39bed88d384c7ee12d8c073878b4366611e6907c7ecb7f3"
+          },
+          {
+            "path": "src/main/res/values/styles.xml",
+            "role": "asset",
+            "hash": "sha256:ef070adad173c8455290c7ea27b14a391ca47a4580e8b52b89010b60f5d0ed31"
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -30,6 +30,7 @@ import {
   RendererError,
 } from '@demoweave/renderer';
 import { registerUpdateCommand, showFreshness } from './freshness.js';
+import { mobileDeviceId, mobilePlatform } from './runtime-options.js';
 import { registerTutorialCommand } from './tutorial-command.js';
 
 const program = new Command();
@@ -134,6 +135,24 @@ program.command('doctor').description('Check local DemoWeave prerequisites').act
   const web = await getWebDriverCapabilities();
   const webStatus = web.chromium ? 'OK' : 'OPTIONAL';
   console.log(`${webStatus.padEnd(8)} playwright web${web.chromium ? '  Chromium ready' : '  Chromium not installed; run: pnpm --filter @demoweave/drivers exec playwright install chromium'}`);
+  const adb = commandAvailable('adb');
+  if (!adb.ok) {
+    console.log(`${'OPTIONAL'.padEnd(8)} adb Android  not found; Android mobile execution is unavailable`);
+  } else {
+    const devices = spawnSync('adb', ['devices'], { encoding: 'utf8', shell: false, windowsHide: true });
+    const readyDevices = devices.status === 0
+      ? devices.stdout.split(/\r?\n/).slice(1).filter((line) => /\sdevice\s*$/.test(line.trim())).length
+      : 0;
+    const detail = devices.status !== 0
+      ? 'installed; device readiness could not be checked'
+      : readyDevices === 0
+        ? 'installed; no ready Android devices'
+        : readyDevices === 1
+          ? 'installed; 1 ready Android device'
+          : `installed; ${readyDevices} ready Android devices, pass --mobile-device-id explicitly`;
+    console.log(`${'OPTIONAL'.padEnd(8)} adb Android  ${detail}`);
+  }
+  console.log(`${'OPTIONAL'.padEnd(8)} iOS mobile  backend not implemented`);
   if (failedRequired) process.exitCode = 1;
 });
 
@@ -245,6 +264,8 @@ program.command('run')
   .option('--timeout <ms>', 'default driver action timeout in milliseconds', positiveInteger, 30_000)
   .option('--base-url <url>', 'base URL for relative web navigation')
   .option('--desktop-pid <pid>', 'explicit PID of an already-running Windows desktop application', positiveInteger)
+  .option('--mobile-platform <platform>', 'mobile runtime platform: android or ios', mobilePlatform)
+  .option('--mobile-device-id <id>', 'explicit Android serial or iOS UDID', mobileDeviceId)
   .option('--headed', 'show the browser window while running web Flows')
   .action(async (reference, options) => {
     try {
@@ -253,6 +274,8 @@ program.command('run')
         commandTimeoutMs: options.timeout,
         ...(options.baseUrl ? { baseUrl: options.baseUrl } : {}),
         ...(options.desktopPid ? { desktopPid: options.desktopPid } : {}),
+        ...(options.mobilePlatform !== undefined ? { mobilePlatform: options.mobilePlatform } : {}),
+        ...(options.mobileDeviceId !== undefined ? { mobileDeviceId: options.mobileDeviceId } : {}),
         headless: !options.headed,
       });
       console.log(`Flow: ${result.flowId}`);

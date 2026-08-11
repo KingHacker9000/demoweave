@@ -189,7 +189,55 @@ test('profiles DemoWeave workspace members while retaining nested manifest facts
     'docs/M5_DOGFOOD.md',
     'docs/M7_DESIGN.md',
     'docs/development/m12b-windows-uia.md',
+    'docs/development/m13-android-adb.md',
   ]);
+});
+
+test('detects only owned Android launcher applications with deterministic mobile surfaces', async (context) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'demoweave-android-analyzer-'));
+  context.after(() => fs.rm(root, { recursive: true, force: true }));
+  const launcher = `<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"><application>
+  <activity android:name=".MainActivity" android:exported="true"><intent-filter>
+    <action android:name="android.intent.action.MAIN" />
+    <category android:name="android.intent.category.LAUNCHER" />
+  </intent-filter></activity>
+</application></manifest>`;
+  await fs.mkdir(path.join(root, 'src', 'main'), { recursive: true });
+  await fs.writeFile(path.join(root, 'src', 'main', 'AndroidManifest.xml'), launcher);
+
+  const first = await analyzeProject(root);
+  const second = await analyzeProject(root);
+  assert.deepEqual(first.frameworks, [{ name: 'Android', root: '.' }]);
+  assert.deepEqual(first.surfaces, [{ id: 'mobile-android', type: 'mobile', root: '.', framework: 'Android', label: 'Android' }]);
+  assert.deepEqual(first.surfaces, second.surfaces);
+});
+
+test('does not classify Android library, non-launcher, or non-exported manifests as runnable mobile apps', async (context) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'demoweave-android-libraries-'));
+  context.after(() => fs.rm(root, { recursive: true, force: true }));
+  await fs.mkdir(path.join(root, 'library', 'src', 'main'), { recursive: true });
+  await fs.mkdir(path.join(root, 'non-launcher', 'src', 'main'), { recursive: true });
+  await fs.mkdir(path.join(root, 'not-exported', 'src', 'main'), { recursive: true });
+  await fs.writeFile(path.join(root, 'library', 'src', 'main', 'AndroidManifest.xml'), '<manifest><application /></manifest>');
+  await fs.writeFile(path.join(root, 'non-launcher', 'src', 'main', 'AndroidManifest.xml'), '<manifest><application><activity><intent-filter><action android:name="android.intent.action.MAIN" /></intent-filter></activity></application></manifest>');
+  await fs.writeFile(path.join(root, 'not-exported', 'src', 'main', 'AndroidManifest.xml'), '<manifest><application><activity android:exported="false"><intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter></activity></application></manifest>');
+  const profile = await analyzeProject(root);
+  assert.equal(profile.surfaces.some((surface) => surface.type === 'mobile'), false);
+  assert.equal(profile.frameworks.some((framework) => framework.name === 'Android'), false);
+});
+
+test('nested initialized DemoWeave projects own Android launcher surfaces', async (context) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'demoweave-nested-android-'));
+  context.after(() => fs.rm(root, { recursive: true, force: true }));
+  const nested = path.join(root, 'fixtures', 'android');
+  await fs.mkdir(path.join(nested, '.demoweave'), { recursive: true });
+  await fs.mkdir(path.join(nested, 'src', 'main'), { recursive: true });
+  await fs.writeFile(path.join(nested, '.demoweave', 'config.json'), '{}');
+  await fs.writeFile(path.join(nested, 'src', 'main', 'AndroidManifest.xml'), '<manifest><application><activity android:exported="true"><intent-filter><category android:name="android.intent.category.LAUNCHER" /><action android:name="android.intent.action.MAIN" /></intent-filter></activity></application></manifest>');
+
+  assert.equal((await analyzeProject(root)).surfaces.some((surface) => surface.type === 'mobile'), false);
+  assert.deepEqual((await analyzeProject(nested)).surfaces, [{ id: 'mobile-android', type: 'mobile', root: '.', framework: 'Android', label: 'Android' }]);
 });
 
 test('keeps component, workspace, path, and surface identifiers deterministic', async () => {

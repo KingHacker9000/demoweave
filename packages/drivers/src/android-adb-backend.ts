@@ -346,13 +346,11 @@ export class AndroidAdbBackend implements MobileBackend {
     const focus = await this.device(['shell', 'input', 'tap', String(point.x), String(point.y)]);
     if (focus.exitCode !== 0) return failed('INPUT_FOCUS_FAILED', focus.stderr || 'Could not focus Android input target');
     if (clear) {
-      await this.device(['shell', 'input', 'keyevent', 'KEYCODE_MOVE_END']);
-      await this.device(['shell', 'input', 'keyevent', '--longpress', 'KEYCODE_DEL']);
-      const refreshed = await this.resolve(target, true);
-      if (refreshed && !('status' in refreshed) && refreshed.text) {
-        for (let index = 0; index < refreshed.text.length; index += 1) {
-          await this.device(['shell', 'input', 'keyevent', 'KEYCODE_DEL']);
-        }
+      const moveEnd = await this.device(['shell', 'input', 'keyevent', 'KEYCODE_MOVE_END']);
+      if (moveEnd.exitCode !== 0) return failed('INPUT_CLEAR_FAILED', moveEnd.stderr || 'Could not move to the end of Android input text');
+      for (const _character of Array.from(node.text)) {
+        const remove = await this.device(['shell', 'input', 'keyevent', 'KEYCODE_DEL']);
+        if (remove.exitCode !== 0) return failed('INPUT_CLEAR_FAILED', remove.stderr || 'Could not clear Android input text');
       }
     }
     if (!value) return passed();

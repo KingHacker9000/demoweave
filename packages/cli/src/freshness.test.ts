@@ -46,6 +46,8 @@ test('forwards invocation-scoped browser context during selective Flow regenerat
     baseUrl: 'http://127.0.0.1:4321',
     headed: true,
     desktopPid: 4242,
+    mobilePlatform: 'android',
+    mobileDeviceId: ' emulator-5554 ',
   }, dependencies(async (reference, options) => {
     receivedReference = reference;
     receivedOptions = options;
@@ -58,6 +60,8 @@ test('forwards invocation-scoped browser context during selective Flow regenerat
     baseUrl: 'http://127.0.0.1:4321',
     headless: false,
     desktopPid: 4242,
+    mobilePlatform: 'android',
+    mobileDeviceId: ' emulator-5554 ',
   });
 });
 

@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "id": "create-project",
+  "title": "Create a project in the native Android fixture",
+  "surfaceId": "mobile-android",
+  "sources": [
+    { "path": "build.gradle", "role": "config" },
+    { "path": "src/main/AndroidManifest.xml", "role": "config" },
+    { "path": "src/main/java/dev/demoweave/fixture/MainActivity.java", "role": "implementation" },
+    { "path": "src/main/res/layout/activity_main.xml", "role": "implementation" },
+    { "path": "src/main/res/values/colors.xml", "role": "asset" },
+    { "path": "src/main/res/values/strings.xml", "role": "data" },
+    { "path": "src/main/res/values/styles.xml", "role": "asset" },
+    { "path": "src/main/res/drawable/field_background.xml", "role": "asset" },
+    { "path": "src/main/res/drawable/result_background.xml", "role": "asset" }
+  ],
+  "steps": [
+    {
+      "id": "input-project-name",
+      "type": "input",
+      "target": { "strategy": "automationId", "value": "project_name" },
+      "value": "Demo Project",
+      "clear": true
+    },
+    {
+      "id": "activate-create",
+      "type": "activate",
+      "target": { "strategy": "automationId", "value": "create_button" }
+    },
+    {
+      "id": "wait-result",
+      "type": "wait",
+      "condition": {
+        "kind": "visible",
+        "target": { "strategy": "automationId", "value": "result" }
+      },
+      "timeoutMs": 5000
+    },
+    {
+      "id": "assert-result-text",
+      "type": "assert",
+      "assertion": {
+        "kind": "textContains",
+        "value": "Demo Project",
+        "target": { "strategy": "automationId", "value": "result" }
+      }
+    },
+    {
+      "id": "capture-device",
+      "type": "capture",
+      "evidenceId": "create-project-result",
+      "kind": "screenshot",
+      "label": "Native Android project creation result"
+    }
+  ]
+}
