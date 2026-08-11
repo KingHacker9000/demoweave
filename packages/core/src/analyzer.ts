@@ -75,6 +75,32 @@ function rel(base: string, target: string): string {
   return value || '.';
 }
 
+function portablePath(value: string): string {
+  return value.replaceAll(path.sep, '/');
+}
+
+async function nestedDemoWeaveProjectRoots(root: string): Promise<string[]> {
+  const configs = await fg(['.demoweave/config.json', '**/.demoweave/config.json'], {
+    cwd: root,
+    ignore: IGNORE,
+    onlyFiles: true,
+    unique: true,
+  });
+  return configs
+    .map((config) => {
+      const portable = portablePath(config);
+      const marker = '/.demoweave/config.json';
+      return portable === '.demoweave/config.json' ? '.' : portable.slice(0, -marker.length);
+    })
+    .filter((projectRoot) => projectRoot !== '.')
+    .sort();
+}
+
+function belongsToNestedProject(candidate: string, nestedRoots: string[]): boolean {
+  const portable = portablePath(candidate);
+  return nestedRoots.some((projectRoot) => portable === projectRoot || portable.startsWith(`${projectRoot}/`));
+}
+
 function slug(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'surface';
 }
@@ -596,7 +622,10 @@ export async function analyzeProject(input = '.'): Promise<ProjectProfile> {
     }
   }
 
-  const notebooks = sourceFiles.filter((file) => file.endsWith('.ipynb')).sort();
+  const nestedProjects = await nestedDemoWeaveProjectRoots(root);
+  const notebooks = sourceFiles
+    .filter((file) => file.endsWith('.ipynb') && !belongsToNestedProject(file, nestedProjects))
+    .sort();
   if (notebooks.length) {
     addSurface({
       type: 'notebook',
@@ -610,7 +639,8 @@ export async function analyzeProject(input = '.'): Promise<ProjectProfile> {
     onlyDirectories: true,
     deep: 3,
   });
-  if (researchDirs.length) addSurface({ type: 'research', root: researchDirs.sort()[0]!, label: 'Research workflow' });
+  const ownedResearchDirs = researchDirs.filter((directory) => !belongsToNestedProject(directory, nestedProjects)).sort();
+  if (ownedResearchDirs.length) addSurface({ type: 'research', root: ownedResearchDirs[0]!, label: 'Research workflow' });
 
   const docs = await fg([
     'README.md',
