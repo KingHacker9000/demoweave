@@ -131,7 +131,7 @@ test('activates by semantic target and never exposes coordinates to Flow', async
   const response = await backend.execute(step as never, context(), { platform: 'android', deviceId: 'emulator-5554' });
   assert.equal(response.status, 'passed');
   assert.ok(runner.calls.some((args) => args.join(' ').includes('shell input tap 540 545')));
-  await backend.close(context(), { platform: 'android', deviceId: 'emulator-5554' });
+  await backend.close();
 });
 
 test('captures real PNG bytes from adb screencap and rejects element capture', async () => {
