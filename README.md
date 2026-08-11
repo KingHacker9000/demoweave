@@ -137,7 +137,7 @@ Flows may declare project-relative `sources`. Successful execution fingerprints 
 
 M7 implements the same `Flow v1` against `web` surfaces using Playwright Chromium. The application must already be running; DemoWeave does not guess or launch an arbitrary repository dev server.
 
-For relative `navigate` destinations, pass the reachable origin at runtime:
+For relative navigation, pass the reachable origin at runtime:
 
 ```bash
 node packages/cli/dist/index.js run <web-flow-id-or-path> \
