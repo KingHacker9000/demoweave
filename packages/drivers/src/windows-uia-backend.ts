@@ -15,6 +15,7 @@ export const windowsUiaBackendVersion = '0.0.1';
 
 const DEFAULT_TIMEOUT_MS = 5_000;
 const POLL_INTERVAL_MS = 50;
+const MAX_WINDOWS_PID = 2_147_483_647;
 const SUPPORTED_KEYS = new Set([
   'Enter', 'Tab', 'Escape', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Home', 'End',
 ]);
@@ -143,7 +144,7 @@ function helperFailure(response: WindowsUiaResponse): DesktopBackendStepResult {
 }
 
 function validPid(value: number | undefined): value is number {
-  return Number.isSafeInteger(value) && (value ?? 0) > 0;
+  return Number.isSafeInteger(value) && (value ?? 0) > 0 && (value ?? 0) <= MAX_WINDOWS_PID;
 }
 
 export class WindowsUiaBackend implements DesktopBackend {
@@ -180,7 +181,11 @@ export class WindowsUiaBackend implements DesktopBackend {
       return { available: false, reason: 'DESKTOP_PID_REQUIRED', detail: 'An explicit --desktop-pid <pid> is required.' };
     }
     if (!validPid(this.desktopPid)) {
-      return { available: false, reason: 'INVALID_DESKTOP_PID', detail: 'Desktop PID must be a positive integer.' };
+      return {
+        available: false,
+        reason: 'INVALID_DESKTOP_PID',
+        detail: `Desktop PID must be an integer between 1 and ${MAX_WINDOWS_PID}.`,
+      };
     }
     const response = await this.helper.request({ operation: 'attach', pid: this.desktopPid });
     if (!response.ok) return { available: false, reason: response.error?.code, detail: response.error?.message };
