@@ -5,13 +5,14 @@ import type { DesktopPlatform } from './desktop-capabilities.js';
 export const desktopBackendApiVersion = 1 as const;
 
 export type DesktopBackendStep = Extract<FlowStep, {
-  type: 'activate' | 'input' | 'press' | 'wait' | 'assert' | 'capture';
+  type: 'activate' | 'input' | 'press' | 'scroll' | 'wait' | 'assert' | 'capture';
 }>;
 
 export type DesktopBackendCapability =
   | 'semantic-control'
   | 'text-input'
   | 'keyboard-input'
+  | 'scroll'
   | 'window-capture'
   | 'element-capture';
 
