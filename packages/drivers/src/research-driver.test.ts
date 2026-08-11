@@ -86,7 +86,7 @@ test('runs commands and asserts their output through the lightweight process ses
   await driver.close(ctx);
 });
 
-test('captures a native JSON artifact as immutable Evidence with source provenance', async (t) => {
+test('captures a native JSON artifact as immutable Evidence without treating the generated output as a source dependency', async (t) => {
   const root = await project(t);
   await fs.mkdir(path.join(root, 'outputs'), { recursive: true });
   await fs.writeFile(path.join(root, 'analysis.py'), '# deterministic research fixture\n');
@@ -100,8 +100,7 @@ test('captures a native JSON artifact as immutable Evidence with source provenan
   assert.equal(result.evidence?.[0]?.format, 'json');
   assert.equal(result.evidence?.[0]?.producer?.id, 'research');
   assert.equal(result.evidence?.[0]?.provenance.surfaceId, 'research-fixture');
-  assert.equal(result.evidence?.[0]?.provenance.sources[0]?.path, 'outputs/metrics.json');
-  assert.match(result.evidence?.[0]?.provenance.sources[0]?.hash ?? '', /^sha256:[0-9a-f]{64}$/);
+  assert.deepEqual(result.evidence?.[0]?.provenance.sources, []);
   assert.equal(await fs.readFile(path.join(root, '.demoweave', 'evidence', 'artifacts', 'metrics.json'), 'utf8'), '{"accuracy":0.93}\n');
   const manifest = ManifestSchema.parse(JSON.parse(await fs.readFile(path.join(root, '.demoweave', 'evidence', 'manifest.json'), 'utf8')));
   assert.equal(manifest.evidence.find((item) => item.id === 'metrics')?.kind, 'result');
