@@ -294,7 +294,7 @@ node packages/cli/dist/index.js docs inspect README.md
 node packages/cli/dist/index.js docs inspect README.md --json
 ```
 
-The inspection provides the exact target SHA-256 hash and deterministic section IDs. The agent then writes a `DocumentPlan v1` under `.demoweave/plans/` using those IDs] and one or more intentional operations: `preserve`, `edit`, `replace`, `create`, or reasoned `remove`.
+The inspection provides the exact target SHA-256 hash and deterministic section IDs. The agent then writes a `DocumentPlan v1` under `.demoweave/plans/` using those IDs and one or more intentional operations: `preserve`, `edit`, `replace`, `create`, or reasoned `remove`.
 
 Preview the complete candidate without touching the document:
 
