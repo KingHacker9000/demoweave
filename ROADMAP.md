@@ -20,10 +20,11 @@ DemoWeave is **multi-surface by design**. A repository may expose web, CLI, desk
 | P1 — Web fixture pilot | ✅ Complete | Browser Evidence + reviewed docs + stale/selective-regeneration proof |
 | M8 — Timeline compositor | ✅ Complete | `TimelinePlan v1`; local Evidence/media → deterministic MP4/GIF without OBS |
 | M9 — Tutorial output | ✅ Complete | `TutorialPlan v1`; existing MP4 Evidence → upload-oriented package |
-| **M10 — Visual QA** | **🚧 Current** | Deterministic sample packet → agent-reviewed hash-bound PASS/NEEDS-CHANGES report |
-| M11 — Research / notebook driver | Next | Native plots/results/experiments as first-class Evidence |
+| M10 — Visual QA | ✅ Complete | Deterministic sample packet → agent-reviewed hash-bound PASS/NEEDS-CHANGES report |
+| M11 — Research / notebook driver | ✅ Complete | Explicit research/notebook execution → immutable native plot/table/result/IPYNB Evidence |
+| **M12 — Desktop drivers** | **Next** | Native Electron/Windows/macOS/Linux surfaces without an OBS requirement |
 
-Milestone PR history: M0/M1 #1, M2 #2, M3 #3, M4 #4, P0 #5, M5 #6, M6 #7, M7 #8, M5 hardening #9, P1 #10, M8 #11, M9 #12. M10 is draft PR #13.
+Milestone PR history: M0/M1 #1, M2 #2, M3 #3, M4 #4, P0 #5, M5 #6, M6 #7, M7 #8, M5 hardening #9, P1 #10, M8 #11, M9 #12, M10 #13, M11 #14.
 
 ## Product principles
 
@@ -31,12 +32,14 @@ Milestone PR history: M0/M1 #1, M2 #2, M3 #3, M4 #4, P0 #5, M5 #6, M6 #7, M7 #8,
 - **Evidence over decoration.** Visuals must explain or prove something useful.
 - **Multi-surface by design.** Never collapse a repository into one `projectType`.
 - **Capture, presentation, and review are separate stages.**
+- **Prefer native artifacts over UI recordings when the native artifact is the result users care about.**
 - **No OBS requirement.** Capture the smallest useful surface directly and compose later.
 - **No hidden LLM calls.** The agent authors prose, tutorial narrative, and visual-QA findings.
 - **Preserve good existing documentation.** Patch intentionally instead of regenerating blindly.
 - **README.md and arbitrary Markdown are first-class targets.** `/docs` is not special.
 - **Freshness before regeneration or review.** Unknown/stale evidence is never silently treated as current.
 - **One source of truth for demos.** Structured Flows feed Evidence; presentation plans derive media without rewriting what happened.
+- **Generated output is not automatically a source dependency.** Material code/config/data belongs in Flow `sources`; captured output bytes become immutable Evidence.
 - **Claude Code and Codex share the same workflow contracts.**
 - Keep the core lightweight; platform-specific drivers/renderers stay isolated.
 
@@ -53,7 +56,9 @@ Flow v1 + declared sources
   ↓
 SurfaceDriver v1
   ├─ terminal → TerminalTrack Evidence
-  └─ web/Playwright → screenshot Evidence
+  ├─ web/Playwright → screenshot Evidence
+  └─ research/notebook → native artifact Evidence
+                         (plot/table/result/image/video/IPYNB)
   ↓
 Evidence v1 + Manifest v1 + fingerprints
   ├─ terminal renderer → PNG / GIF
@@ -83,15 +88,15 @@ reviewed Markdown patch
 
 ### ProjectProfile v1
 
-Deterministic repository facts: components, ecosystems, manifests, workspaces, entrypoints, languages, frameworks, commands, existing docs, and stable surface IDs. Baseline ecosystems: Node, Python, Rust, Go.
+Deterministic repository facts: components, ecosystems, manifests, workspaces, entrypoints, languages, frameworks, commands, existing docs, and stable surface IDs. Baseline ecosystems: Node, Python, Rust, Go. Explicit nested `.demoweave/config.json` roots own their loose research/notebook surfaces without hiding nested repository facts from a parent profile.
 
 ### Flow v1
 
-Platform-neutral semantic actions (`run`, `navigate`, `activate`, `input`, `press`, `scroll`, `wait`, `assert`, `capture`) plus optional explicit source dependencies. Runtime browser configuration and presentation metadata do not belong in Flow.
+Platform-neutral semantic actions (`run`, `navigate`, `activate`, `input`, `press`, `scroll`, `wait`, `assert`, `capture`) plus optional explicit source dependencies. M11 adds optional `capture.artifact.path` for project-local native output files; UI `target` and native `artifact` are mutually exclusive. Runtime browser configuration, environment inference, and presentation metadata do not belong in Flow.
 
 ### Evidence v1 / Manifest v1
 
-Typed artifact lifecycle, producer, provenance, source/Flow/artifact fingerprints, derivation relationships, and project indexing.
+Typed artifact lifecycle, producer, provenance, source/Flow/artifact fingerprints, derivation relationships, and project indexing. Baseline formats now include IPYNB alongside image/video/text/data formats.
 
 ### TerminalTrack v1
 
@@ -103,7 +108,7 @@ Hash-bound Markdown operations (`preserve`, direct-body `edit`, subtree `replace
 
 ### FreshnessReport v1
 
-Evidence classification (`fresh`, `stale`, `missing`, `unknown`), explicit reason chains, impacted Markdown, and the currently supported minimal regeneration actions.
+Evidence classification (`fresh`, `stale`, `missing`, `unknown`), explicit reason chains, impacted Markdown, and the currently supported minimal regeneration actions. The generic `run-flow` regeneration path now covers research/notebook Flows as well as terminal/web sources.
 
 ### TimelinePlan v1
 
@@ -115,7 +120,7 @@ Agent-authored title/description/language/tags, caption timing/text, chapter tim
 
 ### VisualQAPacket / VisualQAReport v1
 
-Current M10 review contract. DemoWeave generates deterministic sample frames/contact sheet/timing/context/signals from **fresh** PNG/GIF/MP4 Evidence. The agent visually reviews those samples and authors a durable PASS/NEEDS-CHANGES report bound to the exact packet and source hashes.
+Deterministic sample frames/contact sheet/timing/context/signals from **fresh** PNG/GIF/MP4 Evidence plus a durable agent-authored PASS/NEEDS-CHANGES report bound to exact packet/source hashes.
 
 ---
 
@@ -203,117 +208,82 @@ Delivered:
 
 M9 intentionally does not synthesize narration/TTS, publish/upload, record browser interaction, or perform hidden visual review.
 
----
+## M10 — Visual QA ✅
 
-# Current milestone
+M10 makes visual review reproducible without pretending deterministic media analysis replaces agent judgment.
 
-## M10 — Visual QA 🚧
+Delivered:
 
-**Goal:** make visual review reproducible without pretending that deterministic media analysis replaces agent judgment.
+- `VisualQAPacket v1` generated from fresh PNG/GIF/MP4 Evidence
+- exact source hash/dimensions/duration
+- deterministic uniform sample frames + contact sheet
+- optional Timeline/Tutorial context
+- advisory black/freeze signals
+- durable `VisualQAReport v1` with PASS/NEEDS-CHANGES findings
+- exact packet/source/sample/contact-sheet hash binding at finalization
+- source freshness checks both before prepare and before finalize
+- PASS as derived `agent/visual-qa` Evidence; NEEDS-CHANGES as a failing gate
+- freshness propagation into finalized reviews
+- generated review cache separated from durable report metadata
+- real seven-sample `terminal-web-proof-mp4` dogfood review
+- intentional ~2.65–5.0s reading hold recorded as informational rather than auto-failed
+- CI pins the exact visually reviewed source hash, so changed media requires an explicit new review
+- review-packet upload remains available even when that approval hash is stale, allowing the next review to happen without weakening the gate
+- Ubuntu/Windows tests/smokes; Linux real finalized review gate
 
-```text
-fresh PNG/GIF/MP4 Evidence
-        ↓
-demoweave qa prepare
-        ↓
-VisualQAPacket v1 (generated/cache)
-  ├─ exact source hash/dimensions/duration
-  ├─ deterministic uniform sample frames
-  ├─ contact sheet
-  ├─ scene/caption context when provenance exposes it
-  └─ advisory black/freeze ranges
-        ↓
-agent opens/inspects the actual images
-        ↓
-VisualQAReport v1 (durable)
-  ├─ packet/source hash binding
-  ├─ PASS or NEEDS-CHANGES
-  └─ structured findings/recommendations
-        ↓
-demoweave qa finalize
-        ↓
-derived agent/visual-qa result Evidence
-```
+M10 does not make OCR/secret-scanning guarantees, call a hidden vision model, auto-fix media, or fabricate browser recording.
 
-### M10 rules
+## M11 — Research / notebook driver ✅
 
-- Review only fresh Evidence; stale/missing/unknown sources are rejected by the public prepare command.
-- The packet is generated cache; the report is durable agent-authored metadata.
-- Black/freeze detection is advisory. A deliberate final reading hold is not automatically a failure.
-- DemoWeave does not secretly call a vision model or OCR engine.
-- PASS cannot contain error findings.
-- NEEDS-CHANGES must contain warning/error findings and returns a failing CLI status after the review is recorded.
-- Changed source/packet/sample/contact-sheet bytes invalidate finalization; prepare and review again.
-- No automatic media fix is performed after a finding.
+M11 makes native experiment outputs first-class Evidence and keeps notebook/application chrome out of the path unless the UI itself is what needs documenting.
 
-### M10 current scope
+Delivered:
 
-- PNG/GIF/MP4 source Evidence
-- deterministic uniform sampling
-- generated contact sheet
-- project/path/symlink/hash safety
-- MP4 probing through ffprobe
-- GIF/MP4 sample extraction through FFmpeg
-- active Timeline scene / Tutorial caption context where provenance exposes plans
-- black-range / freeze-range signals
-- finding categories for readability, clipping, loading state, visible-secret risk, dead time, caption mismatch, composition, text overlap, flicker, other
-- `demoweave qa prepare`
-- `demoweave qa finalize`
-- finalized result Evidence derived from the reviewed source
-- freshness propagation into the durable QA result
+- `ResearchDriver` implementing `SurfaceDriver v1` for both `research` and `notebook`
+- existing Flow `run`, `wait`, `assert`, and `capture` semantics reused; no research-only automation language
+- backwards-compatible optional `capture.artifact.path` in Flow v1
+- native artifact snapshot into `.demoweave/evidence/artifacts/`
+- baseline PNG/JPEG/WebP/SVG/GIF/WebM/MP4/JSON/CSV/TXT/MD/HTML/IPYNB formats
+- semantic Evidence kinds such as `plot`, `table`, `result`, `image`, and `recording`
+- `driver/research` producer metadata + artifact/Flow/material-source fingerprints
+- transient generated output paths kept out of source provenance
+- project traversal and symlink-escape protection
+- no environment/Jupyter/Python installation or guessing
+- explicit notebook execution command model: a repository chooses `jupyter`, `uv`, `python`, `poetry`, R, Julia, MATLAB, another binary, etc.
+- a dependency-free fixture-local notebook executor only for cross-platform contract testing; it is not a Jupyter implementation
+- nested initialized DemoWeave project ownership boundary for loose research/notebook surface detection without hiding nested manifest/source facts
+- published Flow/Evidence JSON Schema parity tests for native artifact capture + IPYNB
+- `fixtures/research` with two real detected surfaces:
+  - `research-research-workflow`
+  - `notebook-notebooks`
+- fixture produces/captures:
+  - SVG learning-curve plot
+  - CSV benchmark table
+  - JSON metrics result
+  - executed IPYNB with real captured cell stdout
+- immutable Evidence remains fresh after the transient `outputs/` directory is deleted
+- controlled source mutation stales exactly the three research outputs, not the notebook
+- generic M6 update computes exactly one `run-flow research-results` repair
+- second update performs zero actions with byte-identical Evidence/manifest
+- hosted Ubuntu/Windows build/tests/typecheck + full M11 smoke
 
-### M10 dogfood target
-
-Review the real fresh `terminal-web-proof-mp4` composition using seven samples.
-
-The reviewed proof should establish:
-
-- both panes remain legible and unclipped;
-- aspect ratio/spacing is intentional;
-- terminal reveal progresses correctly;
-- browser pane remains honestly static;
-- no browser chrome, machine path, notification, or visible secret appears;
-- the final freeze signal (~2.65–5.0s) is the deliberate reading hold rather than accidental dead time.
-
-CI prepares the exact packet from a freshly recomposed source. Linux encodes the completed review findings into the packet-bound report and runs `qa finalize`; Windows independently exercises the same contracts and smoke path.
-
-### M10 acceptance criteria
-
-1. VisualQAPacket v1 is generated deterministically from fresh PNG/GIF/MP4 Evidence.
-2. Packet includes source hash/dimensions/duration, ordered sample timestamps/hashes, contact-sheet hash, and advisory signals.
-3. Generated packet/frames live under cache; durable reports live separately.
-4. VisualQAReport v1 binds exact packet and source hashes.
-5. PASS/NEEDS-CHANGES severity rules are validated.
-6. Finalization refuses pending/stale/changed source, changed packet, changed sample/contact sheet, or invalid finding references.
-7. PASS creates derived `agent/visual-qa` result Evidence.
-8. NEEDS-CHANGES records the review but returns a non-zero gate status.
-9. Freshness propagation makes a finalized review stale when its reviewed source changes.
-10. Scene/caption context is surfaced when plan provenance is available.
-11. Black/freeze heuristics remain signals, never automatic verdicts.
-12. Real M8 dogfood contact sheet/full-size samples are visually reviewed.
-13. Final M8 proof receives a real packet-bound PASS review with the intentional final hold recorded explicitly.
-14. Ubuntu and Windows pass build/tests/typecheck and M10 smoke; Linux also runs the real finalized dogfood gate.
-15. README/shared skill describe the workflow accurately without claiming OCR, hidden vision APIs, auto-fix, or browser recording.
-16. M11 is not started inside the M10 PR.
+M11 does not screen-record notebook UI, infer a scientific environment, or turn generated output paths into fake source dependencies.
 
 ---
 
-# Later milestones
-
-## M11 — Research / notebook driver
-
-Use native outputs where possible rather than screenshots of notebook UI:
-
-- notebook/script execution
-- plots/figures
-- benchmark/result tables
-- generated images/videos
-- experiment metadata/comparisons
-- deterministic output Evidence and provenance
+# Next milestones
 
 ## M12 — Desktop drivers
 
 Electron, Windows, macOS, Linux. Capture priority: semantic/application-native → window-specific OS capture → region capture → display capture. No OBS requirement.
+
+Key questions for M12:
+
+- define a portable desktop target model without leaking one OS automation API into Flow v1;
+- separate semantic app control from window/frame capture;
+- use Electron-native hooks where available before generic OS automation;
+- preserve the same Evidence/freshness/review contracts established by terminal/web/research;
+- make capability detection explicit so unsupported hosts fail clearly rather than guessing.
 
 ## M13 — Mobile drivers
 
@@ -331,7 +301,7 @@ Integrate rather than replace existing stacks: plain Markdown/GitHub, Fumadocs, 
 
 # 1.0 target
 
-DemoWeave 1.0 should provide stable agent workflows/contracts, multi-surface analysis, terminal + web + process/library support, evidence-backed screenshot/GIF/video presentation where supported, arbitrary Markdown review/apply, incremental stale tracking, lightweight composition, tutorial packaging, reproducible agent visual QA, and extension paths for research/desktop/mobile.
+DemoWeave 1.0 should provide stable agent workflows/contracts, multi-surface analysis, terminal + web + research/notebook + process/library support, evidence-backed screenshot/GIF/video/native-result presentation where supported, arbitrary Markdown review/apply, incremental stale tracking, lightweight composition, tutorial packaging, reproducible agent visual QA, and extension paths for desktop/mobile/ecosystem integrations.
 
 ## Development order
 
@@ -349,13 +319,13 @@ DemoWeave 1.0 should provide stable agent workflows/contracts, multi-surface ana
 | 10 | ✅ P1 — web fixture | second-surface public proof |
 | 11 | ✅ M8 — compositor | independent evidence → polished scenes |
 | 12 | ✅ M9 — tutorial output | MP4 Evidence → upload-oriented package |
-| 13 | **🚧 M10 — visual QA** | reproducible agent review gate |
-| 14 | M11 — research/notebook | research repos |
-| 15 | M12 — desktop | native apps |
+| 13 | ✅ M10 — visual QA | reproducible agent review gate |
+| 14 | ✅ M11 — research/notebook | native research results + notebook Evidence |
+| 15 | **M12 — desktop** | native apps |
 | 16 | M13 — mobile | Android/iOS |
 | 17 | M14/M15 — ecosystem | plugins/publishers |
 | 18 | 1.0 hardening | public stable release |
 
 ## Current next step
 
-Finish the real `terminal-web-proof` packet-bound PASS review, keep the full cross-platform suite green, merge M10, then move to **M11 — Research / notebook driver**.
+Merge M11 after the final cross-platform + re-reviewed M10 visual gate is green, then start **M12 — Desktop drivers** with capability discovery and a minimal Electron/Windows-first vertical slice before broader OS adapters.
