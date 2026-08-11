@@ -117,6 +117,16 @@ test('keeps supported press keys explicit and focuses a supplied semantic target
   assert.equal(unsupported.error?.code, 'UNSUPPORTED_KEY');
 });
 
+test('preserves foreground ownership failures from native key injection', async () => {
+  const helper = new FakeHelper((request) => request.operation === 'press'
+    ? { ok: false, error: { code: 'FOREGROUND_WINDOW_MISMATCH', message: 'foreground mismatch' } }
+    : { ok: true });
+  const value = await opened(backend(helper));
+  const result = await value.execute(step({ id: 'press', type: 'press', key: 'Enter', target: TARGET }), CONTEXT);
+  assert.equal(result.status, 'failed');
+  assert.equal(result.error?.code, 'FOREGROUND_WINDOW_MISMATCH');
+});
+
 test('bounds visible waits and reports a stable timeout', async () => {
   const helper = new FakeHelper((request) => request.operation === 'inspect'
     ? { ok: true, element: { exists: true, visible: false, name: '' } }
@@ -162,7 +172,7 @@ test('returns real helper PNG bytes and preserves window-capture failure', async
   assert.equal(failed.error?.code, 'WINDOW_CAPTURE_FAILED');
 });
 
-test('helper is shell-safe, subtree-scoped, maps semantic properties explicitly, and uses no temporary capture', async () => {
+test('helper is shell-safe, PID-scoped for key injection, maps semantic properties explicitly, and uses no temporary capture', async () => {
   const script = await fs.readFile(path.join(import.meta.dirname, 'windows-uia-helper.ps1'), 'utf8');
   assert.doesNotMatch(script, /Invoke-Expression/i);
   assert.match(script, /TreeScope\]::Descendants/);
@@ -170,6 +180,9 @@ test('helper is shell-safe, subtree-scoped, maps semantic properties explicitly,
   assert.match(script, /Name/);
   assert.match(script, /ControlTypeProperty/);
   assert.match(script, /testId has no defined Windows UI Automation mapping/);
+  assert.match(script, /GetForegroundWindow/);
+  assert.match(script, /GetWindowThreadProcessId/);
+  assert.match(script, /FOREGROUND_WINDOW_MISMATCH/);
   assert.match(script, /MemoryStream/);
   assert.doesNotMatch(script, /GetTemp|TEMP|WriteAllBytes/i);
 });
