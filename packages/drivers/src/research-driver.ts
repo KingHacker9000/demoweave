@@ -197,7 +197,7 @@ export class ResearchDriver implements SurfaceDriver {
     }
   }
 
-  async close(): Promise<void> {
+  async close(_context: DriverContext): Promise<void> {
     await this.session?.close();
     this.session = undefined;
     this.lastRun = undefined;
@@ -237,9 +237,10 @@ export class ResearchDriver implements SurfaceDriver {
       return this.lastRun ? { stepId: step.id, status: 'passed' } : this.failure(step.id, 'NO_COMMAND', 'No research command has been run');
     }
     if (step.condition.kind === 'duration') {
-      const durationTimeoutMs = step.timeoutMs ?? Math.max(this.waitTimeoutMs, step.condition.ms);
-      if (step.condition.ms > durationTimeoutMs) return this.failure(step.id, 'WAIT_TIMEOUT', `Duration wait exceeded its ${durationTimeoutMs}ms timeout`);
-      await new Promise((resolve) => setTimeout(resolve, step.condition.ms));
+      const waitMs = step.condition.ms;
+      const durationTimeoutMs = step.timeoutMs ?? Math.max(this.waitTimeoutMs, waitMs);
+      if (waitMs > durationTimeoutMs) return this.failure(step.id, 'WAIT_TIMEOUT', `Duration wait exceeded its ${durationTimeoutMs}ms timeout`);
+      await new Promise((resolve) => setTimeout(resolve, waitMs));
       return { stepId: step.id, status: 'passed' };
     }
     if (step.condition.kind === 'fileExists') {
