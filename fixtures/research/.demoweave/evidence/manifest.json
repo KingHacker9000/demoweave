@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "projectProfileVersion": 1,
+  "flows": [
+    {
+      "id": "notebook-results",
+      "path": ".demoweave/flows/notebook-results.json",
+      "surfaceId": "notebook-notebooks"
+    },
+    {
+      "id": "research-results",
+      "path": ".demoweave/flows/research-results.json",
+      "surfaceId": "research-research-workflow"
+    }
+  ],
+  "evidence": []
+}
