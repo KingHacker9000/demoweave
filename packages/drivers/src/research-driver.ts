@@ -296,7 +296,7 @@ export class ResearchDriver implements SurfaceDriver {
 
     const target = path.join(context.projectRoot, '.demoweave', 'evidence', 'artifacts', `${step.evidenceId}${extension}`);
     await copyFileAtomic(source, target);
-    const [artifactHash, sourceHash] = await Promise.all([sha256File(target), sha256File(source)]);
+    const artifactHash = await sha256File(target);
     const manifest = await readManifest(context.projectRoot);
     const previous = manifest.evidence.find((item) => item.id === step.evidenceId);
     const gitCommit = currentGitCommit(context.projectRoot);
@@ -316,7 +316,7 @@ export class ResearchDriver implements SurfaceDriver {
         stepId: step.id,
         surfaceId: context.surface.id,
         ...(gitCommit ? { gitCommit } : {}),
-        sources: [{ path: step.artifact.path.replaceAll('\\', '/'), role: 'asset', hash: sourceHash }],
+        sources: [],
       },
     });
     await writeManifest(context.projectRoot, {
