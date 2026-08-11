@@ -8,13 +8,15 @@ Use DemoWeave when the user asks to create, improve, update, or validate documen
 - Use DemoWeave for deterministic inspection, execution, evidence capture, rendering, composition, tutorial packaging, visual-review preparation/binding, freshness analysis, Markdown patch review, validation, and provenance.
 - Use your own repository tools to understand intent, architecture, and which workflows actually matter.
 - Do not generate visual media merely to decorate a document. Capture evidence only when it improves comprehension.
+- Prefer native result artifacts over screenshots of tool/notebook chrome when the artifact itself is what users need to understand: plots, tables, metrics, generated images/videos, and executed notebooks should stay native where possible.
 - Preserve useful existing documentation. Prefer intentional section-level edits over rewriting files wholesale.
 - Never assume `/docs` is the only output. README.md and arbitrary Markdown files are first-class targets.
 - The agent supplies judgment and narrative. DemoWeave does not secretly call an LLM to write prose, tutorial captions, or visual-QA findings.
 - Treat `unknown` freshness as unresolved information, not permission to regenerate or review. Never invent a baseline.
 - Prefer DemoWeave's minimal regeneration plan over rerunning an entire evidence pipeline manually.
-- Keep runtime/browser configuration out of Flow v1. Do not embed Playwright selectors, browser launch settings, recorder commands, renderer/compositor layout, or tutorial metadata in a Flow.
-- Keep capture, presentation, and review separate. A composed static browser screenshot is still a static browser screenshot.
+- Keep runtime/browser/environment configuration out of Flow v1 unless it is an explicit project command. Do not embed Playwright selectors, guessed package/environment setup, browser launch settings, recorder commands, renderer/compositor layout, or tutorial metadata in a Flow.
+- Declare project-relative Flow `sources` only for material inputs such as code, config, fixtures, or data. A disposable generated output being captured is not automatically a source dependency.
+- Keep capture, presentation, and review separate. A composed static browser screenshot is still a static browser screenshot; a captured `.ipynb` is still a notebook artifact, not proof that notebook UI was recorded.
 - Black/freeze ranges produced by visual QA are advisory signals, not automatic verdicts.
 - Never reuse a visual-QA report after its packet or source bytes changed. Prepare and visually review the new packet.
 - Do not invent DemoWeave commands or Flow actions. Check `demoweave --help` and the published schemas first.
@@ -87,6 +89,43 @@ Use `--headed` only when a visible browser helps local debugging.
 Prefer semantic targets (`role`, `label`, test/automation IDs) over brittle text where available. Raw Playwright selectors do not belong in Flow v1.
 
 Current web capture writes PNG screenshot Evidence. Browser interaction GIF/video recording is not implemented; do not fabricate or claim it.
+
+## Research / notebook workflow
+
+The research driver implements Flow v1 for `research` and `notebook` surfaces. It runs only commands explicitly declared by the Flow and captures native project-local files rather than guessing an environment or screen-recording notebook UI.
+
+Use ordinary `run`, `wait`, and `assert` steps for the repository's real workflow. A project may explicitly invoke `jupyter`, `uv`, `python`, `poetry`, R, Julia, MATLAB, a compiled binary, or another command already available in its environment. DemoWeave does **not** install or infer those tools.
+
+Capture a generated native artifact with optional `capture.artifact.path`:
+
+```json
+{
+  "id": "capture-plot",
+  "type": "capture",
+  "evidenceId": "training-curve",
+  "kind": "plot",
+  "artifact": { "path": "outputs/training-curve.svg" }
+}
+```
+
+`target` and `artifact` are mutually exclusive. UI targets remain for semantic UI drivers; `artifact.path` is for project-local files.
+
+Choose Evidence kind by meaning, not extension:
+
+- `plot` for figures/curves;
+- `table` for benchmark/result tables;
+- `result` for metrics, summaries, or executed notebook artifacts;
+- `image` for generated images;
+- `recording` for generated GIF/WebM/MP4;
+- `text`, `code`, `diagram`, or `comparison` where those semantics are accurate.
+
+Baseline native formats include PNG/JPEG/WebP/SVG/GIF/WebM/MP4, JSON/CSV/TXT/Markdown/HTML, and IPYNB.
+
+On capture, DemoWeave copies the file into an immutable snapshot under `.demoweave/evidence/artifacts/`, records `driver/research` provenance, then normal Flow fingerprinting adds the declared material `sources`. Do not list transient `outputs/...` files as Flow sources merely because they are capture inputs. Cleaning a disposable output directory should not make the immutable Evidence stale.
+
+After a material source changes, use the normal freshness workflow. The generic `run-flow` regeneration path can rerun a stale research/notebook Flow once, and a second no-change update should perform zero actions.
+
+The committed `fixtures/research` example demonstrates native SVG plot, CSV table, JSON metrics, and executed IPYNB Evidence. Its tiny Node notebook executor exists only to keep CI dependency-free; it is not a Jupyter implementation.
 
 ## Timeline composition workflow
 
@@ -268,7 +307,7 @@ For stale web Flows with relative navigation, keep the app running and supply th
 demoweave update . --apply --base-url http://127.0.0.1:3000
 ```
 
-Current update planning supports known Flow/terminal regeneration paths. Compositor/tutorial rebuilds are explained by freshness but are not automatically scheduled yet. Do not treat `unknown` as permission to regenerate.
+Current update planning supports known `run-flow` regeneration for executable source Evidence across terminal, web, research, and notebook surfaces plus supported terminal derivations. Compositor/tutorial rebuilds are explained by freshness but are not automatically scheduled yet. Do not treat `unknown` as permission to regenerate.
 
 Finalized visual-QA report Evidence derives from its reviewed media source, so later source changes make the review stale through normal upstream propagation.
 
@@ -316,7 +355,8 @@ demoweave docs discard .demoweave/plans/readme.json
 Current executable surface drivers:
 
 - **terminal** — non-interactive process/pipe execution + TerminalTrack capture;
-- **web** — Playwright Chromium semantic interaction + PNG screenshot capture against an already-running app.
+- **web** — Playwright Chromium semantic interaction + PNG screenshot capture against an already-running app;
+- **research / notebook** — explicit process execution + immutable native artifact capture; no environment inference or notebook-UI recording.
 
 Current presentation/review tooling:
 
@@ -330,7 +370,6 @@ Not yet available:
 - interactive PTY input;
 - browser interaction GIF/video recording;
 - desktop/native mobile capture;
-- research/notebook driver;
 - narration/TTS generation;
 - publishing/upload integration;
 - OCR-based secret detection;
@@ -361,6 +400,10 @@ Current metadata layout:
     artifacts/
       <evidence-id>.terminal.json
       <evidence-id>.png
+      <evidence-id>.svg
+      <evidence-id>.csv
+      <evidence-id>.json
+      <evidence-id>.ipynb
 docs-media/
   <terminal-evidence-id>.png
   <terminal-evidence-id>.gif
