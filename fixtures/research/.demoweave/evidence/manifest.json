@@ -1,0 +1,70 @@
+{
+  "schemaVersion": 1,
+  "projectProfileVersion": 1,
+  "flows": [
+    {
+      "id": "notebook-results",
+      "path": ".demoweave/flows/notebook-results.json",
+      "surfaceId": "notebook-notebooks"
+    },
+    {
+      "id": "research-results",
+      "path": ".demoweave/flows/research-results.json",
+      "surfaceId": "research-research-workflow"
+    }
+  ],
+  "evidence": [
+    {
+      "schemaVersion": 1,
+      "id": "research-executed-notebook",
+      "kind": "result",
+      "status": "planned",
+      "label": "Executed notebook with captured cell output",
+      "provenance": {
+        "flowId": "notebook-results",
+        "stepId": "capture-notebook",
+        "surfaceId": "notebook-notebooks",
+        "sources": []
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "id": "research-learning-curve",
+      "kind": "plot",
+      "status": "planned",
+      "label": "Validation accuracy learning curve",
+      "provenance": {
+        "flowId": "research-results",
+        "stepId": "capture-plot",
+        "surfaceId": "research-research-workflow",
+        "sources": []
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "id": "research-metrics",
+      "kind": "result",
+      "status": "planned",
+      "label": "Experiment summary metrics",
+      "provenance": {
+        "flowId": "research-results",
+        "stepId": "capture-metrics",
+        "surfaceId": "research-research-workflow",
+        "sources": []
+      }
+    },
+    {
+      "schemaVersion": 1,
+      "id": "research-results-table",
+      "kind": "table",
+      "status": "planned",
+      "label": "Per-epoch benchmark results",
+      "provenance": {
+        "flowId": "research-results",
+        "stepId": "capture-table",
+        "surfaceId": "research-research-workflow",
+        "sources": []
+      }
+    }
+  ]
+}

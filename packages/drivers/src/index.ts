@@ -71,6 +71,12 @@ export { getWebDriverCapabilities } from './web-capabilities.js';
 export type { WebDriverCapabilities } from './web-capabilities.js';
 
 export {
+  ResearchDriver,
+  researchDriverVersion,
+} from './research-driver.js';
+export type { ResearchDriverOptions } from './research-driver.js';
+
+export {
   executeFlow,
   FlowExecutionError,
   runFlow,

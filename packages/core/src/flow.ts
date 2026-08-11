@@ -124,11 +124,16 @@ export const AssertStepSchema = StepBaseSchema.extend({
   assertion: AssertionSchema,
 }).strict();
 
+export const ArtifactCaptureSchema = z.object({
+  path: z.string().min(1),
+}).strict();
+
 export const CaptureStepSchema = StepBaseSchema.extend({
   type: z.literal('capture'),
   evidenceId: z.string().min(1),
   kind: EvidenceKindSchema,
   target: InteractionTargetSchema.optional(),
+  artifact: ArtifactCaptureSchema.optional(),
 }).strict();
 
 export const FlowStepSchema = z.discriminatedUnion('type', [
@@ -154,15 +159,22 @@ export const FlowSchema = z.object({
 }).strict().superRefine((flow, ctx) => {
   const seen = new Set<string>();
   for (let index = 0; index < flow.steps.length; index += 1) {
-    const id = flow.steps[index]!.id;
-    if (seen.has(id)) {
+    const step = flow.steps[index]!;
+    if (seen.has(step.id)) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ['steps', index, 'id'],
-        message: `Duplicate Flow step id: ${id}`,
+        message: `Duplicate Flow step id: ${step.id}`,
       });
     }
-    seen.add(id);
+    seen.add(step.id);
+    if (step.type === 'capture' && step.target && step.artifact) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['steps', index, 'artifact'],
+        message: 'capture.target and capture.artifact are mutually exclusive',
+      });
+    }
   }
   const sourcePaths = new Set<string>();
   for (let index = 0; index < (flow.sources?.length ?? 0); index += 1) {
@@ -185,5 +197,6 @@ export type FlowSourceDependencyRole = z.infer<typeof FlowSourceDependencyRoleSc
 export type FlowSourceDependency = z.infer<typeof FlowSourceDependencySchema>;
 export type WaitCondition = z.infer<typeof WaitConditionSchema>;
 export type Assertion = z.infer<typeof AssertionSchema>;
+export type ArtifactCapture = z.infer<typeof ArtifactCaptureSchema>;
 export type FlowStep = z.infer<typeof FlowStepSchema>;
 export type Flow = z.infer<typeof FlowSchema>;

@@ -8,12 +8,10 @@
   "properties": {
     "schemaVersion": { "const": 1 },
     "id": { "type": "string", "minLength": 1 },
-    "kind": {
-      "enum": ["screenshot", "recording", "terminal", "image", "diagram", "plot", "table", "result", "text", "code", "comparison"]
-    },
+    "kind": { "enum": ["screenshot", "recording", "terminal", "image", "diagram", "plot", "table", "result", "text", "code", "comparison"] },
     "status": { "enum": ["planned", "available", "stale", "missing", "failed"] },
     "label": { "type": "string", "minLength": 1 },
-    "format": { "enum": ["png", "jpeg", "webp", "gif", "webm", "mp4", "svg", "json", "csv", "txt", "md", "ansi", "html", "srt", "vtt"] },
+    "format": { "enum": ["png", "jpeg", "webp", "gif", "webm", "mp4", "svg", "json", "csv", "txt", "md", "ansi", "html", "srt", "vtt", "ipynb"] },
     "path": { "type": "string", "minLength": 1 },
     "artifactHash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
     "mimeType": { "type": "string", "minLength": 1 },
@@ -52,28 +50,16 @@
         }
       },
       "allOf": [
-        {
-          "if": { "required": ["stepId"] },
-          "then": { "required": ["flowId"] }
-        }
+        { "if": { "required": ["stepId"] }, "then": { "required": ["flowId"] } }
       ]
     },
-    "derivedFrom": {
-      "type": "array",
-      "items": { "type": "string", "minLength": 1 }
-    }
+    "derivedFrom": { "type": "array", "items": { "type": "string", "minLength": 1 } }
   },
   "allOf": [
     {
-      "if": {
-        "properties": { "status": { "enum": ["available", "stale"] } },
-        "required": ["status"]
-      },
+      "if": { "properties": { "status": { "enum": ["available", "stale"] } }, "required": ["status"] },
       "then": { "required": ["path"] }
     },
-    {
-      "if": { "required": ["artifactHash"] },
-      "then": { "required": ["path"] }
-    }
+    { "if": { "required": ["artifactHash"] }, "then": { "required": ["path"] } }
   ]
 }

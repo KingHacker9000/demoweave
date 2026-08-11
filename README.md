@@ -2,7 +2,7 @@
 
 **Runtime evidence for agent-authored software documentation.**
 
-DemoWeave helps Claude Code, Codex, and other coding agents ground documentation in verified repository facts and captured runtime behavior. The agent decides what to explain and writes the narrative; DemoWeave inspects the repository, executes declared terminal or browser workflows, records evidence with provenance, renders and composes media, packages tutorial assets, prepares deterministic visual-review packets, explains when evidence becomes stale, and safely previews/applies reviewed Markdown changes.
+DemoWeave helps Claude Code, Codex, and other coding agents ground documentation in verified repository facts and captured runtime behavior. The agent decides what to explain and writes the narrative; DemoWeave inspects the repository, executes declared terminal, browser, research, or notebook workflows, records evidence with provenance, renders and composes media, packages tutorial assets, prepares deterministic visual-review packets, explains when evidence becomes stale, and safely previews/applies reviewed Markdown changes.
 
 ![DemoWeave inspecting its own repository in a captured terminal workflow](docs-media/inspect-project-terminal.gif)
 
@@ -32,14 +32,15 @@ The result is a shared workflow in which an agent supplies reasoning, writing, a
 | Multi-surface model | Available | One profile can record multiple components, entrypoints, frameworks, and typed surfaces |
 | Terminal workflows | Available | Non-interactive `Flow v1` execution with process runs, waits, assertions, and terminal capture |
 | Web workflows | Available | Headless Chromium through Playwright; semantic navigate/interact/wait/assert/scroll and PNG screenshot capture |
-| Evidence and provenance | Available | `TerminalTrack v1`, screenshot/media `Evidence v1`, `Manifest v1`, source/Flow/artifact fingerprints, and derivation relationships |
+| Research / notebook workflows | Available | Explicit repository commands plus native plot/table/result/image/video/IPYNB artifact capture; no notebook-UI recording or environment guessing |
+| Evidence and provenance | Available | `TerminalTrack v1`, screenshot/native/media `Evidence v1`, `Manifest v1`, source/Flow/artifact fingerprints, and derivation relationships |
 | Terminal rendering | Available | Headless PNG rendering; GIF rendering when FFmpeg is installed |
 | Timeline composition | Available | `TimelinePlan v1`; deterministic single/split scenes over local PNG/GIF Evidence/media; MP4/GIF output through FFmpeg |
 | Tutorial packaging | Available | `TutorialPlan v1`; existing MP4 Evidence → packaged MP4, thumbnail, SRT/VTT, chapters, description, and YouTube-oriented JSON metadata |
 | Visual QA | Available | Fresh PNG/GIF/MP4 Evidence → sampled frames/contact sheet/signals → agent-authored hash-bound PASS or NEEDS-CHANGES report |
 | Safe Markdown planning/patching | Available | `DocumentPlan v1`, section inspection, exact diff preview, review token, atomic apply/discard |
 | Incremental stale tracking | Available | `FreshnessReport v1`, explainable stale chains, document impact, dry-run/minimal selective regeneration |
-| Desktop, mobile, notebook, and research execution | Planned | Surface drivers are not implemented yet |
+| Desktop and mobile execution | Planned | Native desktop/mobile surface drivers are not implemented yet |
 | Browser interaction recording | Planned | Web screenshot Evidence exists; composition does not pretend a static browser screenshot is browser video |
 | Narration/TTS and publishing | Planned/optional | Tutorial packaging uses agent-authored captions/metadata; it does not synthesize narration or upload to a platform |
 
@@ -56,8 +57,10 @@ flowchart LR
     A --> F["Flow v1"]
     F --> T["Terminal driver"]
     F --> B["Playwright web driver"]
+    F --> RS["Research / notebook driver"]
     T --> E["Evidence + Manifest"]
     B --> E
+    RS --> E
     E --> V["Terminal renderer"]
     V --> M["PNG / GIF"]
     E --> TL["TimelinePlan v1"]
@@ -89,7 +92,7 @@ The repository includes a [shared DemoWeave skill](skills/demoweave/SKILL.md) th
 
 DemoWeave is currently a source pnpm workspace, not a published npm package. Use it from a repository checkout.
 
-Requirements: Node.js 20+ and pnpm. FFmpeg is optional for core inspection and screenshot capture, but required for GIF rendering, timeline composition, tutorial thumbnail generation, and sampling animated media for visual QA. `ffprobe` is required for tutorial video validation and MP4 visual QA. Playwright Chromium is required only when executing web Flows.
+Requirements: Node.js 20+ and pnpm. FFmpeg is optional for core inspection, terminal capture, web screenshots, and native research artifact capture, but required for GIF rendering, timeline composition, tutorial thumbnail generation, and sampling animated media for visual QA. `ffprobe` is required for tutorial video validation and MP4 visual QA. Playwright Chromium is required only when executing web Flows. Research/notebook Flows use the explicit commands declared by the repository; DemoWeave does not install or guess a Python/Jupyter/R/Julia/MATLAB environment.
 
 ```bash
 git clone https://github.com/KingHacker9000/demoweave.git
@@ -134,7 +137,7 @@ Flows may declare project-relative `sources`. Successful execution fingerprints 
 
 M7 implements the same `Flow v1` against `web` surfaces using Playwright Chromium. The application must already be running; DemoWeave does not guess or launch an arbitrary repository dev server.
 
-For relative `navigate` destinations, pass the reachable origin at runtime:
+For relative navigation, pass the reachable origin at runtime:
 
 ```bash
 node packages/cli/dist/index.js run <web-flow-id-or-path> \
@@ -154,6 +157,38 @@ The web driver currently implements the existing semantic Flow actions for navig
 Screenshot capture writes `.demoweave/evidence/artifacts/<evidence-id>.png`, records `driver/web` provenance in the manifest, and uses the same M6 Flow/source/artifact fingerprinting as terminal Evidence. Browser video/interaction GIF capture is intentionally not implemented yet.
 
 For a complete committed browser dogfood example, see the [P1 web fixture](fixtures/web/README.md): DemoWeave detects the standalone Next.js app, executes a semantic `create-project` Flow, captures the real result as screenshot Evidence, links it from the fixture README, and proves stale-source → impacted-document → selective regeneration → no-churn behavior.
+
+## Capture research and notebook outputs
+
+M11 adds `ResearchDriver` for `research` and `notebook` surfaces. The agent declares the repository's real execution command in ordinary Flow `run` steps, then captures the files that command actually generated with `capture.artifact.path`. DemoWeave copies each project-local artifact into an immutable Evidence snapshot instead of recording notebook chrome.
+
+The committed [research fixture](fixtures/research/README.md) proves a plot, benchmark table, metrics result, and executed notebook:
+
+```bash
+node packages/cli/dist/index.js inspect fixtures/research
+node packages/cli/dist/index.js run research-results --project fixtures/research
+node packages/cli/dist/index.js run notebook-results --project fixtures/research
+node packages/cli/dist/index.js status fixtures/research
+node packages/cli/dist/index.js validate fixtures/research
+```
+
+A native capture step looks like:
+
+```json
+{
+  "id": "capture-metrics",
+  "type": "capture",
+  "evidenceId": "research-metrics",
+  "kind": "result",
+  "artifact": { "path": "outputs/metrics.json" }
+}
+```
+
+Baseline artifact formats include PNG/JPEG/WebP/SVG/GIF/WebM/MP4, JSON/CSV/TXT/Markdown/HTML, and IPYNB. Use the Evidence `kind` that describes what the artifact means (`plot`, `table`, `result`, `image`, `recording`, etc.). Material code/config/data belongs in the Flow's explicit `sources`; disposable generated output paths are capture inputs, not source dependencies. The immutable Evidence bytes and Flow/source hashes are what freshness tracks.
+
+DemoWeave does not infer a virtual environment, install Jupyter, or implement a hidden notebook runtime. A project can explicitly run `jupyter`, `uv`, `python`, `poetry`, R, Julia, MATLAB, a compiled binary, or any other repository-controlled command. The fixture uses a tiny dependency-free Node executor only so cross-platform CI can prove the `.ipynb` artifact contract without pretending that helper is Jupyter.
+
+M11 uses the normal M6 update loop: if a declared research source changes, `demoweave update --apply` can rerun the producing Flow once. Cleaning a transient `outputs/` directory after capture does not stale the immutable Evidence snapshot, and a second update with nothing changed performs zero actions and no Evidence churn.
 
 ## Compose independent evidence
 
@@ -246,7 +281,7 @@ node packages/cli/dist/index.js update . --apply \
   --base-url http://127.0.0.1:3000
 ```
 
-A stale source Evidence item schedules one run of its producing Flow when the required runtime context is available; affected supported terminal derivations are selectively re-rendered. Compositor and tutorial outputs still participate in freshness propagation through `derivedFrom` and plan/file fingerprints, but the current minimal regeneration planner intentionally does not invent automatic compose/tutorial rebuild actions. Finalized QA reports derive from their reviewed source, so later source changes propagate stale state into the review record. Unknown baselines are reported rather than guessed. If everything is fresh, `update --apply` executes zero actions, so unchanged evidence and documents are not churned.
+A stale source Evidence item schedules one run of its producing Flow when the required runtime context is available. Research/notebook Evidence uses that same surface-agnostic regeneration path; affected supported terminal derivations are selectively re-rendered. Compositor and tutorial outputs still participate in freshness propagation through `derivedFrom` and plan/file fingerprints, but the current minimal regeneration planner intentionally does not invent automatic compose/tutorial rebuild actions. Finalized QA reports derive from their reviewed source, so later source changes propagate stale state into the review record. Unknown baselines are reported rather than guessed. If everything is fresh, `update --apply` executes zero actions, so unchanged evidence and documents are not churned.
 
 Use `--json` with `status` or `update` for the structured `FreshnessReport v1`/update result.
 
@@ -286,8 +321,8 @@ Use `node packages/cli/dist/index.js --help`, `node packages/cli/dist/index.js d
 ## Core concepts
 
 - **ProjectProfile** — deterministic facts about components, ecosystems, manifests, workspaces, entrypoints, commands, docs, and surfaces.
-- **Flow** — a surface-neutral sequence of semantic actions plus optional explicit source dependencies. Terminal and web drivers implement different subsets without changing the Flow contract.
-- **Evidence** — a typed artifact record with lifecycle, producer, provenance, source/artifact fingerprints, and optional derivation metadata. Current captures include terminal tracks and web PNG screenshots; renderers/compositors/tutorial packaging add derived media/text Evidence.
+- **Flow** — a surface-neutral sequence of semantic actions plus optional explicit source dependencies. Terminal, web, research, and notebook drivers implement different subsets without changing the shared Flow contract; native artifact capture uses optional `capture.artifact.path`.
+- **Evidence** — a typed artifact record with lifecycle, producer, provenance, source/artifact fingerprints, and optional derivation metadata. Current captures include terminal tracks, web PNG screenshots, and native research/notebook artifacts; renderers/compositors/tutorial packaging add derived media/text Evidence.
 - **Manifest** — the project index that connects Flows to source and derived Evidence.
 - **TimelinePlan** — presentation-only single/split scene composition over local Evidence/media. It never contains browser/terminal automation instructions.
 - **TutorialPlan** — agent-authored tutorial metadata, captions, chapters, and thumbnail treatment bound to an existing MP4 Evidence source.
@@ -299,9 +334,9 @@ The versioned JSON contracts live in [`schemas/`](schemas/).
 
 ## Project status
 
-DemoWeave is in active development. **M0–M9 plus Pilots P0 and P1 are complete:** the project can inspect multi-ecosystem repositories; execute terminal and Playwright-backed web Flows; capture fingerprinted terminal or browser screenshot Evidence; render terminal PNG/GIF media; compose independent media into deterministic MP4/GIF scenes; package existing MP4 Evidence into upload-oriented tutorial assets; explain stale evidence; use runtime artifacts in reviewed Markdown; and prove provenance/no-churn behavior across terminal and web surfaces.
+DemoWeave is in active development. **M0–M11 plus Pilots P0 and P1 are complete:** the project can inspect multi-ecosystem repositories; execute terminal, Playwright-backed web, research, and notebook Flows; capture fingerprinted terminal, browser screenshot, or native research/notebook Evidence; render terminal PNG/GIF media; compose independent media into deterministic MP4/GIF scenes; package existing MP4 Evidence into upload-oriented tutorial assets; run reproducible agent visual QA; explain stale evidence; use runtime artifacts in reviewed Markdown; and prove selective regeneration/no-churn behavior across terminal, web, research, and notebook surfaces.
 
-**M10 is current:** deterministic visual-review packets sample fresh PNG/GIF/MP4 Evidence and bind an agent-authored PASS/NEEDS-CHANGES report to the exact source and sampled bytes. OCR-based secret detection, automatic visual fixes, browser recording, narration/TTS, publishing, and the M11 research/notebook driver remain separate later work.
+**M12 is next:** native desktop drivers for Electron, Windows, macOS, and Linux while preserving the same semantic Flow/Evidence boundary and no-OBS capture philosophy. Interactive PTY input, browser recording, narration/TTS, publishing, mobile drivers, OCR-based secret detection, and automatic visual fixes remain later/optional work.
 
 See [ROADMAP.md](ROADMAP.md) for milestone boundaries and future surface drivers.
 
@@ -313,7 +348,7 @@ pnpm test
 pnpm typecheck
 ```
 
-CI installs Chromium and FFmpeg, runs build/full tests/typecheck, exercises M5/M6/M7/P1/M8/M9/M10 smokes on Ubuntu and Windows, refreshes the real composition, builds the real tutorial package, and prepares/finalizes the reviewed M10 dogfood packet on Linux.
+CI installs Chromium and FFmpeg, runs build/full tests/typecheck, exercises M5/M6/M7/P1/M8/M9/M10/M11 smokes on Ubuntu and Windows, proves research/native-artifact cleanup + stale-repair + no-churn behavior, refreshes the real composition, builds the real tutorial package, and prepares/finalizes the reviewed M10 dogfood packet on Linux.
 
 ## License
 
