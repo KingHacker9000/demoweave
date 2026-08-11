@@ -140,6 +140,20 @@ export {
 export type { MobileDriverOptions } from './mobile-driver.js';
 
 export {
+  AndroidAdbBackend,
+  ProcessAdbRunner,
+  androidAdbBackendVersion,
+  androidNodeMatchesTarget,
+  parseAndroidUiHierarchy,
+} from './android-adb-backend.js';
+export type {
+  AdbCommandResult,
+  AdbRunner,
+  AndroidAdbBackendOptions,
+  ProcessAdbRunnerOptions,
+} from './android-adb-backend.js';
+
+export {
   executeFlow,
   FlowExecutionError,
   runFlow,
