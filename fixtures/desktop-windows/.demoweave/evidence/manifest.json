@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "projectProfileVersion": 1,
+  "flows": [
+    {
+      "id": "create-project",
+      "path": ".demoweave/flows/create-project.json",
+      "surfaceId": "desktop-windows-forms"
+    }
+  ],
+  "evidence": [
+    {
+      "schemaVersion": 1,
+      "id": "create-project-result",
+      "kind": "screenshot",
+      "status": "available",
+      "label": "Native Windows project creation result",
+      "format": "png",
+      "path": ".demoweave/evidence/artifacts/create-project-result.png",
+      "artifactHash": "sha256:75b7e617c7a315b7e66182df74df6a346d66439dcc53a5772188b45b7e217964",
+      "mimeType": "image/png",
+      "producer": {
+        "kind": "driver",
+        "id": "desktop/windows-uia",
+        "version": "0.0.1"
+      },
+      "provenance": {
+        "flowId": "create-project",
+        "stepId": "capture-window",
+        "surfaceId": "desktop-windows-forms",
+        "flowHash": "sha256:66e0431846145c602781fe4387c62dfa48a2193308996aeb9a95cc02d82a2341",
+        "sources": [
+          {
+            "path": "app.cs",
+            "role": "implementation",
+            "hash": "sha256:7905baacfbc12d70f50256089f834ad708176ce277226b4067d6a58fbd4d5375"
+          },
+          {
+            "path": "fixture-data.json",
+            "role": "data",
+            "hash": "sha256:86552d972167114861ed4f4a8c29e14fa006689aac7ba8ac7c39df0ac55d4843"
+          }
+        ]
+      }
+    }
+  ]
+}

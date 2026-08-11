@@ -32,6 +32,7 @@ The result is a shared workflow in which an agent supplies reasoning, writing, a
 | Multi-surface model | Available | One profile can record multiple components, entrypoints, frameworks, and typed surfaces |
 | Terminal workflows | Available | Non-interactive `Flow v1` execution with process runs, waits, assertions, and terminal capture |
 | Web workflows | Available | Headless Chromium through Playwright; semantic navigate/interact/wait/assert/scroll and PNG screenshot capture |
+| Windows desktop workflows | Available on Windows | Explicit PID attachment; semantic UI Automation input/activate/press/wait/assert; top-level window PNG capture |
 | Research / notebook workflows | Available | Explicit repository commands plus native plot/table/result/image/video/IPYNB artifact capture; no notebook-UI recording or environment guessing |
 | Evidence and provenance | Available | `TerminalTrack v1`, screenshot/native/media `Evidence v1`, `Manifest v1`, source/Flow/artifact fingerprints, and derivation relationships |
 | Terminal rendering | Available | Headless PNG rendering; GIF rendering when FFmpeg is installed |
@@ -40,11 +41,11 @@ The result is a shared workflow in which an agent supplies reasoning, writing, a
 | Visual QA | Available | Fresh PNG/GIF/MP4 Evidence → sampled frames/contact sheet/signals → agent-authored hash-bound PASS or NEEDS-CHANGES report |
 | Safe Markdown planning/patching | Available | `DocumentPlan v1`, section inspection, exact diff preview, review token, atomic apply/discard |
 | Incremental stale tracking | Available | `FreshnessReport v1`, explainable stale chains, document impact, dry-run/minimal selective regeneration |
-| Desktop and mobile execution | Planned | Native desktop/mobile surface drivers are not implemented yet |
+| macOS/Linux desktop and mobile execution | Planned | Native macOS, Linux desktop, Android, and iOS backends are not implemented yet |
 | Browser interaction recording | Planned | Web screenshot Evidence exists; composition does not pretend a static browser screenshot is browser video |
 | Narration/TTS and publishing | Planned/optional | Tutorial packaging uses agent-authored captions/metadata; it does not synthesize narration or upload to a platform |
 
-Interactive PTY input, browser video/GIF recording, native desktop/mobile automation, narration generation, automatic publishing, OCR-based secret detection, and automatic visual fixes are outside the current implementation.
+Interactive PTY input, browser video/GIF recording, macOS/Linux desktop automation, native mobile automation, narration generation, automatic publishing, OCR-based secret detection, and automatic visual fixes are outside the current implementation.
 
 ## How it works
 
@@ -157,6 +158,22 @@ The web driver currently implements the existing semantic Flow actions for navig
 Screenshot capture writes `.demoweave/evidence/artifacts/<evidence-id>.png`, records `driver/web` provenance in the manifest, and uses the same M6 Flow/source/artifact fingerprinting as terminal Evidence. Browser video/interaction GIF capture is intentionally not implemented yet.
 
 For a complete committed browser dogfood example, see the [P1 web fixture](fixtures/web/README.md): DemoWeave detects the standalone Next.js app, executes a semantic `create-project` Flow, captures the real result as screenshot Evidence, links it from the fixture README, and proves stale-source → impacted-document → selective regeneration → no-churn behavior.
+
+## Run a Windows desktop Flow
+
+M12B implements the existing semantic `Flow v1` through Windows UI Automation. Start the native application separately, obtain its process ID, and attach explicitly:
+
+```bash
+node packages/cli/dist/index.js run <desktop-flow-id-or-path> \
+  --project <path> \
+  --desktop-pid <pid>
+```
+
+The backend searches only within that process's single top-level application window. It maps `automationId`/`accessibilityId` to UIA AutomationId, `name`/`text`/`label` to accessible Name, and a small explicit `role` set to UIA ControlType. `testId`, scrolling, element capture, process launching, and ambiguous window selection are intentionally unsupported.
+
+Current actions are semantic `activate` (`InvokePattern`), `input` (`ValuePattern`), explicit key `press`, visible/hidden/text `wait`, visible/hidden/text `assert`, and full top-level window PNG `capture`. Stale desktop Evidence can use the same selective repair path with `demoweave update --apply --desktop-pid <pid>`.
+
+The committed [native Windows fixture](fixtures/desktop-windows/) proves real PID attachment, semantic interaction, window-only PNG Evidence, source freshness, selective regeneration, and no-change/no-churn behavior without OBS or screen coordinates.
 
 ## Capture research and notebook outputs
 
@@ -334,9 +351,9 @@ The versioned JSON contracts live in [`schemas/`](schemas/).
 
 ## Project status
 
-DemoWeave is in active development. **M0–M11 plus Pilots P0 and P1 are complete:** the project can inspect multi-ecosystem repositories; execute terminal, Playwright-backed web, research, and notebook Flows; capture fingerprinted terminal, browser screenshot, or native research/notebook Evidence; render terminal PNG/GIF media; compose independent media into deterministic MP4/GIF scenes; package existing MP4 Evidence into upload-oriented tutorial assets; run reproducible agent visual QA; explain stale evidence; use runtime artifacts in reviewed Markdown; and prove selective regeneration/no-churn behavior across terminal, web, research, and notebook surfaces.
+DemoWeave is in active development. **M0–M11 plus Pilots P0 and P1 are complete, and M12 is in progress:** the project can inspect multi-ecosystem repositories; execute terminal, Playwright-backed web, research, notebook, and Windows UI Automation Flows; capture fingerprinted terminal, browser screenshot, native research/notebook, or Windows application-window Evidence; render and compose media; package tutorials; run reproducible agent visual QA; explain stale evidence; safely patch Markdown; and prove selective regeneration/no-churn behavior.
 
-**M12 is next:** native desktop drivers for Electron, Windows, macOS, and Linux while preserving the same semantic Flow/Evidence boundary and no-OBS capture philosophy. Interactive PTY input, browser recording, narration/TTS, publishing, mobile drivers, OCR-based secret detection, and automatic visual fixes remain later/optional work.
+**M12A/M12B now provide the portable desktop backend boundary and one proven Windows backend.** macOS and Linux native backends remain planned. Interactive PTY input, browser recording, narration/TTS, publishing, mobile drivers, OCR-based secret detection, and automatic visual fixes remain later/optional work.
 
 See [ROADMAP.md](ROADMAP.md) for milestone boundaries and future surface drivers.
 

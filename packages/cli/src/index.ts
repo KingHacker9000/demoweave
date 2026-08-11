@@ -106,8 +106,9 @@ async function listJsonFiles(directory: string): Promise<string[]> {
 }
 
 function positiveInteger(value: string): number {
+  if (!/^[1-9][0-9]*$/.test(value)) throw new Error(`Expected a positive integer, received ${value}`);
   const parsed = Number(value);
-  if (!Number.isInteger(parsed) || parsed <= 0) throw new Error(`Expected a positive integer, received ${value}`);
+  if (!Number.isSafeInteger(parsed)) throw new Error(`Expected a positive integer, received ${value}`);
   return parsed;
 }
 
@@ -243,6 +244,7 @@ program.command('run')
   .option('--project <path>', 'project root', '.')
   .option('--timeout <ms>', 'default driver action timeout in milliseconds', positiveInteger, 30_000)
   .option('--base-url <url>', 'base URL for relative web navigation')
+  .option('--desktop-pid <pid>', 'explicit PID of an already-running Windows desktop application', positiveInteger)
   .option('--headed', 'show the browser window while running web Flows')
   .action(async (reference, options) => {
     try {
@@ -250,6 +252,7 @@ program.command('run')
         projectRoot: options.project,
         commandTimeoutMs: options.timeout,
         ...(options.baseUrl ? { baseUrl: options.baseUrl } : {}),
+        ...(options.desktopPid ? { desktopPid: options.desktopPid } : {}),
         headless: !options.headed,
       });
       console.log(`Flow: ${result.flowId}`);

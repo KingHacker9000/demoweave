@@ -12,6 +12,7 @@ import { renderEvidence } from '@demoweave/renderer';
 export interface UpdateRuntimeOptions {
   baseUrl?: string;
   headed?: boolean;
+  desktopPid?: number;
 }
 
 interface UpdateActionDependencies {
@@ -75,6 +76,7 @@ export async function applyRegenerationAction(
       projectRoot: root,
       ...(runtime.baseUrl ? { baseUrl: runtime.baseUrl } : {}),
       ...(runtime.headed ? { headless: false } : {}),
+      ...(runtime.desktopPid ? { desktopPid: runtime.desktopPid } : {}),
     });
     if (result.status !== 'passed') {
       throw new Error(`Flow ${action.flowId} failed: ${result.error?.message ?? 'unknown execution error'}`);
@@ -96,6 +98,12 @@ export function registerUpdateCommand(program: Command): void {
     .option('--apply', 'execute the computed minimal regeneration plan')
     .option('--base-url <url>', 'base URL for relative web navigation during regeneration')
     .option('--headed', 'show the browser window while regenerating web Evidence')
+    .option('--desktop-pid <pid>', 'explicit PID of an already-running Windows desktop application', (value) => {
+      if (!/^[1-9][0-9]*$/.test(value)) throw new Error(`Expected a positive integer, received ${value}`);
+      const parsed = Number(value);
+      if (!Number.isSafeInteger(parsed)) throw new Error(`Expected a positive integer, received ${value}`);
+      return parsed;
+    })
     .option('--json', 'print the before/after report as JSON')
     .action(async (input, options) => {
       const root = path.resolve(input);
@@ -115,6 +123,7 @@ export function registerUpdateCommand(program: Command): void {
           await applyRegenerationAction(root, action, {
             ...(options.baseUrl ? { baseUrl: options.baseUrl } : {}),
             ...(options.headed ? { headed: true } : {}),
+            ...(options.desktopPid ? { desktopPid: options.desktopPid } : {}),
           });
           applied.push(action);
         }

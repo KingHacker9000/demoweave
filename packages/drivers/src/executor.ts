@@ -20,6 +20,7 @@ export interface FlowExecutionOptions {
   commandTimeoutMs?: number;
   baseUrl?: string;
   headless?: boolean;
+  desktopPid?: number;
   drivers?: SurfaceDriver[];
 }
 
@@ -88,7 +89,7 @@ export async function executeFlow(
   project: ProjectProfile,
   flow: Flow,
   flowPath: string,
-  options: Pick<FlowExecutionOptions, 'commandTimeoutMs' | 'baseUrl' | 'headless' | 'drivers'> = {},
+  options: Pick<FlowExecutionOptions, 'commandTimeoutMs' | 'baseUrl' | 'headless' | 'desktopPid' | 'drivers'> = {},
 ): Promise<FlowExecutionResult> {
   const surface = project.surfaces.find((candidate) => candidate.id === flow.surfaceId);
   if (!surface) {
@@ -122,6 +123,8 @@ export async function executeFlow(
     }),
     new DesktopDriver({
       flowPath: relativeFlowPath,
+      desktopPid: options.desktopPid,
+      actionTimeoutMs: options.commandTimeoutMs,
     }),
   ];
   const driver = drivers.find((candidate) => candidate.supports(surface));

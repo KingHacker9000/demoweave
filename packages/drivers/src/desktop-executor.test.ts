@@ -6,7 +6,7 @@ import test from 'node:test';
 import { FlowSchema, ProjectProfileSchema } from '@demoweave/core';
 import { executeFlow } from './executor.js';
 
-test('default executor routes desktop surfaces to DesktopDriver and requires a real native backend', async (t) => {
+test('default executor routes desktop surfaces to DesktopDriver and requires explicit Windows runtime context', async (t) => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'demoweave-desktop-executor-'));
   t.after(() => fs.rm(root, { recursive: true, force: true }));
   await fs.mkdir(path.join(root, '.demoweave', 'flows'), { recursive: true });
@@ -39,7 +39,11 @@ test('default executor routes desktop surfaces to DesktopDriver and requires a r
   assert.equal(result.status, 'failed');
   assert.equal(result.driverId, 'desktop');
   assert.equal(result.error?.code, 'PREPARE_FAILED');
-  assert.match(result.error?.message ?? '', /No desktop backend is registered for/);
+  if (process.platform === 'win32') {
+    assert.match(result.error?.message ?? '', /DESKTOP_PID_REQUIRED.*--desktop-pid/);
+  } else {
+    assert.match(result.error?.message ?? '', /No desktop backend is registered for/);
+  }
   assert.deepEqual(result.steps, [{ stepId: 'press-enter', status: 'skipped' }]);
   assert.deepEqual(result.evidence, []);
 });

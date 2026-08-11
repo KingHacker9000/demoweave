@@ -22,9 +22,9 @@ DemoWeave is **multi-surface by design**. A repository may expose web, CLI, desk
 | M9 — Tutorial output | ✅ Complete | `TutorialPlan v1`; existing MP4 Evidence → upload-oriented package |
 | M10 — Visual QA | ✅ Complete | Deterministic sample packet → agent-reviewed hash-bound PASS/NEEDS-CHANGES report |
 | M11 — Research / notebook driver | ✅ Complete | Explicit research/notebook execution → immutable native plot/table/result/IPYNB Evidence |
-| **M12 — Desktop drivers** | **Next** | Native Electron/Windows/macOS/Linux surfaces without an OBS requirement |
+| **M12 — Desktop drivers** | **🚧 Current** | Portable backend boundary + proven Windows UI Automation/window-capture backend; macOS/Linux remain planned |
 
-Milestone PR history: M0/M1 #1, M2 #2, M3 #3, M4 #4, P0 #5, M5 #6, M6 #7, M7 #8, M5 hardening #9, P1 #10, M8 #11, M9 #12, M10 #13, M11 #14.
+Milestone PR history: M0/M1 #1, M2 #2, M3 #3, M4 #4, P0 #5, M5 #6, M6 #7, M7 #8, M5 hardening #9, P1 #10, M8 #11, M9 #12, M10 #13, M11 #14, M12A #15, M12B #16.
 
 ## Product principles
 
@@ -275,15 +275,26 @@ M11 does not screen-record notebook UI, infer a scientific environment, or turn 
 
 ## M12 — Desktop drivers
 
-Electron, Windows, macOS, Linux. Capture priority: semantic/application-native → window-specific OS capture → region capture → display capture. No OBS requirement.
+M12 is in progress. Capture priority remains semantic/application-native → window-specific OS capture → region capture → display capture, with no OBS requirement.
 
-Key questions for M12:
+Delivered:
 
-- define a portable desktop target model without leaking one OS automation API into Flow v1;
-- separate semantic app control from window/frame capture;
-- use Electron-native hooks where available before generic OS automation;
-- preserve the same Evidence/freshness/review contracts established by terminal/web/research;
-- make capability detection explicit so unsupported hosts fail clearly rather than guessing.
+- M12A: portable `DesktopDriver → DesktopBackend v1` lifecycle, capability probing, explicit unsupported-host diagnostics, and normal screenshot Evidence ownership;
+- M12B: Windows-only `WindowsUiaBackend` attached to an explicit already-running `--desktop-pid`;
+- PID-anchored, single-window UIA subtree lookup with explicit missing/ambiguous diagnostics;
+- semantic AutomationId/accessible Name/ControlType targets, `InvokePattern`, `ValuePattern`, explicit key presses, bounded waits/assertions;
+- native top-level application-window PNG capture through `PrintWindow`;
+- normal Flow/source/artifact provenance, selective `update --apply --desktop-pid`, and zero-action/no-churn proof;
+- a committed native WinForms fixture and visually inspected window-only screenshot Evidence.
+
+Remaining M12 slices:
+
+- macOS native backend;
+- Linux native backend;
+- any Electron-specific backend beyond what is factually exposed through a proven native adapter;
+- element capture and robust semantic scrolling where a backend can implement them without coordinate fallbacks.
+
+Flow v1 remains platform-neutral. DemoWeave does not infer or launch executables, store runtime PIDs in metadata, choose ambiguous windows, capture the full display, or claim generic cross-platform desktop support.
 
 ## M13 — Mobile drivers
 
@@ -321,11 +332,11 @@ DemoWeave 1.0 should provide stable agent workflows/contracts, multi-surface ana
 | 12 | ✅ M9 — tutorial output | MP4 Evidence → upload-oriented package |
 | 13 | ✅ M10 — visual QA | reproducible agent review gate |
 | 14 | ✅ M11 — research/notebook | native research results + notebook Evidence |
-| 15 | **M12 — desktop** | native apps |
+| 15 | **🚧 M12 — desktop** | Windows available; macOS/Linux planned |
 | 16 | M13 — mobile | Android/iOS |
 | 17 | M14/M15 — ecosystem | plugins/publishers |
 | 18 | 1.0 hardening | public stable release |
 
 ## Current next step
 
-Merge M11 after the final cross-platform + re-reviewed M10 visual gate is green, then start **M12 — Desktop drivers** with capability discovery and a minimal Electron/Windows-first vertical slice before broader OS adapters.
+Complete M12B review/merge with its real Windows screenshot Evidence and hosted cross-platform checks, then continue M12 through separate, honestly probed macOS and Linux native backend slices. Mobile/M13, browser recording, narration, publishing, and unrelated desktop expansion remain out of scope.

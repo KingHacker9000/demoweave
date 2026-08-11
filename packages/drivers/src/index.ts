@@ -106,6 +106,19 @@ export {
 export type { DesktopDriverOptions } from './desktop-driver.js';
 
 export {
+  PowerShellWindowsUiaHelper,
+  WindowsUiaBackend,
+  windowsUiaBackendVersion,
+} from './windows-uia-backend.js';
+export type {
+  PowerShellWindowsUiaHelperOptions,
+  WindowsUiaBackendOptions,
+  WindowsUiaHelper,
+  WindowsUiaRequest,
+  WindowsUiaResponse,
+} from './windows-uia-backend.js';
+
+export {
   executeFlow,
   FlowExecutionError,
   runFlow,
