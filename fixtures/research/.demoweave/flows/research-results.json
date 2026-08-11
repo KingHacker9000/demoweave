@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "id": "research-results",
+  "title": "Generate native research results",
+  "surfaceId": "research-research-workflow",
+  "sources": [
+    { "path": "experiments/run.mjs", "role": "implementation" }
+  ],
+  "steps": [
+    {
+      "id": "run-experiment",
+      "type": "run",
+      "command": "node",
+      "args": ["experiments/run.mjs"]
+    },
+    {
+      "id": "assert-result",
+      "type": "assert",
+      "assertion": {
+        "kind": "outputContains",
+        "stream": "stdout",
+        "value": "accuracy=0.93"
+      }
+    },
+    {
+      "id": "capture-plot",
+      "type": "capture",
+      "evidenceId": "research-learning-curve",
+      "kind": "plot",
+      "label": "Validation accuracy learning curve",
+      "artifact": { "path": "outputs/learning-curve.svg" }
+    },
+    {
+      "id": "capture-table",
+      "type": "capture",
+      "evidenceId": "research-results-table",
+      "kind": "table",
+      "label": "Per-epoch benchmark results",
+      "artifact": { "path": "outputs/results.csv" }
+    },
+    {
+      "id": "capture-metrics",
+      "type": "capture",
+      "evidenceId": "research-metrics",
+      "kind": "result",
+      "label": "Experiment summary metrics",
+      "artifact": { "path": "outputs/metrics.json" }
+    }
+  ]
+}
