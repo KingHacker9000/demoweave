@@ -9,6 +9,7 @@ import {
   type Manifest,
 } from '@demoweave/core';
 import type { DriverContext, DriverDescriptor, DriverStepResult, SurfaceDriver } from './index.js';
+import { AndroidAdbBackend } from './android-adb-backend.js';
 import type {
   MobileBackend,
   MobileBackendProbe,
@@ -25,6 +26,7 @@ export interface MobileDriverOptions {
   platform?: MobilePlatform;
   deviceId?: string;
   flowPath?: string;
+  actionTimeoutMs?: number;
 }
 
 type ProbeAttempt = {
@@ -125,7 +127,7 @@ export class MobileDriver implements SurfaceDriver {
   private probeAttempts: ProbeAttempt[] = [];
 
   constructor(options: MobileDriverOptions = {}) {
-    this.backends = options.backends ?? [];
+    this.backends = options.backends ?? [new AndroidAdbBackend({ actionTimeoutMs: options.actionTimeoutMs })];
     this.target = options.platform ? {
       platform: options.platform,
       ...(options.deviceId ? { deviceId: options.deviceId } : {}),
