@@ -17,6 +17,14 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - name: Upload committed M12B Windows fixture screenshot for review
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: m12b-committed-windows-fixture-screenshot
+          if-no-files-found: error
+          retention-days: 1
+          path: fixtures/desktop-windows/.demoweave/evidence/artifacts/create-project-result.png
       - name: Install FFmpeg (Ubuntu)
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y ffmpeg
