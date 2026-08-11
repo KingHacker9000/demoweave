@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "id": "notebook-results",
+  "title": "Execute and capture a notebook artifact",
+  "surfaceId": "notebook-notebooks",
+  "sources": [
+    { "path": "notebooks/experiment.ipynb", "role": "implementation" },
+    { "path": "notebooks/execute.mjs", "role": "implementation" }
+  ],
+  "steps": [
+    {
+      "id": "execute-notebook",
+      "type": "run",
+      "command": "node",
+      "args": ["notebooks/execute.mjs", "notebooks/experiment.ipynb", "outputs/executed.ipynb"]
+    },
+    {
+      "id": "assert-execution",
+      "type": "assert",
+      "assertion": {
+        "kind": "outputContains",
+        "stream": "stdout",
+        "value": "Notebook executed: 1 code cell(s)"
+      }
+    },
+    {
+      "id": "capture-notebook",
+      "type": "capture",
+      "evidenceId": "research-executed-notebook",
+      "kind": "result",
+      "label": "Executed notebook with captured cell output",
+      "artifact": { "path": "outputs/executed.ipynb" }
+    }
+  ]
+}
