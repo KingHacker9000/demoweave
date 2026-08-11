@@ -40,7 +40,7 @@ jobs:
       - run: pnpm build
       - run: pnpm test
       - run: pnpm typecheck
-      - name: Smoke test built CLI, web driver, freshness, rendering, composition, tutorial packaging, visual QA, and Markdown review
+      - name: Smoke test built CLI, web/research drivers, freshness, rendering, composition, tutorial packaging, visual QA, and Markdown review
         run: |
           node packages/cli/dist/index.js --help
           node packages/cli/dist/index.js doctor
@@ -56,6 +56,7 @@ jobs:
           node scripts/m8-compositor-smoke.mjs
           node scripts/m9-tutorial-smoke.mjs
           node scripts/m10-visual-qa-smoke.mjs
+          node scripts/m11-research-smoke.mjs
           node scripts/m5-dogfood-smoke.mjs
           node packages/cli/dist/index.js validate .
           node scripts/p1-web-fixture-smoke.mjs
