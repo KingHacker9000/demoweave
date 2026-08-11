@@ -66,3 +66,19 @@ test('demoweave run reports execution details and returns non-zero for a failed 
   assert.match(failed.stdout, /Final: FAILED/);
   assert.match(failed.stderr, /NONZERO_EXIT/);
 });
+
+test('demoweave run strictly validates --desktop-pid', () => {
+  const result = spawnSync(process.execPath, [cli, 'run', 'unused', '--desktop-pid', '0'], { encoding: 'utf8' });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /Expected a positive integer/);
+
+  const scientific = spawnSync(process.execPath, [cli, 'run', 'unused', '--desktop-pid', '1e3'], { encoding: 'utf8' });
+  assert.notEqual(scientific.status, 0);
+  assert.match(scientific.stderr, /Expected a positive integer/);
+});
+
+test('demoweave update strictly validates --desktop-pid', () => {
+  const result = spawnSync(process.execPath, [cli, 'update', '.', '--desktop-pid', '-4'], { encoding: 'utf8' });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /Expected a positive integer/);
+});

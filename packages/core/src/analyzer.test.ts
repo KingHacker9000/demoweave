@@ -33,6 +33,22 @@ test('detects Node web fixture', async () => {
   assert.ok(profile.frameworks.some((framework) => framework.name === 'Next.js'));
 });
 
+test('detects a native Windows Forms desktop entrypoint without pretending it is Electron', async () => {
+  const profile = await analyzeProject(path.join(fixtures, 'desktop-windows'));
+  assert.deepEqual(profile.languages, [
+    { name: 'C#', files: 1 },
+    { name: 'PowerShell', files: 1 },
+  ]);
+  assert.deepEqual(profile.frameworks, [{ name: 'Windows Forms', root: '.' }]);
+  assert.deepEqual(profile.surfaces, [{
+    id: 'desktop-windows-forms',
+    type: 'desktop',
+    root: '.',
+    framework: 'Windows Forms',
+    label: 'Windows Forms',
+  }]);
+});
+
 test('detects Node library fixture', async () => {
   const profile = await analyzeProject(path.join(fixtures, 'library'));
   assert.deepEqual(profile.surfaces.map((surface) => surface.type), ['library']);
@@ -167,7 +183,13 @@ test('profiles DemoWeave workspace members while retaining nested manifest facts
   assert.deepEqual(profile.commands.build, ['pnpm build']);
   assert.deepEqual(profile.commands.test, ['pnpm test']);
   assert.deepEqual(profile.commands.run, ['demoweave']);
-  assert.deepEqual(profile.existingDocs, ['README.md', 'ROADMAP.md', 'docs/M5_DOGFOOD.md', 'docs/M7_DESIGN.md']);
+  assert.deepEqual(profile.existingDocs, [
+    'README.md',
+    'ROADMAP.md',
+    'docs/M5_DOGFOOD.md',
+    'docs/M7_DESIGN.md',
+    'docs/development/m12b-windows-uia.md',
+  ]);
 });
 
 test('keeps component, workspace, path, and surface identifiers deterministic', async () => {

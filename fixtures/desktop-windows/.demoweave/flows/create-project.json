@@ -1,0 +1,78 @@
+{
+  "schemaVersion": 1,
+  "id": "create-project",
+  "title": "Create a project in the native Windows fixture",
+  "surfaceId": "desktop-windows-forms",
+  "sources": [
+    {
+      "path": "app.cs",
+      "role": "implementation"
+    },
+    {
+      "path": "fixture-data.json",
+      "role": "data"
+    }
+  ],
+  "steps": [
+    {
+      "id": "input-project-name",
+      "type": "input",
+      "target": {
+        "strategy": "automationId",
+        "value": "project-name"
+      },
+      "value": "Demo Project",
+      "clear": true
+    },
+    {
+      "id": "activate-create",
+      "type": "activate",
+      "target": {
+        "strategy": "automationId",
+        "value": "create-button"
+      }
+    },
+    {
+      "id": "wait-result",
+      "type": "wait",
+      "condition": {
+        "kind": "visible",
+        "target": {
+          "strategy": "automationId",
+          "value": "result-text"
+        }
+      },
+      "timeoutMs": 5000
+    },
+    {
+      "id": "assert-result-visible",
+      "type": "assert",
+      "assertion": {
+        "kind": "visible",
+        "target": {
+          "strategy": "automationId",
+          "value": "result-text"
+        }
+      }
+    },
+    {
+      "id": "assert-result-text",
+      "type": "assert",
+      "assertion": {
+        "kind": "textContains",
+        "value": "Demo Project",
+        "target": {
+          "strategy": "automationId",
+          "value": "result-text"
+        }
+      }
+    },
+    {
+      "id": "capture-window",
+      "type": "capture",
+      "evidenceId": "create-project-result",
+      "kind": "screenshot",
+      "label": "Native Windows project creation result"
+    }
+  ]
+}

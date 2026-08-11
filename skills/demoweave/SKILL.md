@@ -90,6 +90,33 @@ Prefer semantic targets (`role`, `label`, test/automation IDs) over brittle text
 
 Current web capture writes PNG screenshot Evidence. Browser interaction GIF/video recording is not implemented; do not fabricate or claim it.
 
+## Windows desktop Flow workflow
+
+The Windows UI Automation backend executes existing semantic Flow v1 actions against an already-running application. DemoWeave does not infer or launch the executable. Supply one explicit positive process ID at runtime:
+
+```bash
+demoweave run <flow-id-or-path> --desktop-pid <pid>
+```
+
+The PID is invocation context only. Do not store it in Flow v1, ProjectProfile, Evidence provenance, config, or the manifest. The attached process must expose exactly one plausible top-level UIA application window in the current interactive session; missing, windowless, cross-session, and multi-window processes fail explicitly.
+
+Prefer `automationId` targets. Current factual mappings are:
+
+- `automationId` / `accessibilityId` → UIA AutomationId;
+- `name` / `text` / `label` → UIA accessible Name;
+- `role` → a small explicit UIA ControlType map;
+- `testId` → unsupported.
+
+Current Windows actions are `activate` through InvokePattern, `input` through ValuePattern, explicit basic navigation/Enter key presses, visible/hidden/text waits, visible/hidden/text assertions, and targetless `capture` with `kind: "screenshot"` for the attached top-level window. Scrolling and element capture are not implemented. There is no coordinate-click, full-display, OBS, or ambiguous-window fallback.
+
+For stale desktop Evidence, keep the application running and pass the same runtime context through selective regeneration:
+
+```bash
+demoweave update <project> --apply --desktop-pid <pid>
+```
+
+The committed `fixtures/desktop-windows` example uses a native WinForms executable with stable AutomationIds and proves window-only PNG Evidence plus freshness/no-churn behavior. Build and launch the fixture separately before running its Flow.
+
 ## Research / notebook workflow
 
 The research driver implements Flow v1 for `research` and `notebook` surfaces. It runs only commands explicitly declared by the Flow and captures native project-local files rather than guessing an environment or screen-recording notebook UI.
@@ -356,6 +383,7 @@ Current executable surface drivers:
 
 - **terminal** — non-interactive process/pipe execution + TerminalTrack capture;
 - **web** — Playwright Chromium semantic interaction + PNG screenshot capture against an already-running app;
+- **Windows desktop** — explicit-PID Windows UI Automation + top-level application-window PNG capture;
 - **research / notebook** — explicit process execution + immutable native artifact capture; no environment inference or notebook-UI recording.
 
 Current presentation/review tooling:
@@ -369,7 +397,8 @@ Not yet available:
 
 - interactive PTY input;
 - browser interaction GIF/video recording;
-- desktop/native mobile capture;
+- macOS/Linux desktop or native mobile capture;
+- Windows desktop scrolling or element capture;
 - narration/TTS generation;
 - publishing/upload integration;
 - OCR-based secret detection;

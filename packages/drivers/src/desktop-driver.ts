@@ -19,6 +19,7 @@ import {
   getDesktopHostCapabilities,
   type DesktopHostCapabilities,
 } from './desktop-capabilities.js';
+import { WindowsUiaBackend } from './windows-uia-backend.js';
 
 export const desktopDriverVersion = '0.0.1';
 
@@ -26,6 +27,8 @@ export interface DesktopDriverOptions {
   backends?: DesktopBackend[];
   hostCapabilities?: DesktopHostCapabilities;
   flowPath?: string;
+  desktopPid?: number;
+  actionTimeoutMs?: number;
 }
 
 type ProbeAttempt = {
@@ -96,7 +99,14 @@ function currentGitCommit(projectRoot: string): string | undefined {
 
 function validatePng(capture: DesktopPngCapture): Buffer {
   const bytes = Buffer.from(capture.bytes);
-  if (bytes.length < PNG_SIGNATURE.length || !bytes.subarray(0, PNG_SIGNATURE.length).equals(PNG_SIGNATURE)) {
+  const hasSignature = bytes.length >= 33 && bytes.subarray(0, PNG_SIGNATURE.length).equals(PNG_SIGNATURE);
+  const hasIhdr = hasSignature
+    && bytes.readUInt32BE(8) === 13
+    && bytes.subarray(12, 16).toString('ascii') === 'IHDR'
+    && bytes.readUInt32BE(16) > 0
+    && bytes.readUInt32BE(20) > 0;
+  const hasIend = hasIhdr && bytes.subarray(-8, -4).toString('ascii') === 'IEND';
+  if (!hasIend) {
     throw new Error('Desktop backend capture is not a valid PNG byte stream');
   }
   return bytes;
@@ -121,8 +131,12 @@ export class DesktopDriver implements SurfaceDriver {
   private probeAttempts: ProbeAttempt[] = [];
 
   constructor(options: DesktopDriverOptions = {}) {
-    this.backends = options.backends ?? [];
     this.hostCapabilities = options.hostCapabilities ?? getDesktopHostCapabilities();
+    this.backends = options.backends ?? [new WindowsUiaBackend({
+      desktopPid: options.desktopPid,
+      actionTimeoutMs: options.actionTimeoutMs,
+      hostCapabilities: this.hostCapabilities,
+    })];
     this.flowPath = options.flowPath;
   }
 
@@ -158,7 +172,10 @@ export class DesktopDriver implements SurfaceDriver {
     }
 
     const diagnostics = this.probeAttempts
-      .map(({ backendId, probe }) => `${backendId}: ${probe.reason ?? probe.detail ?? 'unavailable'}`)
+      .map(({ backendId, probe }) => {
+        const reason = probe.reason ?? 'unavailable';
+        return `${backendId}: ${reason}${probe.detail && probe.detail !== reason ? `: ${probe.detail}` : ''}`;
+      })
       .join('; ');
     throw new Error(`No registered desktop backend is available.${diagnostics ? ` ${diagnostics}` : ''}`);
   }

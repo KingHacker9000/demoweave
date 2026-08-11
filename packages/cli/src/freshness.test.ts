@@ -45,6 +45,7 @@ test('forwards invocation-scoped browser context during selective Flow regenerat
   await applyRegenerationAction('/fixture', runAction, {
     baseUrl: 'http://127.0.0.1:4321',
     headed: true,
+    desktopPid: 4242,
   }, dependencies(async (reference, options) => {
     receivedReference = reference;
     receivedOptions = options;
@@ -56,6 +57,7 @@ test('forwards invocation-scoped browser context during selective Flow regenerat
     projectRoot: '/fixture',
     baseUrl: 'http://127.0.0.1:4321',
     headless: false,
+    desktopPid: 4242,
   });
 });
 

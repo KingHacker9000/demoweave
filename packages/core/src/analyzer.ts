@@ -22,6 +22,7 @@ const LANGUAGE_BY_EXT: Record<string, string> = {
   '.py': 'Python', '.rs': 'Rust', '.go': 'Go', '.java': 'Java', '.kt': 'Kotlin',
   '.swift': 'Swift', '.c': 'C', '.h': 'C', '.cpp': 'C++', '.hpp': 'C++', '.cs': 'C#',
   '.rb': 'Ruby', '.php': 'PHP', '.r': 'R', '.lua': 'Lua', '.sh': 'Shell', '.ipynb': 'Jupyter Notebook',
+  '.ps1': 'PowerShell',
 };
 
 const FRAMEWORKS: Array<{ dep: string; name: string; surface?: Surface['type'] }> = [
@@ -551,7 +552,7 @@ export async function analyzeProject(input = '.'): Promise<ProjectProfile> {
   const workspaces = detectedWorkspaces.map((workspace) => workspace.profile);
   const packageManagers = await detectPackageManagers(root, detectedComponents, workspaces);
 
-  const sourceFiles = await fg(['**/*.{ts,tsx,js,jsx,py,rs,go,java,kt,swift,c,h,cpp,hpp,cs,rb,php,r,lua,sh,ipynb}'], {
+  const sourceFiles = await fg(['**/*.{ts,tsx,js,jsx,py,rs,go,java,kt,swift,c,h,cpp,hpp,cs,rb,php,r,lua,sh,ps1,ipynb}'], {
     cwd: root,
     ignore: IGNORE,
     onlyFiles: true,
@@ -623,6 +624,20 @@ export async function analyzeProject(input = '.'): Promise<ProjectProfile> {
   }
 
   const nestedProjects = await nestedDemoWeaveProjectRoots(root);
+  const winFormsScripts = sourceFiles
+    .filter((file) => (file.endsWith('.ps1') || file.endsWith('.cs')) && !belongsToNestedProject(file, nestedProjects))
+    .sort();
+  for (const script of winFormsScripts) {
+    const contents = await fs.readFile(path.join(root, script), 'utf8');
+    if (!/System\.Windows\.Forms/i.test(contents) || !/(?:Application\]::Run|Application\.Run)/i.test(contents)) continue;
+    const surfaceRoot = rel(root, path.dirname(path.join(root, script)));
+    if (!frameworks.some((item) => item.name === 'Windows Forms' && item.root === surfaceRoot)) {
+      frameworks.push({ name: 'Windows Forms', root: surfaceRoot });
+    }
+    if (!surfaces.some((surface) => surface.type === 'desktop' && surface.root === surfaceRoot)) {
+      addSurface({ id: slug('desktop-windows-forms'), type: 'desktop', root: surfaceRoot, framework: 'Windows Forms', label: 'Windows Forms' });
+    }
+  }
   const notebooks = sourceFiles
     .filter((file) => file.endsWith('.ipynb') && !belongsToNestedProject(file, nestedProjects))
     .sort();
