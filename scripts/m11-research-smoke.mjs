@@ -56,6 +56,7 @@ try {
     assert.equal(evidence?.producer?.id, 'research');
     assert.match(evidence?.artifactHash ?? '', /^sha256:[0-9a-f]{64}$/);
     assert.ok(evidence?.provenance?.flowHash);
+    assert.equal(evidence?.provenance?.sources.some((source) => source.path.startsWith('outputs/')), false);
   }
 
   const executed = JSON.parse(await fs.readFile(path.join(project, '.demoweave', 'evidence', 'artifacts', 'research-executed-notebook.ipynb'), 'utf8'));
@@ -68,6 +69,13 @@ try {
   assert.equal(fresh.summary.missing, 0);
   assert.equal(fresh.summary.unknown, 0);
   assert.equal(fresh.summary.fresh, 4);
+
+  await fs.rm(path.join(project, 'outputs'), { recursive: true, force: true });
+  const afterOutputCleanup = await analyzeFreshness(project);
+  assert.equal(afterOutputCleanup.summary.stale, 0);
+  assert.equal(afterOutputCleanup.summary.missing, 0);
+  assert.equal(afterOutputCleanup.summary.unknown, 0);
+  assert.equal(afterOutputCleanup.summary.fresh, 4);
 
   await fs.appendFile(path.join(project, 'experiments', 'run.mjs'), '\n// controlled freshness mutation\n');
   const stale = await analyzeFreshness(project);
@@ -97,7 +105,7 @@ try {
   const afterNoop = await Promise.all(tracked.map(digest));
   assert.deepEqual(afterNoop, beforeNoop);
 
-  console.log('M11 research/notebook smoke passed: native plot/table/result/notebook Evidence, selective stale repair, and zero-action no-churn.');
+  console.log('M11 research/notebook smoke passed: native plot/table/result/notebook Evidence, transient-output cleanup safety, selective stale repair, and zero-action no-churn.');
 } finally {
   await fs.rm(tempRoot, { recursive: true, force: true });
 }
