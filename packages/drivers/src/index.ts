@@ -77,6 +77,35 @@ export {
 export type { ResearchDriverOptions } from './research-driver.js';
 
 export {
+  desktopBackendApiVersion,
+} from './desktop-backend.js';
+export type {
+  DesktopBackend,
+  DesktopBackendCapability,
+  DesktopBackendDescriptor,
+  DesktopBackendProbe,
+  DesktopBackendStep,
+  DesktopBackendStepResult,
+  DesktopPngCapture,
+} from './desktop-backend.js';
+
+export {
+  getDesktopHostCapabilities,
+} from './desktop-capabilities.js';
+export type {
+  DesktopHostCapabilities,
+  DesktopPlatform,
+  DesktopSessionKind,
+  InteractiveSessionHint,
+} from './desktop-capabilities.js';
+
+export {
+  DesktopDriver,
+  desktopDriverVersion,
+} from './desktop-driver.js';
+export type { DesktopDriverOptions } from './desktop-driver.js';
+
+export {
   executeFlow,
   FlowExecutionError,
   runFlow,

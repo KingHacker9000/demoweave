@@ -10,6 +10,7 @@ import {
   type ProjectProfile,
 } from '@demoweave/core';
 import type { DriverContext, DriverError, DriverStepResult, SurfaceDriver } from './index.js';
+import { DesktopDriver } from './desktop-driver.js';
 import { ResearchDriver } from './research-driver.js';
 import { TerminalDriver } from './terminal-driver.js';
 import { WebDriver } from './web-driver.js';
@@ -117,6 +118,9 @@ export async function executeFlow(
     }),
     new ResearchDriver({
       commandTimeoutMs: options.commandTimeoutMs,
+      flowPath: relativeFlowPath,
+    }),
+    new DesktopDriver({
       flowPath: relativeFlowPath,
     }),
   ];
