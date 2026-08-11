@@ -7,6 +7,7 @@ import type { DesktopBackendStep } from './desktop-backend.js';
 import type { DesktopHostCapabilities } from './desktop-capabilities.js';
 import type { DriverContext } from './index.js';
 import {
+  PowerShellWindowsUiaHelper,
   WindowsUiaBackend,
   type WindowsUiaHelper,
   type WindowsUiaRequest,
@@ -170,6 +171,14 @@ test('returns real helper PNG bytes and preserves window-capture failure', async
     : { ok: true })));
   const failed = await failure.execute(step({ id: 'capture', type: 'capture', evidenceId: 'proof', kind: 'screenshot' }), CONTEXT);
   assert.equal(failed.error?.code, 'WINDOW_CAPTURE_FAILED');
+});
+
+test('real PowerShell helper starts and returns its structured protocol on hosted Windows', { skip: process.platform !== 'win32' }, async () => {
+  const helper = new PowerShellWindowsUiaHelper();
+  const response = await helper.request({ operation: 'attach', pid: 2_147_483_647 });
+  assert.equal(response.ok, false);
+  assert.equal(response.error?.code, 'PROCESS_NOT_FOUND');
+  assert.match(response.error?.message ?? '', /does not exist/i);
 });
 
 test('helper is shell-safe, PID-scoped for key injection, maps semantic properties explicitly, and uses no temporary capture', async () => {
