@@ -140,6 +140,8 @@ public static class DemoWeaveNativeWindow {
   [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr hWnd, out RECT rect);
   [DllImport("user32.dll")] public static extern bool PrintWindow(IntPtr hWnd, IntPtr hdc, uint flags);
   [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);
+  [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
+  [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
 }
 '@
 
@@ -185,14 +187,26 @@ public static class DemoWeaveNativeWindow {
       if (-not $keys.ContainsKey([string]$request.key)) {
         Throw-ProtocolError 'UNSUPPORTED_KEY' "Unsupported Windows key: $($request.key)"
       }
+
+      $handle = [IntPtr]$window.Current.NativeWindowHandle
+      [void][DemoWeaveNativeWindow]::SetForegroundWindow($handle)
+      $window.SetFocus()
       if ($request.target) {
         $element = Find-Target $window $request.target $false
         $element.SetFocus()
-      } else {
-        [void][DemoWeaveNativeWindow]::SetForegroundWindow([IntPtr]$window.Current.NativeWindowHandle)
-        $window.SetFocus()
       }
       Start-Sleep -Milliseconds 50
+
+      $foreground = [DemoWeaveNativeWindow]::GetForegroundWindow()
+      $foregroundProcessId = [uint32]0
+      if ($foreground -eq [IntPtr]::Zero) {
+        Throw-ProtocolError 'FOREGROUND_WINDOW_MISMATCH' 'Windows could not resolve a foreground window before key injection.'
+      }
+      [void][DemoWeaveNativeWindow]::GetWindowThreadProcessId($foreground, [ref]$foregroundProcessId)
+      if ($foregroundProcessId -ne [uint32]$request.pid) {
+        Throw-ProtocolError 'FOREGROUND_WINDOW_MISMATCH' "Refusing to send a key because the foreground window is not owned by process $($request.pid)."
+      }
+
       [System.Windows.Forms.SendKeys]::SendWait($keys[[string]$request.key])
       Write-ProtocolResponse @{ ok = $true }
     }
