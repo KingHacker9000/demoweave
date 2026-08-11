@@ -11,6 +11,7 @@ import {
 } from '@demoweave/core';
 import type {
   DesktopBackend,
+  DesktopBackendDescriptor,
   DesktopBackendStep,
   DesktopBackendStepResult,
 } from './desktop-backend.js';
@@ -32,12 +33,12 @@ const WINDOWS_HOST: DesktopHostCapabilities = {
 };
 
 class FakeDesktopBackend implements DesktopBackend {
-  readonly descriptor = {
+  readonly descriptor: DesktopBackendDescriptor = {
     id: 'fake-uia',
-    apiVersion: 1 as const,
+    apiVersion: 1,
     version: 'test',
-    platforms: ['windows'] as const,
-    stepTypes: ['activate', 'input', 'press', 'scroll', 'wait', 'assert', 'capture'] as DesktopBackendStep['type'][],
+    platforms: ['windows'],
+    stepTypes: ['activate', 'input', 'press', 'scroll', 'wait', 'assert', 'capture'],
     capabilities: [
       'semantic-control',
       'text-input',
@@ -45,7 +46,7 @@ class FakeDesktopBackend implements DesktopBackend {
       'scroll',
       'window-capture',
       'element-capture',
-    ] as const,
+    ],
   };
 
   readonly steps: DesktopBackendStep[] = [];
