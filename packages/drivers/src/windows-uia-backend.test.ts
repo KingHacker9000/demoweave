@@ -51,7 +51,7 @@ async function opened(value: WindowsUiaBackend): Promise<WindowsUiaBackend> {
   return value;
 }
 
-test('is Windows-only and requires a strictly positive explicit PID', async () => {
+test('is Windows-only and requires an explicit PID inside the .NET process-id range', async () => {
   const nonWindows = new WindowsUiaBackend({ desktopPid: 42, hostCapabilities: LINUX_HOST, helper: new FakeHelper() });
   assert.deepEqual(await nonWindows.probe(), {
     available: false, reason: 'UNSUPPORTED_PLATFORM', detail: 'Windows UI Automation is available only on Windows.',
@@ -60,6 +60,8 @@ test('is Windows-only and requires a strictly positive explicit PID', async () =
   assert.equal((await missing.probe()).reason, 'DESKTOP_PID_REQUIRED');
   const invalid = new WindowsUiaBackend({ desktopPid: 0, hostCapabilities: WINDOWS_HOST, helper: new FakeHelper() });
   assert.equal((await invalid.probe()).reason, 'INVALID_DESKTOP_PID');
+  const tooLarge = new WindowsUiaBackend({ desktopPid: 2_147_483_648, hostCapabilities: WINDOWS_HOST, helper: new FakeHelper() });
+  assert.equal((await tooLarge.probe()).reason, 'INVALID_DESKTOP_PID');
 });
 
 for (const [code, label] of [
