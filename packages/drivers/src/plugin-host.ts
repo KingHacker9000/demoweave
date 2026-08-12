@@ -12,6 +12,7 @@ import {
   SurfaceTypeSchema,
   normalizeManifest,
   type Evidence,
+  type FlowStep,
   type Manifest,
   type ProjectProfile,
   type Surface,
@@ -25,7 +26,7 @@ import {
   type PluginOptions,
   type PluginRegistry,
 } from '@demoweave/sdk';
-import type { DriverContext, SurfaceDriver } from './index.js';
+import type { DriverContext, DriverStepResult, SurfaceDriver } from './index.js';
 
 export class PluginHostError extends Error {
   constructor(readonly code: string, message: string) {
@@ -89,6 +90,45 @@ function deepFreeze<T>(value: T): T {
     Object.freeze(value);
   }
   return value;
+}
+
+function invalidDriverResult(message: string): PluginHostError {
+  return new PluginHostError('PLUGIN_DRIVER_RESULT_INVALID', message);
+}
+
+function validateDriverResult(value: unknown, step: FlowStep): DriverStepResult {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw invalidDriverResult(`Plugin driver returned a non-object result for step ${step.id}.`);
+  }
+  const result = value as Record<string, unknown>;
+  if (result.stepId !== step.id) {
+    throw invalidDriverResult(`Plugin driver result stepId must match step ${step.id}.`);
+  }
+  if (result.status !== 'passed' && result.status !== 'failed' && result.status !== 'skipped') {
+    throw invalidDriverResult(`Plugin driver returned an invalid status for step ${step.id}.`);
+  }
+  if (result.stdout !== undefined && typeof result.stdout !== 'string') {
+    throw invalidDriverResult(`Plugin driver stdout must be a string for step ${step.id}.`);
+  }
+  if (result.stderr !== undefined && typeof result.stderr !== 'string') {
+    throw invalidDriverResult(`Plugin driver stderr must be a string for step ${step.id}.`);
+  }
+  if (result.exitCode !== undefined && !Number.isInteger(result.exitCode)) {
+    throw invalidDriverResult(`Plugin driver exitCode must be an integer for step ${step.id}.`);
+  }
+  if (result.error !== undefined) {
+    if (!result.error || typeof result.error !== 'object' || Array.isArray(result.error)) {
+      throw invalidDriverResult(`Plugin driver error must be an object for step ${step.id}.`);
+    }
+    const error = result.error as Record<string, unknown>;
+    if (typeof error.message !== 'string' || (error.code !== undefined && typeof error.code !== 'string')) {
+      throw invalidDriverResult(`Plugin driver error has an invalid shape for step ${step.id}.`);
+    }
+  }
+  if (result.evidence !== undefined && !Array.isArray(result.evidence)) {
+    throw invalidDriverResult(`Plugin driver evidence must be an array for step ${step.id}.`);
+  }
+  return result as unknown as DriverStepResult;
 }
 
 async function readConfiguration(root: string): Promise<ConfiguredPlugin[]> {
@@ -293,6 +333,7 @@ export class PluginHost {
   }
 
   async applyDetectors(profile: ProjectProfile): Promise<ProjectProfile> {
+    const detectorProfile = deepFreeze(structuredClone(profile));
     const surfaces = [...profile.surfaces];
     const frameworks = [...profile.frameworks];
     const surfaceIds = new Set(surfaces.map((surface) => surface.id));
@@ -300,7 +341,7 @@ export class PluginHost {
       for (const detector of loaded.detectors) {
         let result;
         try {
-          result = await detector.detect({ projectRoot: this.projectRoot, project: profile, options: loaded.configured.options });
+          result = await detector.detect({ projectRoot: this.projectRoot, project: detectorProfile, options: loaded.configured.options });
         } catch (error) {
           throw new PluginHostError('PLUGIN_DETECTOR_FAILED', `Detector ${loaded.plugin.id}/${detector.id} failed: ${error instanceof Error ? error.message : String(error)}`);
         }
@@ -340,10 +381,14 @@ export class PluginHost {
     for (const loaded of this.plugins) {
       for (const contribution of loaded.drivers) {
         const producerId = `plugin/${loaded.plugin.id}/${contribution.id}`;
+        const hostedEvidenceByStep = new Map<string, Map<string, Evidence>>();
         const evidence = {
           writeArtifact: async (input: Parameters<import('@demoweave/sdk').PluginEvidenceService['writeArtifact']>[0]): Promise<Evidence> => {
             if (!isPortableId(input.evidenceId)) throw new PluginHostError('PLUGIN_EVIDENCE_ID_INVALID', `Plugin Evidence id is not portable: ${input.evidenceId}`);
-            if (!context.flow.steps.some((step) => step.id === input.stepId)) throw new PluginHostError('PLUGIN_EVIDENCE_STEP_INVALID', `Plugin Evidence references unknown step ${input.stepId}.`);
+            const step = context.flow.steps.find((candidate) => candidate.id === input.stepId);
+            if (!step || step.type !== 'capture') throw new PluginHostError('PLUGIN_EVIDENCE_STEP_INVALID', `Plugin Evidence requires a capture step; received ${input.stepId}.`);
+            if (step.evidenceId !== input.evidenceId) throw new PluginHostError('PLUGIN_EVIDENCE_ID_MISMATCH', `Plugin Evidence id ${input.evidenceId} does not match capture step ${step.id}.`);
+            if (step.kind !== input.kind) throw new PluginHostError('PLUGIN_EVIDENCE_KIND_MISMATCH', `Plugin Evidence kind ${input.kind} does not match capture step ${step.id}.`);
             const artifactRelative = `.demoweave/evidence/artifacts/${input.evidenceId}.${input.format}`;
             const artifactPath = path.join(this.projectRoot, ...artifactRelative.split('/'));
             const { path: manifestPath, value: manifest } = await readManifest(this.projectRoot);
@@ -386,6 +431,9 @@ export class PluginHost {
               evidence: [...manifest.evidence.filter((item) => item.id !== next.id), next],
             });
             await atomicWrite(manifestPath, `${JSON.stringify(updated, null, 2)}\n`, 'manifest');
+            const hostedForStep = hostedEvidenceByStep.get(input.stepId) ?? new Map<string, Evidence>();
+            hostedForStep.set(next.id, next);
+            hostedEvidenceByStep.set(input.stepId, hostedForStep);
             return next;
           },
         };
@@ -412,7 +460,20 @@ export class PluginHost {
           prepare: (driverContext) => driver.prepare(driverContext),
           async execute(step, driverContext) {
             try {
-              return await driver.execute(step, driverContext);
+              if (!contribution.stepTypes.includes(step.type)) {
+                throw new PluginHostError('PLUGIN_DRIVER_UNSUPPORTED_ACTION', `Driver ${producerId} does not advertise step type ${step.type}.`);
+              }
+              hostedEvidenceByStep.delete(step.id);
+              const result = validateDriverResult(await driver.execute(step, driverContext), step);
+              const hosted = hostedEvidenceByStep.get(step.id) ?? new Map<string, Evidence>();
+              for (const returned of result.evidence ?? []) {
+                if (!returned || typeof returned !== 'object' || !hosted.has(returned.id)) {
+                  throw new PluginHostError('PLUGIN_EVIDENCE_UNHOSTED', `Driver ${producerId} returned Evidence that was not written by the host for step ${step.id}.`);
+                }
+              }
+              const hostedEvidence = [...hosted.values()];
+              const { evidence: _returnedEvidence, ...ordinaryResult } = result;
+              return hostedEvidence.length ? { ...ordinaryResult, evidence: hostedEvidence } : ordinaryResult;
             } catch (error) {
               return {
                 stepId: step.id,

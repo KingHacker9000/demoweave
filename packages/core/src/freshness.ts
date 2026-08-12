@@ -136,6 +136,7 @@ const UNKNOWN_REASON_CODES = new Set<FreshnessReason['code']>([
   'artifact-baseline-unavailable',
   'source-baseline-unavailable',
   'flow-baseline-unavailable',
+  'plugin-unavailable',
   'upstream-unknown',
 ]);
 

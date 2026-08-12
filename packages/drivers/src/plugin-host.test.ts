@@ -4,7 +4,13 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { analyzeFreshness, analyzeProject, ManifestSchema } from '@demoweave/core';
+import {
+  analyzeFreshness,
+  analyzeProject,
+  FlowSchema,
+  ManifestSchema,
+  ProjectProfileSchema,
+} from '@demoweave/core';
 import { runFlow } from './executor.js';
 import { loadPluginHost, PluginHostError } from './plugin-host.js';
 
@@ -32,6 +38,48 @@ async function moduleFile(root: string, name: string, source: string): Promise<s
 
 async function expectCode(action: () => Promise<unknown>, code: string): Promise<void> {
   await assert.rejects(action, (error: unknown) => error instanceof PluginHostError && error.code === code);
+}
+
+async function driverFixture(
+  context: test.TestContext,
+  source: string,
+  options: Record<string, unknown>,
+) {
+  const root = await project(context);
+  const plugin = await moduleFile(root, 'runtime-driver', source);
+  await configure(root, [{ module: plugin, options }]);
+  const flow = FlowSchema.parse({
+    schemaVersion: 1,
+    id: 'plugin-flow',
+    surfaceId: 'service-fixture',
+    steps: [
+      { id: 'assert-step', type: 'assert', assertion: { kind: 'textContains', value: 'ready' } },
+      { id: 'capture-step', type: 'capture', evidenceId: 'hosted-result', kind: 'result' },
+    ],
+  });
+  const profile = ProjectProfileSchema.parse({
+    schemaVersion: 1,
+    name: 'plugin-runtime',
+    root: '.',
+    analyzedAt: new Date(0).toISOString(),
+    packageManagers: [], workspaces: [], components: [], languages: [], frameworks: [],
+    surfaces: [{ id: 'service-fixture', type: 'service', root: '.' }],
+    commands: { install: [], build: [], test: [], run: [] },
+    existingDocs: [],
+  });
+  await fs.mkdir(path.join(root, '.demoweave', 'flows'), { recursive: true });
+  await fs.mkdir(path.join(root, '.demoweave', 'evidence', 'artifacts'), { recursive: true });
+  await fs.writeFile(path.join(root, '.demoweave', 'flows', 'plugin-flow.json'), `${JSON.stringify(flow, null, 2)}\n`);
+  await fs.writeFile(path.join(root, '.demoweave', 'evidence', 'manifest.json'), `${JSON.stringify({
+    schemaVersion: 1,
+    projectProfileVersion: 1,
+    flows: [{ id: flow.id, path: '.demoweave/flows/plugin-flow.json', surfaceId: flow.surfaceId }],
+    evidence: [],
+  }, null, 2)}\n`);
+  const driverContext = { projectRoot: root, surface: profile.surfaces[0]!, flow };
+  const drivers = await (await loadPluginHost(root)).createDrivers(driverContext);
+  assert.equal(drivers.length, 1);
+  return { root, flow, driver: drivers[0]!, driverContext };
 }
 
 test('loader rejects traversal, absolute paths, and symlink escapes', async (context) => {
@@ -94,6 +142,119 @@ test('duplicate plugin and contribution ids fail instead of shadowing', async (c
   }};\n`);
   await configure(root, [{ module: duplicateDrivers, options: {} }]);
   await expectCode(() => loadPluginHost(root), 'PLUGIN_CONTRIBUTION_DUPLICATE');
+});
+
+test('plain JavaScript detectors receive a detached recursively frozen profile', async (context) => {
+  const root = await project(context);
+  const plugin = await moduleFile(root, 'readonly-detector', `export default {id:"readonly-detector",apiVersion:1,register(r){
+    r.registerDetector({id:"mutation-attempt",detect({project}){
+      let rejected=false;
+      try { project.surfaces.push({id:"injected",type:"service",root:"../../escape"}); } catch { rejected=true; }
+      if (!rejected) throw new Error("mutable detector context");
+      return {surfaces:[{id:project.surfaces[0].id,type:"service",root:"."}]};
+    }});
+  }};\n`);
+  await configure(root, [{ module: plugin, options: {} }]);
+  const profile = ProjectProfileSchema.parse({
+    schemaVersion: 1,
+    name: 'readonly-profile',
+    root: '.',
+    analyzedAt: new Date(0).toISOString(),
+    packageManagers: [], workspaces: [], components: [], languages: [], frameworks: [],
+    surfaces: [{ id: 'built-in-service', type: 'service', root: '.' }],
+    commands: { install: [], build: [], test: [], run: [] },
+    existingDocs: [],
+  });
+  const before = JSON.stringify(profile);
+  await expectCode(() => loadPluginHost(root).then((host) => host.applyDetectors(profile)), 'PLUGIN_SURFACE_DUPLICATE');
+  assert.equal(JSON.stringify(profile), before);
+  assert.equal(Object.isFrozen(profile), false);
+  assert.deepEqual(profile.surfaces, [{ id: 'built-in-service', type: 'service', root: '.' }]);
+});
+
+test('Plugin Evidence writes are bound to the exact capture step id, Evidence id, and kind', async (context) => {
+  const source = `export default {id:"evidence-binding",apiVersion:1,register(r){
+    r.registerDriver({id:"evidence-driver",surfaceTypes:["service"],stepTypes:["capture"],create({options,evidence}){return {
+      supports(){return true},async prepare(){},async execute(step){
+        const written=await evidence.writeArtifact({
+          evidenceId:options.evidenceId,stepId:options.stepId,kind:options.kind,
+          format:"json",mimeType:"application/json",data:"{}\\n"
+        });
+        return {stepId:step.id,status:"passed",evidence:[written]};
+      },async close(){}
+    }}});
+  }};\n`;
+  const cases = [
+    { name: 'unknown step', options: { stepId: 'unknown', evidenceId: 'hosted-result', kind: 'result' }, code: 'PLUGIN_EVIDENCE_STEP_INVALID' },
+    { name: 'non-capture step', options: { stepId: 'assert-step', evidenceId: 'hosted-result', kind: 'result' }, code: 'PLUGIN_EVIDENCE_STEP_INVALID' },
+    { name: 'mismatched Evidence id', options: { stepId: 'capture-step', evidenceId: 'other-result', kind: 'result' }, code: 'PLUGIN_EVIDENCE_ID_MISMATCH' },
+    { name: 'mismatched kind', options: { stepId: 'capture-step', evidenceId: 'hosted-result', kind: 'text' }, code: 'PLUGIN_EVIDENCE_KIND_MISMATCH' },
+  ];
+  for (const item of cases) {
+    await context.test(item.name, async (nested) => {
+      const fixture = await driverFixture(nested, source, item.options);
+      const result = await fixture.driver.execute(fixture.flow.steps[1]!, fixture.driverContext);
+      assert.equal(result.status, 'failed');
+      assert.equal(result.error?.code, item.code);
+    });
+  }
+  await context.test('valid capture', async (nested) => {
+    const fixture = await driverFixture(nested, source, { stepId: 'capture-step', evidenceId: 'hosted-result', kind: 'result' });
+    const result = await fixture.driver.execute(fixture.flow.steps[1]!, fixture.driverContext);
+    assert.equal(result.status, 'passed');
+    assert.equal(result.evidence?.[0]?.id, 'hosted-result');
+    assert.equal(await fs.readFile(path.join(fixture.root, '.demoweave', 'evidence', 'artifacts', 'hosted-result.json'), 'utf8'), '{}\n');
+    const manifest = ManifestSchema.parse(JSON.parse(await fs.readFile(path.join(fixture.root, '.demoweave', 'evidence', 'manifest.json'), 'utf8')));
+    assert.equal(manifest.evidence[0]?.provenance.stepId, 'capture-step');
+  });
+});
+
+test('plain JavaScript driver results and hosted Evidence are validated at runtime', async (context) => {
+  const source = (stepTypes: string[]) => `export default {id:"runtime-results",apiVersion:1,register(r){
+    r.registerDriver({id:"runtime-driver",surfaceTypes:["service"],stepTypes:${JSON.stringify(stepTypes)},create({options,evidence}){return {
+      supports(){return true},async prepare(){},async execute(step){
+        if(options.mode==="wrong-step") return {stepId:"wrong",status:"passed"};
+        if(options.mode==="invalid-status") return {stepId:step.id,status:"okay"};
+        if(options.mode==="fabricated") return {stepId:step.id,status:"passed",evidence:[{id:"fabricated"}]};
+        if(options.mode==="hosted") {
+          const written=await evidence.writeArtifact({evidenceId:"hosted-result",stepId:step.id,kind:"result",format:"json",mimeType:"application/json",data:"{}\\n"});
+          return {stepId:step.id,status:"passed",evidence:[written]};
+        }
+        return {stepId:step.id,status:"passed",stdout:"ordinary"};
+      },async close(){}
+    }}});
+  }};\n`;
+  const malformed = [
+    { name: 'wrong stepId', mode: 'wrong-step', code: 'PLUGIN_DRIVER_RESULT_INVALID' },
+    { name: 'invalid status', mode: 'invalid-status', code: 'PLUGIN_DRIVER_RESULT_INVALID' },
+    { name: 'fabricated Evidence', mode: 'fabricated', code: 'PLUGIN_EVIDENCE_UNHOSTED' },
+  ];
+  for (const item of malformed) {
+    await context.test(item.name, async (nested) => {
+      const fixture = await driverFixture(nested, source(['capture']), { mode: item.mode });
+      const result = await fixture.driver.execute(fixture.flow.steps[1]!, fixture.driverContext);
+      assert.equal(result.status, 'failed');
+      assert.equal(result.error?.code, item.code);
+      assert.deepEqual(result.evidence, undefined);
+    });
+  }
+  await context.test('unsupported advertised action', async (nested) => {
+    const fixture = await driverFixture(nested, source(['capture']), { mode: 'ordinary' });
+    const result = await fixture.driver.execute(fixture.flow.steps[0]!, fixture.driverContext);
+    assert.equal(result.error?.code, 'PLUGIN_DRIVER_UNSUPPORTED_ACTION');
+  });
+  await context.test('valid host-written Evidence', async (nested) => {
+    const fixture = await driverFixture(nested, source(['capture']), { mode: 'hosted' });
+    const result = await fixture.driver.execute(fixture.flow.steps[1]!, fixture.driverContext);
+    assert.equal(result.status, 'passed');
+    assert.equal(result.evidence?.[0]?.id, 'hosted-result');
+    assert.equal(result.evidence?.[0]?.producer?.id, 'plugin/runtime-results/runtime-driver');
+  });
+  await context.test('valid ordinary non-Evidence result', async (nested) => {
+    const fixture = await driverFixture(nested, source(['assert']), { mode: 'ordinary' });
+    const result = await fixture.driver.execute(fixture.flow.steps[0]!, fixture.driverContext);
+    assert.deepEqual(result, { stepId: 'assert-step', status: 'passed', stdout: 'ordinary' });
+  });
 });
 
 test('a plugin driver cannot silently override a built-in driver', async (context) => {
@@ -187,17 +348,21 @@ test('external-style fixture proves detector, Evidence, fingerprints, repair, an
   assert.equal(hash(await fs.readFile(path.join(root, '.demoweave', 'evidence', 'artifacts', 'plugin-service-result.json'))), hash(repairedArtifact));
 
   const flowPath = path.join(root, '.demoweave', 'flows', 'service-proof.json');
-  const unsafeFlow = JSON.parse(await fs.readFile(flowPath, 'utf8')) as { steps: Array<{ type: string; evidenceId?: string }> };
+  const safeFlowBytes = await fs.readFile(flowPath);
+  const unsafeFlow = JSON.parse(safeFlowBytes.toString('utf8')) as { steps: Array<{ type: string; evidenceId?: string }> };
   const capture = unsafeFlow.steps.find((step) => step.type === 'capture');
   assert.ok(capture);
   capture.evidenceId = '../escape';
   await fs.writeFile(flowPath, `${JSON.stringify(unsafeFlow, null, 2)}\n`);
   const unsafe = await runFlow('service-proof', { projectRoot: root });
   assert.equal(unsafe.steps.find((step) => step.status === 'failed')?.error?.code, 'PLUGIN_EVIDENCE_ID_INVALID');
+  await fs.writeFile(flowPath, safeFlowBytes);
 
   await configure(root, []);
   const unavailable = await analyzeFreshness(root, { pluginFingerprints: (await loadPluginHost(root)).fingerprints() });
+  assert.equal(unavailable.evidence[0]?.state, 'unknown');
   assert.equal(unavailable.evidence[0]?.reasons.some((reason) => reason.code === 'plugin-unavailable'), true);
+  assert.deepEqual(unavailable.regeneration, []);
   const unresolved = await runFlow('service-proof', { projectRoot: root });
   assert.equal(unresolved.error?.code, 'DRIVER_NOT_FOUND');
 });
