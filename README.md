@@ -28,11 +28,12 @@ The result is a shared workflow in which an agent supplies reasoning, writing, a
 
 | Capability | Status | Current scope |
 |---|---|---|
-| Repository analysis | Available | `ProjectProfile v1` with baseline Node, Python, Rust, and Go manifest analysis |
+| Repository analysis | Available | `ProjectProfile v1` with baseline Node, Python, Rust, and Go manifest analysis plus launcher-only native Android detection |
 | Multi-surface model | Available | One profile can record multiple components, entrypoints, frameworks, and typed surfaces |
 | Terminal workflows | Available | Non-interactive `Flow v1` execution with process runs, waits, assertions, and terminal capture |
 | Web workflows | Available | Headless Chromium through Playwright; semantic navigate/interact/wait/assert/scroll and PNG screenshot capture |
 | Windows desktop workflows | Available on Windows | Explicit PID attachment; semantic UI Automation input/activate/press/wait/assert; top-level window PNG capture |
+| Android mobile workflows | Available with ADB | Invocation-scoped device selection; semantic UIAutomator targets; input/activate/press/scroll/wait/assert; full-device PNG capture |
 | Research / notebook workflows | Available | Explicit repository commands plus native plot/table/result/image/video/IPYNB artifact capture; no notebook-UI recording or environment guessing |
 | Evidence and provenance | Available | `TerminalTrack v1`, screenshot/native/media `Evidence v1`, `Manifest v1`, source/Flow/artifact fingerprints, and derivation relationships |
 | Terminal rendering | Available | Headless PNG rendering; GIF rendering when FFmpeg is installed |
@@ -41,11 +42,11 @@ The result is a shared workflow in which an agent supplies reasoning, writing, a
 | Visual QA | Available | Fresh PNG/GIF/MP4 Evidence → sampled frames/contact sheet/signals → agent-authored hash-bound PASS or NEEDS-CHANGES report |
 | Safe Markdown planning/patching | Available | `DocumentPlan v1`, section inspection, exact diff preview, review token, atomic apply/discard |
 | Incremental stale tracking | Available | `FreshnessReport v1`, explainable stale chains, document impact, dry-run/minimal selective regeneration |
-| macOS/Linux desktop and mobile execution | Planned | Native macOS, Linux desktop, Android, and iOS backends are not implemented yet |
+| macOS/Linux desktop and iOS execution | Planned | Windows desktop and Android are proven; macOS/Linux desktop and iOS backends are not implemented |
 | Browser interaction recording | Planned | Web screenshot Evidence exists; composition does not pretend a static browser screenshot is browser video |
 | Narration/TTS and publishing | Planned/optional | Tutorial packaging uses agent-authored captions/metadata; it does not synthesize narration or upload to a platform |
 
-Interactive PTY input, browser video/GIF recording, macOS/Linux desktop automation, native mobile automation, narration generation, automatic publishing, OCR-based secret detection, and automatic visual fixes are outside the current implementation.
+Interactive PTY input, browser video/GIF recording, macOS/Linux desktop automation, iOS automation, mobile video/element capture, narration generation, automatic publishing, OCR-based secret detection, and automatic visual fixes are outside the current implementation.
 
 ## How it works
 
@@ -174,6 +175,31 @@ The backend searches only within that process's single top-level application win
 Current actions are semantic `activate` (`InvokePattern`), `input` (`ValuePattern`), explicit key `press`, visible/hidden/text `wait`, visible/hidden/text `assert`, and full top-level window PNG `capture`. Stale desktop Evidence can use the same selective repair path with `demoweave update --apply --desktop-pid <pid>`.
 
 The committed [native Windows fixture](fixtures/desktop-windows/) proves real PID attachment, semantic interaction, window-only PNG Evidence, source freshness, selective regeneration, and no-change/no-churn behavior without OBS or screen coordinates.
+
+## Run an Android mobile Flow
+
+M13 implements the existing semantic `Flow v1` through ADB and UIAutomator. Build, install, and launch the application separately, then select the already-ready device at invocation time:
+
+```bash
+node packages/cli/dist/index.js run <mobile-flow-id-or-path> \
+  --project <path> \
+  --mobile-platform android \
+  --mobile-device-id <serial>
+```
+
+If exactly one ready Android device is attached, the serial may be omitted. Multiple devices require an explicit ID. Platform and device ID are invocation-only and are not written to Flow, ProjectProfile, Evidence, Manifest, or provenance.
+
+Targets map `automationId`/`testId` to Android resource IDs, `accessibilityId` to `content-desc`, `text` to UIAutomator text, `label`/`name` to description or text, and a small explicit `role` set to widget classes. Current capture is a targetless full-device PNG through `adb exec-out screencap -p`; element screenshots, video, arbitrary gestures, app launching, and iOS are intentionally unsupported.
+
+Stale Android Evidence can use the same selective repair path:
+
+```bash
+node packages/cli/dist/index.js update <project> --apply \
+  --mobile-platform android \
+  --mobile-device-id <serial>
+```
+
+The committed [native Android fixture](fixtures/mobile-android/) proves launcher detection, semantic replacement input, activation, waits/assertions, real screenshot Evidence, source freshness, one-Flow repair, and a zero-action/no-churn second update on an API 36 emulator.
 
 ## Capture research and notebook outputs
 
@@ -337,9 +363,9 @@ Use `node packages/cli/dist/index.js --help`, `node packages/cli/dist/index.js d
 
 ## Core concepts
 
-- **ProjectProfile** — deterministic facts about components, ecosystems, manifests, workspaces, entrypoints, commands, docs, and surfaces.
-- **Flow** — a surface-neutral sequence of semantic actions plus optional explicit source dependencies. Terminal, web, research, and notebook drivers implement different subsets without changing the shared Flow contract; native artifact capture uses optional `capture.artifact.path`.
-- **Evidence** — a typed artifact record with lifecycle, producer, provenance, source/artifact fingerprints, and optional derivation metadata. Current captures include terminal tracks, web PNG screenshots, and native research/notebook artifacts; renderers/compositors/tutorial packaging add derived media/text Evidence.
+- **ProjectProfile** — deterministic facts about components, ecosystems, manifests, workspaces, entrypoints, commands, docs, and surfaces, including launcher-only Android application surfaces.
+- **Flow** — a surface-neutral sequence of semantic actions plus optional explicit source dependencies. Terminal, web, research/notebook, Windows desktop, and Android drivers implement different subsets without changing the shared Flow contract; native artifact capture uses optional `capture.artifact.path`.
+- **Evidence** — a typed artifact record with lifecycle, producer, provenance, source/artifact fingerprints, and optional derivation metadata. Current captures include terminal tracks, web/Android PNG screenshots, Windows application-window screenshots, and native research/notebook artifacts; renderers/compositors/tutorial packaging add derived media/text Evidence.
 - **Manifest** — the project index that connects Flows to source and derived Evidence.
 - **TimelinePlan** — presentation-only single/split scene composition over local Evidence/media. It never contains browser/terminal automation instructions.
 - **TutorialPlan** — agent-authored tutorial metadata, captions, chapters, and thumbnail treatment bound to an existing MP4 Evidence source.
@@ -351,9 +377,9 @@ The versioned JSON contracts live in [`schemas/`](schemas/).
 
 ## Project status
 
-DemoWeave is in active development. **M0–M11 plus Pilots P0 and P1 are complete, and M12 is in progress:** the project can inspect multi-ecosystem repositories; execute terminal, Playwright-backed web, research, notebook, and Windows UI Automation Flows; capture fingerprinted terminal, browser screenshot, native research/notebook, or Windows application-window Evidence; render and compose media; package tutorials; run reproducible agent visual QA; explain stale evidence; safely patch Markdown; and prove selective regeneration/no-churn behavior.
+DemoWeave is in active development. **M0–M11 plus Pilots P0 and P1 are complete; the Windows slice of M12 and Android slice of M13 are implemented and proven:** the project can inspect multi-ecosystem and native Android repositories; execute terminal, Playwright web, research/notebook, Windows UI Automation, and Android ADB Flows; capture fingerprinted terminal, browser, native-result, Windows-window, or Android-device Evidence; and run the established rendering, composition, tutorial, visual-QA, freshness, and reviewed-Markdown workflows.
 
-**M12A/M12B now provide the portable desktop backend boundary and one proven Windows backend.** macOS and Linux native backends remain planned. Interactive PTY input, browser recording, narration/TTS, publishing, mobile drivers, OCR-based secret detection, and automatic visual fixes remain later/optional work.
+Windows desktop and Android are the currently proven native UI backends. macOS/Linux desktop and iOS remain planned. Interactive PTY input, browser/mobile recording, narration/TTS, publishing, OCR-based secret detection, and automatic visual fixes remain later/optional work.
 
 See [ROADMAP.md](ROADMAP.md) for milestone boundaries and future surface drivers.
 
@@ -365,7 +391,7 @@ pnpm test
 pnpm typecheck
 ```
 
-CI installs Chromium and FFmpeg, runs build/full tests/typecheck, exercises M5/M6/M7/P1/M8/M9/M10/M11 smokes on Ubuntu and Windows, proves research/native-artifact cleanup + stale-repair + no-churn behavior, refreshes the real composition, builds the real tutorial package, and prepares/finalizes the reviewed M10 dogfood packet on Linux.
+CI installs Chromium and FFmpeg, runs build/full tests/typecheck on Ubuntu and Windows, exercises the existing M5–M11 smokes, and validates Android analyzer/CLI/ADB protocol behavior with injected runners. The committed Android screenshot comes from a separate real API 36 emulator proof; hosted CI does not pretend to run an emulator.
 
 ## License
 

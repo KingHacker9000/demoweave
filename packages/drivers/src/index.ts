@@ -119,6 +119,41 @@ export type {
 } from './windows-uia-backend.js';
 
 export {
+  mobileBackendApiVersion,
+} from './mobile-backend.js';
+export type {
+  MobileBackend,
+  MobileBackendCapability,
+  MobileBackendDescriptor,
+  MobileBackendProbe,
+  MobileBackendStep,
+  MobileBackendStepResult,
+  MobilePlatform,
+  MobilePngCapture,
+  MobileRuntimeTarget,
+} from './mobile-backend.js';
+
+export {
+  MobileDriver,
+  mobileDriverVersion,
+} from './mobile-driver.js';
+export type { MobileDriverOptions } from './mobile-driver.js';
+
+export {
+  AndroidAdbBackend,
+  ProcessAdbRunner,
+  androidAdbBackendVersion,
+  androidNodeMatchesTarget,
+  parseAndroidUiHierarchy,
+} from './android-adb-backend.js';
+export type {
+  AdbCommandResult,
+  AdbRunner,
+  AndroidAdbBackendOptions,
+  ProcessAdbRunnerOptions,
+} from './android-adb-backend.js';
+
+export {
   executeFlow,
   FlowExecutionError,
   runFlow,

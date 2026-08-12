@@ -7,12 +7,16 @@ import {
   type RegenerationAction,
 } from '@demoweave/core';
 import { runFlow } from '@demoweave/drivers';
+import type { MobilePlatform } from '@demoweave/drivers';
 import { renderEvidence } from '@demoweave/renderer';
+import { mobileDeviceId, mobilePlatform } from './runtime-options.js';
 
 export interface UpdateRuntimeOptions {
   baseUrl?: string;
   headed?: boolean;
   desktopPid?: number;
+  mobilePlatform?: MobilePlatform;
+  mobileDeviceId?: string;
 }
 
 interface UpdateActionDependencies {
@@ -77,6 +81,8 @@ export async function applyRegenerationAction(
       ...(runtime.baseUrl ? { baseUrl: runtime.baseUrl } : {}),
       ...(runtime.headed ? { headless: false } : {}),
       ...(runtime.desktopPid ? { desktopPid: runtime.desktopPid } : {}),
+      ...(runtime.mobilePlatform !== undefined ? { mobilePlatform: runtime.mobilePlatform } : {}),
+      ...(runtime.mobileDeviceId !== undefined ? { mobileDeviceId: runtime.mobileDeviceId } : {}),
     });
     if (result.status !== 'passed') {
       throw new Error(`Flow ${action.flowId} failed: ${result.error?.message ?? 'unknown execution error'}`);
@@ -104,6 +110,8 @@ export function registerUpdateCommand(program: Command): void {
       if (!Number.isSafeInteger(parsed)) throw new Error(`Expected a positive integer, received ${value}`);
       return parsed;
     })
+    .option('--mobile-platform <platform>', 'mobile runtime platform during regeneration: android or ios', mobilePlatform)
+    .option('--mobile-device-id <id>', 'explicit Android serial or iOS UDID during regeneration', mobileDeviceId)
     .option('--json', 'print the before/after report as JSON')
     .action(async (input, options) => {
       const root = path.resolve(input);
@@ -124,6 +132,8 @@ export function registerUpdateCommand(program: Command): void {
             ...(options.baseUrl ? { baseUrl: options.baseUrl } : {}),
             ...(options.headed ? { headed: true } : {}),
             ...(options.desktopPid ? { desktopPid: options.desktopPid } : {}),
+            ...(options.mobilePlatform !== undefined ? { mobilePlatform: options.mobilePlatform } : {}),
+            ...(options.mobileDeviceId !== undefined ? { mobileDeviceId: options.mobileDeviceId } : {}),
           });
           applied.push(action);
         }

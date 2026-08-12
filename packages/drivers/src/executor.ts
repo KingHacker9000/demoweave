@@ -11,6 +11,8 @@ import {
 } from '@demoweave/core';
 import type { DriverContext, DriverError, DriverStepResult, SurfaceDriver } from './index.js';
 import { DesktopDriver } from './desktop-driver.js';
+import { MobileDriver } from './mobile-driver.js';
+import type { MobilePlatform } from './mobile-backend.js';
 import { ResearchDriver } from './research-driver.js';
 import { TerminalDriver } from './terminal-driver.js';
 import { WebDriver } from './web-driver.js';
@@ -21,6 +23,8 @@ export interface FlowExecutionOptions {
   baseUrl?: string;
   headless?: boolean;
   desktopPid?: number;
+  mobilePlatform?: MobilePlatform;
+  mobileDeviceId?: string;
   drivers?: SurfaceDriver[];
 }
 
@@ -89,7 +93,7 @@ export async function executeFlow(
   project: ProjectProfile,
   flow: Flow,
   flowPath: string,
-  options: Pick<FlowExecutionOptions, 'commandTimeoutMs' | 'baseUrl' | 'headless' | 'desktopPid' | 'drivers'> = {},
+  options: Pick<FlowExecutionOptions, 'commandTimeoutMs' | 'baseUrl' | 'headless' | 'desktopPid' | 'mobilePlatform' | 'mobileDeviceId' | 'drivers'> = {},
 ): Promise<FlowExecutionResult> {
   const surface = project.surfaces.find((candidate) => candidate.id === flow.surfaceId);
   if (!surface) {
@@ -124,6 +128,12 @@ export async function executeFlow(
     new DesktopDriver({
       flowPath: relativeFlowPath,
       desktopPid: options.desktopPid,
+      actionTimeoutMs: options.commandTimeoutMs,
+    }),
+    new MobileDriver({
+      flowPath: relativeFlowPath,
+      platform: options.mobilePlatform,
+      deviceId: options.mobileDeviceId,
       actionTimeoutMs: options.commandTimeoutMs,
     }),
   ];

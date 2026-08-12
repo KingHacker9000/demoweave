@@ -22,9 +22,10 @@ DemoWeave is **multi-surface by design**. A repository may expose web, CLI, desk
 | M9 — Tutorial output | ✅ Complete | `TutorialPlan v1`; existing MP4 Evidence → upload-oriented package |
 | M10 — Visual QA | ✅ Complete | Deterministic sample packet → agent-reviewed hash-bound PASS/NEEDS-CHANGES report |
 | M11 — Research / notebook driver | ✅ Complete | Explicit research/notebook execution → immutable native plot/table/result/IPYNB Evidence |
-| **M12 — Desktop drivers** | **🚧 Current** | Portable backend boundary + proven Windows UI Automation/window-capture backend; macOS/Linux remain planned |
+| M12 — Desktop drivers | 🚧 Partial | Portable backend boundary + proven Windows UI Automation/window-capture backend; macOS/Linux deferred |
+| **M13 — Mobile drivers** | **🚧 Current** | **Android ADB/UIAutomator + device screenshot proven; iOS planned** |
 
-Milestone PR history: M0/M1 #1, M2 #2, M3 #3, M4 #4, P0 #5, M5 #6, M6 #7, M7 #8, M5 hardening #9, P1 #10, M8 #11, M9 #12, M10 #13, M11 #14, M12A #15, M12B #16.
+Milestone PR history: M0/M1 #1, M2 #2, M3 #3, M4 #4, P0 #5, M5 #6, M6 #7, M7 #8, M5 hardening #9, P1 #10, M8 #11, M9 #12, M10 #13, M11 #14, M12A #15, M12B #16, M13 Android #17.
 
 ## Product principles
 
@@ -298,7 +299,24 @@ Flow v1 remains platform-neutral. DemoWeave does not infer or launch executables
 
 ## M13 — Mobile drivers
 
-Android/iOS adapters implementing the same semantic actions and Evidence contracts.
+The Android slice is implemented and proven through the portable `MobileDriver → MobileBackend v1` boundary.
+
+Delivered:
+
+- invocation-only `--mobile-platform android` and optional `--mobile-device-id <serial>` for `run` and selective `update --apply`;
+- launcher-only native Android detection from owned `src/main/AndroidManifest.xml` files;
+- semantic UIAutomator mappings for resource ID, content description, text/name, and explicit widget roles;
+- ADB activation, conservative replacement input, explicit keys, semantic scroll translation, bounded waits/assertions, and full-device PNG capture;
+- `mobile/android-adb` Evidence with normal Flow/source/artifact fingerprints and no persisted serial;
+- a deterministic Java/XML fixture, real API 36 emulator screenshot, visual review, source-stale repair, and zero-action/no-churn proof;
+- hosted Ubuntu/Windows protocol tests with injected ADB runners rather than a manufactured emulator claim.
+
+Remaining mobile work:
+
+- iOS backend and real macOS/Xcode proof;
+- element capture, mobile screen recording/video, arbitrary gestures/multi-touch, and app launching remain intentionally unsupported.
+
+Flow v1 remains platform-neutral; device serials, ADB commands, package/activity launch details, and coordinates do not belong in Flow or persistent metadata.
 
 ## M14 — Plugin/driver SDK
 
@@ -332,11 +350,11 @@ DemoWeave 1.0 should provide stable agent workflows/contracts, multi-surface ana
 | 12 | ✅ M9 — tutorial output | MP4 Evidence → upload-oriented package |
 | 13 | ✅ M10 — visual QA | reproducible agent review gate |
 | 14 | ✅ M11 — research/notebook | native research results + notebook Evidence |
-| 15 | **🚧 M12 — desktop** | Windows available; macOS/Linux planned |
-| 16 | M13 — mobile | Android/iOS |
+| 15 | 🚧 M12 — desktop | Windows available; macOS/Linux deferred |
+| 16 | **🚧 M13 — mobile** | **Android available; iOS planned** |
 | 17 | M14/M15 — ecosystem | plugins/publishers |
 | 18 | 1.0 hardening | public stable release |
 
 ## Current next step
 
-Complete M12B review/merge with its real Windows screenshot Evidence and hosted cross-platform checks, then continue M12 through separate, honestly probed macOS and Linux native backend slices. Mobile/M13, browser recording, narration, publishing, and unrelated desktop expansion remain out of scope.
+Complete M13 Android review/merge against its real emulator Evidence and hosted cross-platform protocol checks. iOS, macOS/Linux desktop backends, browser/mobile recording, narration, publishing, and M14 remain separate planned work.

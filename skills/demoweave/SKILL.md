@@ -117,6 +117,34 @@ demoweave update <project> --apply --desktop-pid <pid>
 
 The committed `fixtures/desktop-windows` example uses a native WinForms executable with stable AutomationIds and proves window-only PNG Evidence plus freshness/no-churn behavior. Build and launch the fixture separately before running its Flow.
 
+## Android mobile Flow workflow
+
+The Android ADB backend executes existing semantic Flow v1 actions against an already-running application on a ready device. DemoWeave does not build, install, or launch the app. Supply the runtime platform and, when needed, the exact ADB serial:
+
+```bash
+demoweave run <flow-id-or-path> --mobile-platform android --mobile-device-id <serial>
+```
+
+When exactly one ready device exists, `--mobile-device-id` may be omitted. Multiple ready devices require it. The platform and serial are invocation context only; never store them in Flow, ProjectProfile, Evidence, Manifest, config, or provenance. iOS is reserved but unavailable until a real backend is implemented and proven.
+
+Current factual target mappings are:
+
+- `automationId` / `testId` → full Android `resource-id` or stable `/id` suffix;
+- `accessibilityId` → `content-desc`;
+- `text` → UIAutomator text;
+- `label` / `name` → `content-desc` or text;
+- `role` → a small explicit Android widget-class map.
+
+Current actions are semantic `activate`, conservative printable-ASCII `input`, explicit key `press`, bounded semantic `scroll`, visible/hidden/text `wait`, visible/hidden/text `assert`, and targetless full-device PNG `capture`. Input supports letters, digits, spaces, and `_ . , : + - @ /`; `clear: true` deletes the current UIAutomator-visible field text first. Element capture, video, arbitrary gestures, coordinates in Flow, and automatic app launch are not implemented.
+
+For stale Android Evidence, rebuild/reinstall/relaunch the app outside DemoWeave, keep the device ready, then pass the runtime context through selective regeneration:
+
+```bash
+demoweave update <project> --apply --mobile-platform android --mobile-device-id <serial>
+```
+
+The committed `fixtures/mobile-android` Java/XML app proves launcher detection, semantic replacement input, activate/wait/assert, `mobile/android-adb` screenshot Evidence, freshness repair, and zero-action/no-churn behavior on a real API 36 emulator.
+
 ## Research / notebook workflow
 
 The research driver implements Flow v1 for `research` and `notebook` surfaces. It runs only commands explicitly declared by the Flow and captures native project-local files rather than guessing an environment or screen-recording notebook UI.
@@ -384,6 +412,7 @@ Current executable surface drivers:
 - **terminal** — non-interactive process/pipe execution + TerminalTrack capture;
 - **web** — Playwright Chromium semantic interaction + PNG screenshot capture against an already-running app;
 - **Windows desktop** — explicit-PID Windows UI Automation + top-level application-window PNG capture;
+- **Android mobile** — invocation-scoped ADB/UIAutomator semantic interaction + full-device PNG capture against an already-running app;
 - **research / notebook** — explicit process execution + immutable native artifact capture; no environment inference or notebook-UI recording.
 
 Current presentation/review tooling:
@@ -396,9 +425,10 @@ Current presentation/review tooling:
 Not yet available:
 
 - interactive PTY input;
-- browser interaction GIF/video recording;
-- macOS/Linux desktop or native mobile capture;
+- browser or mobile interaction GIF/video recording;
+- macOS/Linux desktop or iOS capture;
 - Windows desktop scrolling or element capture;
+- Android element capture, arbitrary gestures/multi-touch, or app launching;
 - narration/TTS generation;
 - publishing/upload integration;
 - OCR-based secret detection;
