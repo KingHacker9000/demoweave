@@ -1,0 +1,9 @@
+{
+  "name": "@demoweave-fixtures/service-plugin",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "peerDependencies": {
+    "@demoweave/sdk": "0.0.1"
+  }
+}

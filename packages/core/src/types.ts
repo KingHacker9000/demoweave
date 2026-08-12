@@ -130,4 +130,5 @@ export type Component = z.infer<typeof ComponentSchema>;
 export type Workspace = z.infer<typeof WorkspaceSchema>;
 export type SurfaceType = z.infer<typeof SurfaceTypeSchema>;
 export type Surface = z.infer<typeof SurfaceSchema>;
+export type Framework = z.infer<typeof FrameworkSchema>;
 export type ProjectProfile = z.infer<typeof ProjectProfileSchema>;

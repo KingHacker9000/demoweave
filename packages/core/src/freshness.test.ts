@@ -248,4 +248,6 @@ test('runtime and published FreshnessReport v1 contracts stay aligned', async ()
   const published = JSON.parse(await fs.readFile(path.join(repository, 'schemas', 'freshness-report.schema.json'), 'utf8')) as any;
   assert.equal(published.properties.schemaVersion.const, 1);
   assert.deepEqual(published.$defs.evidenceFreshness.properties.state.enum, ['fresh', 'stale', 'missing', 'unknown']);
+  assert.equal(published.$defs.reason.properties.code.enum.includes('plugin-changed'), true);
+  assert.equal(published.$defs.reason.properties.code.enum.includes('plugin-unavailable'), true);
 });

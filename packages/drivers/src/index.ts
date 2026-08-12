@@ -162,3 +162,10 @@ export type {
   FlowExecutionOptions,
   FlowExecutionResult,
 } from './executor.js';
+
+export {
+  loadPluginHost,
+  PluginHost,
+  PluginHostError,
+} from './plugin-host.js';
+export type { PluginHostInfo } from './plugin-host.js';

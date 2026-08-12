@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "id": "service-proof",
+  "title": "External plugin service proof",
+  "surfaceId": "service-fixture-service",
+  "sources": [
+    {
+      "path": "marker.json",
+      "role": "fixture"
+    }
+  ],
+  "steps": [
+    {
+      "id": "assert-marker",
+      "type": "assert",
+      "assertion": {
+        "kind": "textContains",
+        "value": "fixture-service"
+      }
+    },
+    {
+      "id": "capture-result",
+      "type": "capture",
+      "evidenceId": "plugin-service-result",
+      "kind": "result"
+    }
+  ]
+}

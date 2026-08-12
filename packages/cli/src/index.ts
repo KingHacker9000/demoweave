@@ -20,7 +20,7 @@ import {
   validateMetadataBindings,
   type FlowFile,
 } from '@demoweave/core';
-import { FlowExecutionError, getWebDriverCapabilities, runFlow } from '@demoweave/drivers';
+import { FlowExecutionError, getWebDriverCapabilities, loadPluginHost, PluginHostError, runFlow } from '@demoweave/drivers';
 import {
   composeTimeline,
   getRendererCapabilities,
@@ -32,6 +32,7 @@ import {
 import { registerUpdateCommand, showFreshness } from './freshness.js';
 import { mobileDeviceId, mobilePlatform } from './runtime-options.js';
 import { registerTutorialCommand } from './tutorial-command.js';
+import { registerPluginCommands } from './plugin-command.js';
 
 const program = new Command();
 program.name('demoweave').description('Agent-native documentation tooling for software repositories').version('0.0.1');
@@ -196,7 +197,16 @@ program.command('init').description('Initialize DemoWeave metadata in a reposito
 
 program.command('inspect').description('Analyze a repository and write .demoweave/project.json').argument('[path]', 'project path', '.').option('--stdout', 'print JSON instead of writing it').action(async (input, options) => {
   const root = path.resolve(input);
-  const profile = await analyzeProject(root);
+  let profile;
+  try {
+    const builtInProfile = await analyzeProject(root);
+    profile = await (await loadPluginHost(root)).applyDetectors(builtInProfile);
+  } catch (error) {
+    const code = error instanceof PluginHostError ? error.code : 'INSPECT_FAILED';
+    console.error(`${code}: ${error instanceof Error ? error.message : String(error)}`);
+    process.exitCode = 1;
+    return;
+  }
   if (options.stdout) {
     console.log(JSON.stringify(profile, null, 2));
     return;
@@ -461,6 +471,7 @@ docs.command('discard')
   });
 registerUpdateCommand(program);
 registerTutorialCommand(program);
+registerPluginCommands(program);
 
 program.command('validate').description('Validate DemoWeave project metadata, tutorial/timeline/document plans, and evidence bindings').argument('[path]', 'project path', '.').action(async (input) => {
   const root = path.resolve(input);

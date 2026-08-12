@@ -1,24 +1,26 @@
 {
-  "name": "@demoweave/drivers",
+  "name": "@demoweave/sdk",
   "version": "0.0.1",
   "private": true,
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
   "scripts": {
-    "build": "tsc -p tsconfig.json && node ../../scripts/copy-driver-assets.mjs",
+    "build": "tsc -p tsconfig.json",
     "test": "pnpm build && node --test dist/*.test.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\""
   },
   "dependencies": {
-    "@demoweave/core": "workspace:*",
-    "@demoweave/sdk": "workspace:*",
-    "cross-spawn": "^7.0.6",
-    "playwright": "1.62.0"
+    "@demoweave/core": "workspace:*"
   },
   "devDependencies": {
-    "@types/cross-spawn": "^6.0.6",
     "@types/node": "^22.10.2",
     "typescript": "^5.7.2"
   }

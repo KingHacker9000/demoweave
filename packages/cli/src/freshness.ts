@@ -6,7 +6,7 @@ import {
   type FreshnessReport,
   type RegenerationAction,
 } from '@demoweave/core';
-import { runFlow } from '@demoweave/drivers';
+import { loadPluginHost, runFlow } from '@demoweave/drivers';
 import type { MobilePlatform } from '@demoweave/drivers';
 import { renderEvidence } from '@demoweave/renderer';
 import { mobileDeviceId, mobilePlatform } from './runtime-options.js';
@@ -63,7 +63,9 @@ export function printFreshnessReport(report: FreshnessReport): void {
 }
 
 export async function showFreshness(projectRoot: string, json = false): Promise<FreshnessReport> {
-  const report = await analyzeFreshness(path.resolve(projectRoot));
+  const root = path.resolve(projectRoot);
+  const host = await loadPluginHost(root);
+  const report = await analyzeFreshness(root, { pluginFingerprints: host.fingerprints() });
   if (json) console.log(JSON.stringify(report, null, 2));
   else printFreshnessReport(report);
   return report;
@@ -116,7 +118,8 @@ export function registerUpdateCommand(program: Command): void {
     .action(async (input, options) => {
       const root = path.resolve(input);
       try {
-        const before = await analyzeFreshness(root);
+        const beforeHost = await loadPluginHost(root);
+        const before = await analyzeFreshness(root, { pluginFingerprints: beforeHost.fingerprints() });
         if (!options.apply) {
           if (options.json) console.log(JSON.stringify({ applied: false, before }, null, 2));
           else {
@@ -137,7 +140,8 @@ export function registerUpdateCommand(program: Command): void {
           });
           applied.push(action);
         }
-        const after = await analyzeFreshness(root);
+        const afterHost = await loadPluginHost(root);
+        const after = await analyzeFreshness(root, { pluginFingerprints: afterHost.fingerprints() });
         if (options.json) {
           console.log(JSON.stringify({ applied: true, actions: applied, before, after }, null, 2));
         } else {

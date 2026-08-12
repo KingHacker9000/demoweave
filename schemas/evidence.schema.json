@@ -22,7 +22,8 @@
       "properties": {
         "kind": { "enum": ["driver", "renderer", "agent", "external"] },
         "id": { "type": "string", "minLength": 1 },
-        "version": { "type": "string", "minLength": 1 }
+        "version": { "type": "string", "minLength": 1 },
+        "pluginFingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
       }
     },
     "provenance": {

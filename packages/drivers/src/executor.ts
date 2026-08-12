@@ -16,6 +16,7 @@ import type { MobilePlatform } from './mobile-backend.js';
 import { ResearchDriver } from './research-driver.js';
 import { TerminalDriver } from './terminal-driver.js';
 import { WebDriver } from './web-driver.js';
+import { loadPluginHost, PluginHostError } from './plugin-host.js';
 
 export interface FlowExecutionOptions {
   projectRoot?: string;
@@ -109,7 +110,8 @@ export async function executeFlow(
   }
 
   const relativeFlowPath = repoRelative(projectRoot, flowPath);
-  const drivers = options.drivers ?? [
+  const context: DriverContext = { projectRoot, surface, flow };
+  const builtInDrivers = [
     new TerminalDriver({
       commandTimeoutMs: options.commandTimeoutMs,
       flowPath: relativeFlowPath,
@@ -137,7 +139,34 @@ export async function executeFlow(
       actionTimeoutMs: options.commandTimeoutMs,
     }),
   ];
-  const driver = drivers.find((candidate) => candidate.supports(surface));
+  let drivers: SurfaceDriver[];
+  if (options.drivers) {
+    drivers = options.drivers;
+  } else {
+    try {
+      const host = await loadPluginHost(projectRoot);
+      drivers = [...builtInDrivers, ...await host.createDrivers(context)];
+    } catch (error) {
+      if (error instanceof PluginHostError) throw new FlowExecutionError(error.code, error.message);
+      throw error;
+    }
+  }
+  const eligible = drivers.filter((candidate) => candidate.supports(surface));
+  if (eligible.length > 1) {
+    return {
+      status: 'failed',
+      flowId: flow.id,
+      surfaceId: surface.id,
+      surfaceType: surface.type,
+      steps: flow.steps.map((step) => ({ stepId: step.id, status: 'skipped' })),
+      evidence: [],
+      error: {
+        code: 'DRIVER_AMBIGUOUS',
+        message: `Multiple drivers support surface ${surface.id}: ${eligible.map((candidate) => candidate.descriptor.id).join(', ')}`,
+      },
+    };
+  }
+  const driver = eligible[0];
   if (!driver) {
     return {
       status: 'failed',
@@ -150,7 +179,6 @@ export async function executeFlow(
     };
   }
 
-  const context: DriverContext = { projectRoot, surface, flow };
   const steps: DriverStepResult[] = [];
   const evidence: Evidence[] = [];
   let error: DriverError | undefined;
