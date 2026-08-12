@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "projectProfileVersion": 1,
+  "flows": [
+    {
+      "id": "service-proof",
+      "path": ".demoweave/flows/service-proof.json",
+      "surfaceId": "service-fixture-service"
+    }
+  ],
+  "evidence": [
+    {
+      "schemaVersion": 1,
+      "id": "plugin-service-result",
+      "kind": "result",
+      "status": "available",
+      "label": "External plugin result",
+      "format": "json",
+      "path": ".demoweave/evidence/artifacts/plugin-service-result.json",
+      "artifactHash": "sha256:b4a4618ce53e0f0493ffe20e586b70022f9b31287c6df7fb86cb0954548e22b9",
+      "mimeType": "application/json",
+      "producer": {
+        "kind": "driver",
+        "id": "plugin/fixture-service/fixture-service-driver",
+        "version": "0.0.1",
+        "pluginFingerprint": "sha256:cc26d42bac067848fc33f9f1ea40ccfba298853b238a5a1fd09ee73939364e1c"
+      },
+      "provenance": {
+        "flowId": "service-proof",
+        "stepId": "capture-result",
+        "surfaceId": "service-fixture-service",
+        "flowHash": "sha256:d2073682c00ece20f76439865f07c49cd691ffaef128b8d69f8f86e67ebbe112",
+        "sources": [
+          {
+            "path": "marker.json",
+            "role": "fixture",
+            "hash": "sha256:f49e56e521e08a7e923a44c2a7998f40efa0ac1aaff98357920a93d121d31dfc"
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "mediaDir": "docs-media",
+  "plugins": [
+    {
+      "module": "./plugins/fixture-plugin/index.js",
+      "options": {
+        "prefix": "DemoWeave"
+      }
+    }
+  ]
+}

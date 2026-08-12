@@ -108,6 +108,26 @@ test('Evidence step provenance requires a Flow', () => {
   assert.equal(result.success, false);
 });
 
+test('plugin producer fingerprints are optional and use content-hash syntax', () => {
+  const base = {
+    schemaVersion: 1,
+    id: 'plugin-result',
+    kind: 'result',
+    status: 'planned',
+    producer: { kind: 'driver', id: 'plugin/example/driver' },
+    provenance: { sources: [] },
+  } as const;
+  assert.equal(EvidenceSchema.safeParse(base).success, true);
+  assert.equal(EvidenceSchema.safeParse({
+    ...base,
+    producer: { ...base.producer, pluginFingerprint: `sha256:${'a'.repeat(64)}` },
+  }).success, true);
+  assert.equal(EvidenceSchema.safeParse({
+    ...base,
+    producer: { ...base.producer, pluginFingerprint: 'example@1' },
+  }).success, false);
+});
+
 test('Manifest v1 rejects duplicate Flow and Evidence ids', () => {
   const evidence = {
     schemaVersion: 1,
@@ -241,6 +261,7 @@ test('published M2 schemas expose the same primary enums as runtime contracts', 
   assert.deepEqual(evidenceSchema.properties.kind.enum, EvidenceKindSchema.options);
   assert.deepEqual(evidenceSchema.properties.status.enum, EvidenceStatusSchema.options);
   assert.deepEqual(evidenceSchema.properties.format.enum, EvidenceFormatSchema.options);
+  assert.equal(evidenceSchema.properties.producer.properties.pluginFingerprint.pattern, '^sha256:[0-9a-f]{64}$');
   assert.equal(flowSchema.properties.schemaVersion.const, 1);
   assert.equal(evidenceSchema.properties.schemaVersion.const, 1);
   assert.equal(manifestSchema.properties.schemaVersion.const, 1);

@@ -25,6 +25,8 @@ export const FreshnessReasonCodeSchema = z.enum([
   'flow-missing',
   'flow-changed',
   'flow-baseline-unavailable',
+  'plugin-changed',
+  'plugin-unavailable',
   'upstream-missing',
   'upstream-stale',
   'upstream-unknown',
@@ -134,6 +136,7 @@ const UNKNOWN_REASON_CODES = new Set<FreshnessReason['code']>([
   'artifact-baseline-unavailable',
   'source-baseline-unavailable',
   'flow-baseline-unavailable',
+  'plugin-unavailable',
   'upstream-unknown',
 ]);
 
@@ -144,7 +147,12 @@ function stateFromReasons(reasons: FreshnessReason[]): FreshnessState {
   return 'fresh';
 }
 
-async function inspectDirectEvidence(root: string, manifest: Manifest, evidence: Evidence): Promise<EvidenceFreshness> {
+async function inspectDirectEvidence(
+  root: string,
+  manifest: Manifest,
+  evidence: Evidence,
+  pluginFingerprints?: ReadonlyMap<string, string>,
+): Promise<EvidenceFreshness> {
   const reasons: FreshnessReason[] = [];
   if (evidence.status === 'planned') reasons.push({ code: 'declared-planned', message: 'Evidence is planned but has not been produced yet.' });
   if (evidence.status === 'stale') reasons.push({ code: 'declared-stale', message: 'Manifest explicitly marks this Evidence stale.' });
@@ -231,6 +239,24 @@ async function inspectDirectEvidence(root: string, manifest: Manifest, evidence:
           });
         }
       }
+    }
+  }
+
+  if (evidence.producer?.pluginFingerprint) {
+    const actualHash = pluginFingerprints?.get(evidence.producer.id);
+    if (!actualHash) {
+      reasons.push({
+        code: 'plugin-unavailable',
+        expectedHash: evidence.producer.pluginFingerprint,
+        message: `Producing plugin contribution is unavailable: ${evidence.producer.id}`,
+      });
+    } else if (actualHash !== evidence.producer.pluginFingerprint) {
+      reasons.push({
+        code: 'plugin-changed',
+        expectedHash: evidence.producer.pluginFingerprint,
+        actualHash,
+        message: `Producing plugin implementation or options changed: ${evidence.producer.id}`,
+      });
     }
   }
 
@@ -380,11 +406,16 @@ function regenerationPlan(manifest: Manifest, freshness: EvidenceFreshness[]): R
   return actions;
 }
 
-export async function analyzeFreshness(projectRoot: string): Promise<FreshnessReport> {
+export async function analyzeFreshness(
+  projectRoot: string,
+  options: { pluginFingerprints?: ReadonlyMap<string, string> } = {},
+): Promise<FreshnessReport> {
   const root = path.resolve(projectRoot);
   const manifest = await readManifest(root);
   const direct = new Map<string, EvidenceFreshness>();
-  for (const evidence of manifest.evidence) direct.set(evidence.id, await inspectDirectEvidence(root, manifest, evidence));
+  for (const evidenceItem of manifest.evidence) {
+    direct.set(evidenceItem.id, await inspectDirectEvidence(root, manifest, evidenceItem, options.pluginFingerprints));
+  }
   const evidence = propagateDerived(manifest, direct);
   const documents = await documentImpacts(root, manifest, evidence);
   const regeneration = regenerationPlan(manifest, evidence);

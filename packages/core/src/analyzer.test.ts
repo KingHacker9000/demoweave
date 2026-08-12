@@ -141,6 +141,7 @@ test('profiles DemoWeave workspace members while retaining nested manifest facts
       { name: '@demoweave/core', root: 'packages/core', workspaceId: 'node:workspace:pnpm-workspace.yaml' },
       { name: '@demoweave/drivers', root: 'packages/drivers', workspaceId: 'node:workspace:pnpm-workspace.yaml' },
       { name: '@demoweave/renderer', root: 'packages/renderer', workspaceId: 'node:workspace:pnpm-workspace.yaml' },
+      { name: '@demoweave/sdk', root: 'packages/sdk', workspaceId: 'node:workspace:pnpm-workspace.yaml' },
     ],
   );
   assert.deepEqual(
@@ -170,6 +171,12 @@ test('profiles DemoWeave workspace members while retaining nested manifest facts
         componentId: 'node:packages/renderer/package.json',
       },
       {
+        id: 'library-demoweave-sdk',
+        type: 'library',
+        root: 'packages/sdk',
+        componentId: 'node:packages/sdk/package.json',
+      },
+      {
         id: 'terminal-demoweave-cli',
         type: 'terminal',
         root: 'packages/cli',
@@ -190,6 +197,7 @@ test('profiles DemoWeave workspace members while retaining nested manifest facts
     'docs/M7_DESIGN.md',
     'docs/development/m12b-windows-uia.md',
     'docs/development/m13-android-adb.md',
+    'docs/development/m14-plugin-sdk.md',
   ]);
 });
 

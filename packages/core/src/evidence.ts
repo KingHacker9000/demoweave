@@ -49,6 +49,7 @@ export const ProducerSchema = z.object({
   kind: z.enum(['driver', 'renderer', 'agent', 'external']),
   id: z.string().min(1),
   version: z.string().min(1).optional(),
+  pluginFingerprint: ContentHashSchema.optional(),
 }).strict();
 
 export const ProvenanceSchema = z.object({

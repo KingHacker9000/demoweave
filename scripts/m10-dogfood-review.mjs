@@ -6,7 +6,7 @@ import path from 'node:path';
 const repository = path.resolve(import.meta.dirname, '..');
 const cli = path.join(repository, 'packages', 'cli', 'dist', 'index.js');
 const reviewId = 'terminal-web-proof-review';
-const reviewedSourceHash = 'sha256:835c8561f8e0abef804a18d0493bfa1cb0c74466c89a539621d336d8d27b1265';
+const reviewedSourceHash = 'sha256:fdab39111763298f303843ece0d8b309f497800b55888b6c9cb901e917abbd62';
 const packetPath = path.join(repository, '.demoweave', 'cache', 'qa', reviewId, 'packet.json');
 const reportPath = path.join(repository, '.demoweave', 'qa', 'reports', `${reviewId}.json`);
 

@@ -58,6 +58,8 @@
             "flow-missing",
             "flow-changed",
             "flow-baseline-unavailable",
+            "plugin-changed",
+            "plugin-unavailable",
             "upstream-missing",
             "upstream-stale",
             "upstream-unknown"

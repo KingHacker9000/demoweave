@@ -1,0 +1,6 @@
+{
+  "name": "demoweave-plugin-sdk-fixture",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module"
+}

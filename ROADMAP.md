@@ -23,7 +23,8 @@ DemoWeave is **multi-surface by design**. A repository may expose web, CLI, desk
 | M10 — Visual QA | ✅ Complete | Deterministic sample packet → agent-reviewed hash-bound PASS/NEEDS-CHANGES report |
 | M11 — Research / notebook driver | ✅ Complete | Explicit research/notebook execution → immutable native plot/table/result/IPYNB Evidence |
 | M12 — Desktop drivers | 🚧 Partial | Portable backend boundary + proven Windows UI Automation/window-capture backend; macOS/Linux deferred |
-| **M13 — Mobile drivers** | **🚧 Current** | **Android ADB/UIAutomator + device screenshot proven; iOS planned** |
+| M13 — Mobile drivers | 🚧 Partial | Android ADB/UIAutomator + device screenshot proven; iOS planned |
+| **M14 — Plugin/driver SDK** | **🚧 Current** | **M14A loader, detectors, driver factories, host Evidence, and freshness implemented; renderer plugins pending** |
 
 Milestone PR history: M0/M1 #1, M2 #2, M3 #3, M4 #4, P0 #5, M5 #6, M6 #7, M7 #8, M5 hardening #9, P1 #10, M8 #11, M9 #12, M10 #13, M11 #14, M12A #15, M12B #16, M13 Android #17.
 
@@ -320,7 +321,29 @@ Flow v1 remains platform-neutral; device serials, ADB commands, package/activity
 
 ## M14 — Plugin/driver SDK
 
-Third-party extension points for surface drivers, evidence producers, renderers, publishers, and detectors.
+M14A establishes the trusted plugin host without changing Flow v1 or opening ProjectProfile v1 to arbitrary values.
+
+Delivered in M14A:
+
+- workspace-only `@demoweave/sdk` with plugin API v1 and `definePlugin`;
+- explicit ordered `.demoweave/config.json` plugin configuration with no discovery or installation;
+- project-root-safe local ESM loading and target-project package resolution;
+- closed deterministic registration with detector and per-Flow driver-factory contributions;
+- additive schema-validated surfaces/framework facts in normal `inspect`;
+- plugin drivers in normal `run` and selective `update --apply`, with ambiguity failures instead of built-in overrides;
+- host-owned Evidence/artifact/Manifest writes plus existing Flow/source fingerprint completion;
+- entry-bytes/identity/options plugin fingerprints and explicit changed/unavailable freshness reasons;
+- `plugins list` and `plugins doctor` inspection commands;
+- external-style service fixture and Windows/Linux-oriented security, lifecycle, freshness, selective-repair, and no-churn tests.
+
+Plugins are trusted Node.js code with CLI process privileges; DemoWeave does not sandbox them. `@demoweave/sdk` remains source-workspace-only and is not claimed as an npm publication.
+
+Remaining M14 work:
+
+- renderer registration/resolution and one external-style renderer proof;
+- completion documentation and shared-skill guidance after the renderer contract is proven.
+
+Publishers remain M15 work.
 
 ## M15 — Documentation publishers
 
@@ -352,9 +375,10 @@ DemoWeave 1.0 should provide stable agent workflows/contracts, multi-surface ana
 | 14 | ✅ M11 — research/notebook | native research results + notebook Evidence |
 | 15 | 🚧 M12 — desktop | Windows available; macOS/Linux deferred |
 | 16 | **🚧 M13 — mobile** | **Android available; iOS planned** |
-| 17 | M14/M15 — ecosystem | plugins/publishers |
-| 18 | 1.0 hardening | public stable release |
+| 17 | **🚧 M14 — plugin SDK** | **M14A implemented; renderer plugins pending** |
+| 18 | M15 — publishers | documentation publishing integrations |
+| 19 | 1.0 hardening | public stable release |
 
 ## Current next step
 
-Complete M13 Android review/merge against its real emulator Evidence and hosted cross-platform protocol checks. iOS, macOS/Linux desktop backends, browser/mobile recording, narration, publishing, and M14 remain separate planned work.
+Review M14A's trust/path model, cross-platform loader behavior, plugin fingerprint freshness, and real fixture Evidence. Stop before renderer-plugin integration and M15 publishers; iOS and macOS/Linux desktop backends remain separate work.
