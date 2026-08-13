@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "planId": "markdown-proof",
+  "publisher": "markdown",
+  "planHash": "sha256:01508ef3ab8f2835936078497f1145a109ea6c10b58591f8129b5ce499ac83fa",
+  "targetRoot": "published",
+  "publishedFiles": [
+    {
+      "path": "README.md",
+      "hash": "sha256:80e98b32f17ed35691d2c903022c7f85da0cb9d4568ced77ed0b9c909b4231b8",
+      "sourcePath": "README.md",
+      "kind": "document"
+    },
+    {
+      "path": "docs-media/proof.svg",
+      "hash": "sha256:3307ea65391a0980da38c3ea3c1a619027d9fe7d180b2a22ee49416adc9ec081",
+      "sourcePath": "docs-media/proof.svg",
+      "kind": "dependency"
+    },
+    {
+      "path": "guide/getting-started.md",
+      "hash": "sha256:a2f068ff721e5fb2e134ca34722a4dbea4b171e0da91d270884d12af9db846c2",
+      "sourcePath": "docs/getting-started.md",
+      "kind": "document"
+    }
+  ],
+  "sources": [
+    {
+      "path": "README.md",
+      "hash": "sha256:e6e8e17820ff792a34f87e5b497302833151ebe6bc423af5e8cfca0bbf79aad0",
+      "kind": "document"
+    },
+    {
+      "path": "docs-media/proof.svg",
+      "hash": "sha256:3307ea65391a0980da38c3ea3c1a619027d9fe7d180b2a22ee49416adc9ec081",
+      "kind": "dependency"
+    },
+    {
+      "path": "docs/getting-started.md",
+      "hash": "sha256:a2f068ff721e5fb2e134ca34722a4dbea4b171e0da91d270884d12af9db846c2",
+      "kind": "document"
+    }
+  ]
+}

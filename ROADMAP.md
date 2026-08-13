@@ -25,9 +25,10 @@ DemoWeave is **multi-surface by design**. A repository may expose web, CLI, desk
 | M12 — Desktop drivers | 🚧 Partial | Portable backend boundary + proven Windows UI Automation/window-capture backend; macOS/Linux deferred |
 | M13 — Mobile drivers | 🚧 Partial | Android ADB/UIAutomator + device screenshot proven; iOS planned |
 | M14 — Plugin/driver SDK | ✅ Complete | Trusted detectors, driver factories, renderer plugins, fingerprints, freshness, and external fixture proof |
-| **M15 — Documentation publishers** | **🚧 Current** | **Publisher contract and integrations are next; no publisher runtime is implemented yet** |
+| **M15 — Documentation publishers** | **🚧 Current** | **M15A complete: deterministic local Markdown publication foundation; framework adapters remain later slices** |
 
-Milestone PR history: M0/M1 #1, M2 #2, M3 #3, M4 #4, P0 #5, M5 #6, M6 #7, M7 #8, M5 hardening #9, P1 #10, M8 #11, M9 #12, M10 #13, M11 #14, M12A #15, M12B #16, M13 Android #17, M14A #19. M14B is tracked in draft PR #20.
+Milestone PR history: M0/M1 #1, M2 #2, M3 #3, M4 #4, P0 #5, M5 #6, M6 #7, M7 #8, M5 hardening #9, P1 #10, M8 #11, M9 #12, M10 #13, M11 #14, M12A #15, M12B #16, M13 Android #17, M14A #19, M14B #20. M15A is tracked in draft PR #21.
+
 ## Product principles
 
 - **Agent supplies intelligence; DemoWeave supplies deterministic tooling.**
@@ -125,6 +126,10 @@ Agent-authored title/description/language/tags, caption timing/text, chapter tim
 Deterministic sample frames/contact sheet/timing/context/signals from **fresh** PNG/GIF/MP4 Evidence plus a durable agent-authored PASS/NEEDS-CHANGES report bound to exact packet/source hashes.
 
 ---
+
+### PublisherPlan / PublicationManifest / PublicationStatus v1
+
+Explicit Markdown source-to-destination mapping; project/symlink-safe dependency closure; source-position link rewriting; write-free preview and unified diffs; hash-bound review token; staged apply with unmanaged-target conflict protection; deterministic publication baseline; and distinct fresh/stale/drifted/missing/unpublished/unknown status.
 
 # Completed milestones
 
@@ -347,7 +352,26 @@ M14 does not add plugin installation/discovery, publisher/upload behavior, rende
 
 ## M15 — Documentation publishers 🚧 Current
 
-Define and implement factual publisher integrations that complement rather than replace existing stacks: plain Markdown/GitHub, Fumadocs, Mintlify, Docusaurus, VitePress, MkDocs, and similar targets. M14 intentionally contains no publisher/upload runtime.
+M15A is implemented and proves the shared publisher foundation through the built-in credential-free `markdown` target.
+
+Delivered in M15A:
+
+- strict `PublisherPlan v1` under `.demoweave/publishers/`;
+- explicit selected Markdown source → destination mapping;
+- reusable host/adapter boundary with host-owned path safety, preview/diff/token, staging/apply, manifest, and status;
+- project-root and symlink-safe local Markdown/image/HTML dependency resolution;
+- remote and fragment-only URLs left untouched and never fetched;
+- unselected local Markdown links rejected rather than recursively copying the repository;
+- source-position-aware exact destination rewrites with query/fragment, BOM, LF/CRLF, whitespace, fences, HTML, and unrelated bytes preserved;
+- deterministic create/update/unchanged classification, candidate hashes, unified text diffs, and `publish-review-v1` token;
+- staged file replacement with rollback of completed replacements on failure, no unrelated deletion, and no global-transaction claim;
+- unmanaged differing targets rejected; previously owned unchanged-baseline files may be explicitly reviewed and updated;
+- deterministic `PublicationManifest v1` and `PublicationStatus v1`;
+- `fresh`, source/dependency `stale`, target `drifted`, target `missing`, `unpublished`, and safely unresolved `unknown` states;
+- `fixtures/publisher-markdown/` and a built-CLI smoke covering mutations, unresolved links, source-byte preservation, unrelated-file survival, and zero-write/no-churn reapply;
+- Ubuntu/Windows CI coverage without publishing credentials.
+
+M15 remains current. Framework-specific adapters, publisher plugin registration, credentials, and remote deployment/upload are later M15 slices and are not claimed by M15A.
 
 ---
 
@@ -381,4 +405,4 @@ DemoWeave 1.0 should provide stable agent workflows/contracts, multi-surface ana
 
 ## Current next step
 
-Define the M15 publisher contract before adding runtime integrations. Preserve M14's explicit trusted-plugin model, host-owned Evidence/provenance boundaries, and no-discovery/no-installation behavior; iOS and macOS/Linux desktop backends remain separate work.
+Review M15A's Markdown publisher contract and real fixture before selecting one framework adapter for a later M15 slice. Preserve the proven host-owned path/review/apply/status boundaries; do not infer framework support from generic file copying, expose `registerPublisher()`, or add remote credentials/deployment until a separate factual proof requires them. iOS and macOS/Linux desktop backends remain separate work.

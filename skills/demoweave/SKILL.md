@@ -388,6 +388,34 @@ Current update planning supports known `run-flow` regeneration for executable so
 
 Finalized visual-QA report Evidence derives from its reviewed media source, so later source changes make the review stale through normal upstream propagation.
 
+## Markdown publication workflow
+
+`PublisherPlan v1` lives under `.demoweave/publishers/` and explicitly selects already-authored Markdown plus each target-relative destination. Do not let DemoWeave guess public documents, generate prose, recursively copy a repository, or imply framework/remote deployment support. M15A has one built-in publisher ID: `markdown`.
+
+Preview the exact candidate tree without writes:
+
+```bash
+demoweave publish preview <plan-id-or-path> --project <path>
+```
+
+Review create/update/unchanged files, copied local dependencies, conflicts, candidate hashes, and unified text diffs. Remote and fragment-only URLs stay unchanged. Every local Markdown link must resolve to an explicitly included entry; local non-Markdown assets are copied automatically through project/symlink-safe dependency closure.
+
+Apply only the exact reviewed token:
+
+```bash
+demoweave publish apply <plan-id-or-path> \
+  --project <path> \
+  --review-token 'publish-review-v1:<reviewed-token>'
+```
+
+Apply recomputes all bound inputs, rejects source/dependency/target changes and unmanaged differing targets, stages candidates, preserves unrelated target files, and writes `PublicationManifest v1`. Never edit source documents as part of publishing. Check the distinct publication state with:
+
+```bash
+demoweave publish status <plan-id-or-path> --project <path>
+```
+
+Treat `stale` source/dependency inputs, `drifted` target edits, `missing` outputs, `unpublished` plans, and `unknown` unsafe baselines as different decisions. An unchanged second preview/apply should report unchanged files, perform zero writes, and leave target/manifest bytes identical.
+
 ## Safe Markdown workflow
 
 Inspect the exact target first:
@@ -438,13 +466,14 @@ Current executable surface drivers:
 - **research / notebook** — explicit process execution + immutable native artifact capture; no environment inference or notebook-UI recording;
 - **configured trusted plugins** — additive detectors, driver factories, and Evidence renderers loaded explicitly from project config; no discovery, installation, or sandbox.
 
-Current presentation/review tooling:
+Current presentation/review/publication tooling:
 
 - terminal PNG/GIF rendering;
 - configured plugin rendering across explicitly advertised Evidence kind/format pairs and EvidenceFormat v1 outputs;
 - TimelinePlan MP4/GIF composition over local PNG/GIF media;
 - TutorialPlan package generation from existing MP4 Evidence;
-- VisualQAPacket/VisualQAReport agent-reviewed QA for fresh PNG/GIF/MP4 Evidence.
+- VisualQAPacket/VisualQAReport agent-reviewed QA for fresh PNG/GIF/MP4 Evidence;
+- built-in `markdown` publication into a separate project-local target tree with reviewed apply and publication status.
 
 Not yet available:
 
@@ -454,8 +483,9 @@ Not yet available:
 - Windows desktop scrolling or element capture;
 - Android element capture, arbitrary gestures/multi-touch, or app launching;
 - plugin discovery, installation, or sandboxing;
+- publisher plugins or framework-specific Docusaurus/VitePress/MkDocs/Fumadocs/Mintlify adapters;
+- credentials or remote deployment/upload;
 - narration/TTS generation;
-- publishing/upload integration;
 - OCR-based secret detection;
 - automatic visual fixes.
 
@@ -473,6 +503,10 @@ Current metadata layout:
     <tutorial>.json
   plans/
     <document-plan>.json
+  publishers/
+    <publisher-plan>.json
+  publications/
+    <publisher-plan>.json
   qa/
     reports/
       <review-id>.json      # durable agent-authored VisualQAReport
@@ -503,6 +537,7 @@ docs-media/
       <tutorial-id>-chapters.txt
       <tutorial-id>-description.txt
       <tutorial-id>-youtube.json
+published/                   # example separate project-local publisher target
 ```
 
 Published contracts live under `schemas/`:
@@ -517,3 +552,6 @@ Published contracts live under `schemas/`:
 - `tutorial.schema.json`
 - `visual-qa.schema.json`
 - `freshness-report.schema.json`
+- `publisher-plan.schema.json`
+- `publication-manifest.schema.json`
+- `publication-status.schema.json`

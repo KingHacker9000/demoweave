@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "id": "markdown-proof",
+  "publisher": "markdown",
+  "targetRoot": "published",
+  "entries": [
+    {
+      "source": "README.md",
+      "destination": "README.md"
+    },
+    {
+      "source": "docs/getting-started.md",
+      "destination": "guide/getting-started.md"
+    }
+  ]
+}

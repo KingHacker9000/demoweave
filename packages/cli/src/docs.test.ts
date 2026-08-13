@@ -132,13 +132,17 @@ test('docs discard deletes only the plan and traversal errors are non-zero', asy
   assert.match(traversal.stderr, /UNSAFE_DOCUMENT_TARGET:/);
 });
 
-test('init creates the normal DocumentPlan and TimelinePlan directories', async (context) => {
+test('init creates the normal DocumentPlan, TimelinePlan, and publication directories', async (context) => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'demoweave-cli-init-docs-'));
   context.after(() => fs.rm(root, { recursive: true, force: true }));
   const initialized = run(['init', root]);
   assert.equal(initialized.status, 0, initialized.stderr);
   assert.match(initialized.stdout, /Document plans:/);
   assert.match(initialized.stdout, /Timelines:/);
+  assert.match(initialized.stdout, /Publisher plans:/);
+  assert.match(initialized.stdout, /Publication manifests:/);
   assert.equal((await fs.stat(path.join(root, '.demoweave', 'plans'))).isDirectory(), true);
   assert.equal((await fs.stat(path.join(root, '.demoweave', 'timelines'))).isDirectory(), true);
+  assert.equal((await fs.stat(path.join(root, '.demoweave', 'publishers'))).isDirectory(), true);
+  assert.equal((await fs.stat(path.join(root, '.demoweave', 'publications'))).isDirectory(), true);
 });
