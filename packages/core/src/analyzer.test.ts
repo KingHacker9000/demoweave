@@ -197,8 +197,9 @@ test('profiles DemoWeave workspace members while retaining nested manifest facts
     'docs/M7_DESIGN.md',
     'docs/development/m12b-windows-uia.md',
     'docs/development/m13-android-adb.md',
-      'docs/development/m14-plugin-sdk.md',
-      'docs/development/m14b-renderer-plugins.md',
+    'docs/development/m14-plugin-sdk.md',
+    'docs/development/m14b-renderer-plugins.md',
+    'docs/development/m15-documentation-publishers.md',
   ]);
 });
 

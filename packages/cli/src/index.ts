@@ -13,6 +13,8 @@ import {
   FlowSchema,
   inspectMarkdownFile,
   ManifestSchema,
+  PublicationManifestSchema,
+  PublisherPlanSchema,
   previewDocumentPlanFile,
   ProjectProfileSchema,
   snapshotEvidenceArtifact,
@@ -34,6 +36,7 @@ import { registerUpdateCommand, showFreshness } from './freshness.js';
 import { mobileDeviceId, mobilePlatform } from './runtime-options.js';
 import { registerTutorialCommand } from './tutorial-command.js';
 import { registerPluginCommands } from './plugin-command.js';
+import { registerPublisherCommands } from './publisher-command.js';
 
 const program = new Command();
 program.name('demoweave').description('Agent-native documentation tooling for software repositories').version('0.0.1');
@@ -167,11 +170,15 @@ program.command('init').description('Initialize DemoWeave metadata in a reposito
   const plansDir = path.join(metadataRoot, 'plans');
   const timelinesDir = path.join(metadataRoot, 'timelines');
   const tutorialsDir = path.join(metadataRoot, 'tutorials');
+  const publishersDir = path.join(metadataRoot, 'publishers');
+  const publicationsDir = path.join(metadataRoot, 'publications');
   await fs.mkdir(flowDir, { recursive: true });
   await fs.mkdir(evidenceDir, { recursive: true });
   await fs.mkdir(plansDir, { recursive: true });
   await fs.mkdir(timelinesDir, { recursive: true });
   await fs.mkdir(tutorialsDir, { recursive: true });
+  await fs.mkdir(publishersDir, { recursive: true });
+  await fs.mkdir(publicationsDir, { recursive: true });
 
   const configPath = path.join(metadataRoot, 'config.json');
   if (!(await exists(configPath))) {
@@ -194,6 +201,8 @@ program.command('init').description('Initialize DemoWeave metadata in a reposito
   console.log(`Document plans: ${repoRelative(process.cwd(), plansDir)}`);
   console.log(`Timelines: ${repoRelative(process.cwd(), timelinesDir)}`);
   console.log(`Tutorials: ${repoRelative(process.cwd(), tutorialsDir)}`);
+  console.log(`Publisher plans: ${repoRelative(process.cwd(), publishersDir)}`);
+  console.log(`Publication manifests: ${repoRelative(process.cwd(), publicationsDir)}`);
   console.log(`Evidence manifest: ${repoRelative(process.cwd(), manifestPath)}`);
 });
 
@@ -478,6 +487,7 @@ docs.command('discard')
 registerUpdateCommand(program);
 registerTutorialCommand(program);
 registerPluginCommands(program);
+registerPublisherCommands(program);
 
 program.command('validate').description('Validate DemoWeave project metadata, tutorial/timeline/document plans, and evidence bindings').argument('[path]', 'project path', '.').action(async (input) => {
   const root = path.resolve(input);
@@ -604,6 +614,40 @@ program.command('validate').description('Validate DemoWeave project metadata, tu
     }
   }
 
+  const publisherDirectory = path.join(root, '.demoweave', 'publishers');
+  let publisherCount = 0;
+  for (const file of await listJsonFiles(publisherDirectory)) {
+    try {
+      const parsed = PublisherPlanSchema.safeParse(JSON.parse(await fs.readFile(file, 'utf8')));
+      if (!parsed.success) {
+        failed = true;
+        for (const issue of parsed.error.issues) console.error(`${repoRelative(root, file)}:${issue.path.join('.')}: ${issue.message}`);
+      } else {
+        publisherCount += 1;
+      }
+    } catch (error) {
+      failed = true;
+      console.error(`${repoRelative(root, file)}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  const publicationDirectory = path.join(root, '.demoweave', 'publications');
+  let publicationCount = 0;
+  for (const file of await listJsonFiles(publicationDirectory)) {
+    try {
+      const parsed = PublicationManifestSchema.safeParse(JSON.parse(await fs.readFile(file, 'utf8')));
+      if (!parsed.success) {
+        failed = true;
+        for (const issue of parsed.error.issues) console.error(`${repoRelative(root, file)}:${issue.path.join('.')}: ${issue.message}`);
+      } else {
+        publicationCount += 1;
+      }
+    } catch (error) {
+      failed = true;
+      console.error(`${repoRelative(root, file)}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
   if (!failed) {
     const bindingIssues = validateMetadataBindings(project, flowFiles, manifest);
     if (bindingIssues.length) {
@@ -622,6 +666,8 @@ program.command('validate').description('Validate DemoWeave project metadata, tu
   console.log(`DocumentPlan v1 files valid: ${planCount}.`);
   console.log(`TimelinePlan v1 files valid: ${timelineCount}.`);
   console.log(`TutorialPlan v1 files valid: ${tutorialCount}.`);
+  console.log(`PublisherPlan v1 files valid: ${publisherCount}.`);
+  console.log(`PublicationManifest v1 files valid: ${publicationCount}.`);
   console.log(`Manifest v1: ${manifest ? 'valid' : 'not present'}.`);
   console.log('Metadata bindings are valid.');
 });

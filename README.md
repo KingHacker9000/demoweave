@@ -42,11 +42,12 @@ The result is a shared workflow in which an agent supplies reasoning, writing, a
 | Visual QA | Available | Fresh PNG/GIF/MP4 Evidence → sampled frames/contact sheet/signals → agent-authored hash-bound PASS or NEEDS-CHANGES report |
 | Safe Markdown planning/patching | Available | `DocumentPlan v1`, section inspection, exact diff preview, review token, atomic apply/discard |
 | Incremental stale tracking | Available | `FreshnessReport v1`, explainable stale chains, document impact, dry-run/minimal selective regeneration |
+| Local Markdown publication | Available | `PublisherPlan v1` → dependency-safe preview/diff/review token → staged local apply + `PublicationManifest v1` and distinct status |
 | macOS/Linux desktop and iOS execution | Planned | Windows desktop and Android are proven; macOS/Linux desktop and iOS backends are not implemented |
 | Browser interaction recording | Planned | Web screenshot Evidence exists; composition does not pretend a static browser screenshot is browser video |
-| Narration/TTS and publishing | Planned/optional | Tutorial packaging uses agent-authored captions/metadata; it does not synthesize narration or upload to a platform |
+| Framework adapters and remote deployment | Planned/optional | M15A provides only credential-free project-local Markdown publication; it does not run docs frameworks or upload remotely |
 
-Interactive PTY input, browser video/GIF recording, macOS/Linux desktop automation, iOS automation, mobile video/element capture, narration generation, automatic publishing, OCR-based secret detection, and automatic visual fixes are outside the current implementation.
+Interactive PTY input, browser video/GIF recording, macOS/Linux desktop automation, iOS automation, mobile video/element capture, narration generation, framework-specific publishing, remote deployment, OCR-based secret detection, and automatic visual fixes are outside the current implementation.
 
 ## How it works
 
@@ -94,7 +95,7 @@ The repository includes a [shared DemoWeave skill](skills/demoweave/SKILL.md) th
 
 DemoWeave is currently a source pnpm workspace, not a published npm package. Use it from a repository checkout.
 
-Requirements: Node.js 20+ and pnpm. FFmpeg is optional for core inspection, terminal capture, web screenshots, and native research artifact capture, but required for GIF rendering, timeline composition, tutorial thumbnail generation, and sampling animated media for visual QA. `ffprobe` is required for tutorial video validation and MP4 visual QA. Playwright Chromium is required only when executing web Flows. Research/notebook Flows use the explicit commands declared by the repository; DemoWeave does not install or guess a Python/Jupyter/R/Julia/MATLAB environment.
+Requirements: Node.js 20+ and pnpm. FFmpeg is optional for core inspection, terminal capture, web screenshots, native research artifact capture, and Markdown publication, but required for GIF rendering, timeline composition, tutorial thumbnail generation, and sampling animated media for visual QA. `ffprobe` is required for tutorial video validation and MP4 visual QA. Playwright Chromium is required only when executing web Flows. Research/notebook Flows use the explicit commands declared by the repository; DemoWeave does not install or guess a Python/Jupyter/R/Julia/MATLAB environment.
 
 ```bash
 git clone https://github.com/KingHacker9000/demoweave.git
@@ -113,7 +114,7 @@ node packages/cli/dist/index.js validate .
 
 On Linux, Playwright may also need its system browser dependencies; `playwright install --with-deps chromium` installs those on supported distributions. `doctor` reports whether Chromium, FFmpeg, and ffprobe are ready for the capabilities that use them.
 
-`inspect` writes the generated `.demoweave/project.json` profile. `init` creates Flow, Evidence, document-plan, timeline, and tutorial metadata directories. `validate` checks the profile, committed Flows, DocumentPlans, TimelinePlans, TutorialPlans, Evidence manifest, and cross-file bindings without requiring FFmpeg just to parse metadata. Visual QA reports are strictly packet/source-bound by `qa finalize` before they become Evidence.
+`inspect` writes the generated `.demoweave/project.json` profile. `init` creates Flow, Evidence, document-plan, timeline, tutorial, publisher-plan, and publication-manifest metadata directories without replacing existing files. `validate` checks the profile, committed Flows, DocumentPlans, TimelinePlans, TutorialPlans, PublisherPlans, PublicationManifests, Evidence manifest, and cross-file bindings without requiring output for an unpublished plan. Visual QA reports are strictly packet/source-bound by `qa finalize` before they become Evidence.
 
 ## Use configured trusted plugins
 
@@ -345,6 +346,20 @@ A stale source Evidence item schedules one run of its producing Flow when the re
 
 Use `--json` with `status` or `update` for the structured `FreshnessReport v1`/update result.
 
+## Publish reviewed Markdown
+
+`PublisherPlan v1` explicitly maps already-authored project Markdown into a separate project-local target tree. The built-in `markdown` publisher copies required local media, rewrites only relocated local destinations, refuses unselected local Markdown links and unmanaged target conflicts, and never fetches remote URLs or runs a documentation framework.
+
+```bash
+node packages/cli/dist/index.js publish preview <plan-id-or-path> --project <path>
+node packages/cli/dist/index.js publish apply <plan-id-or-path> \
+  --project <path> \
+  --review-token 'publish-review-v1:<reviewed-token>'
+node packages/cli/dist/index.js publish status <plan-id-or-path> --project <path>
+```
+
+Preview is write-free and binds the canonical plan, source/dependency hashes, target baseline, and candidate hashes into the review token. Apply recomputes that exact candidate, stages changed files, preserves unrelated target files, and records a deterministic `PublicationManifest v1`. Status keeps source/dependency staleness distinct from target drift or missing output. The real [`fixtures/publisher-markdown/`](fixtures/publisher-markdown/) proof relocates a linked guide, copies an SVG, preserves a remote link, and leaves `published/keep-me.txt` untouched.
+
 ## Safely patch Markdown
 
 M5 adds a review boundary between agent-authored prose and file mutation. Inspect the target first:
@@ -394,9 +409,9 @@ The versioned JSON contracts live in [`schemas/`](schemas/).
 
 ## Project status
 
-DemoWeave is in active development. **M0–M11, M14, and Pilots P0/P1 are complete; the Windows slice of M12 and Android slice of M13 are implemented and proven:** the project can inspect multi-ecosystem and native Android repositories; execute terminal, Playwright web, research/notebook, Windows UI Automation, Android ADB, and explicitly configured trusted-plugin workflows; capture fingerprinted Evidence; render through built-in or plugin renderers; and run the established composition, tutorial, visual-QA, freshness, and reviewed-Markdown workflows.
+DemoWeave is in active development. **M0–M11, M14, M15A, and Pilots P0/P1 are complete; the Windows slice of M12 and Android slice of M13 are implemented and proven.** The project can inspect multi-ecosystem and native Android repositories; execute terminal, Playwright web, research/notebook, Windows UI Automation, Android ADB, and explicitly configured trusted-plugin workflows; capture fingerprinted Evidence; render and compose media; package tutorials; perform hash-bound visual QA; safely patch Markdown; and publish explicitly selected Markdown into a deterministic local target tree.
 
-Windows desktop and Android are the currently proven native UI backends. macOS/Linux desktop and iOS remain planned. `@demoweave/sdk` remains source-workspace-only and is not published to npm. Interactive PTY input, browser/mobile recording, narration/TTS, publishing, OCR-based secret detection, and automatic visual fixes remain later/optional work.
+Windows desktop and Android are the currently proven native UI backends. macOS/Linux desktop and iOS remain planned. `@demoweave/sdk` remains source-workspace-only and is not published to npm. M15A supports only the built-in local `markdown` target: framework adapters, plugin publishers, credentials, remote deployment/upload, interactive PTY input, browser/mobile recording, narration/TTS, OCR-based secret detection, and automatic visual fixes remain later or optional work.
 
 See [ROADMAP.md](ROADMAP.md) for milestone boundaries and future surface drivers.
 
@@ -408,7 +423,7 @@ pnpm test
 pnpm typecheck
 ```
 
-CI installs Chromium and FFmpeg, runs build/full tests/typecheck on Ubuntu and Windows, exercises the existing M5–M11 smokes, validates Android analyzer/CLI/ADB protocol behavior with injected runners, and runs the real external-style plugin loader/renderer fixture without browser or native-UI dependencies. The committed Android screenshot comes from a separate real API 36 emulator proof; hosted CI does not pretend to run an emulator.
+CI installs Chromium and FFmpeg, runs build/full tests/typecheck on Ubuntu and Windows, exercises the M5–M11 and M15A smokes, validates Android analyzer/CLI/ADB protocol behavior with injected runners, and runs the real external-style plugin and Markdown publisher fixtures without credentials or remote publishing. The committed Android screenshot comes from a separate real API 36 emulator proof; hosted CI does not pretend to run an emulator.
 
 ## License
 
