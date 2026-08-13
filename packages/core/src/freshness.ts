@@ -5,7 +5,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { z } from 'zod';
 import { ManifestSchema, type Manifest } from './manifest.js';
-import type { Evidence } from './evidence.js';
+import { EvidenceFormatSchema, type Evidence } from './evidence.js';
 
 const HashSchema = z.string().regex(/^sha256:[0-9a-f]{64}$/);
 
@@ -62,8 +62,9 @@ const RenderEvidenceActionSchema = z.object({
   kind: z.literal('render-evidence'),
   sourceEvidenceId: z.string().min(1),
   evidenceId: z.string().min(1),
-  format: z.enum(['png', 'gif']),
+  format: EvidenceFormatSchema,
   outputPath: z.string().min(1),
+  rendererId: z.string().min(1).optional(),
 }).strict();
 
 export const RegenerationActionSchema = z.discriminatedUnion('kind', [RunFlowActionSchema, RenderEvidenceActionSchema]);
@@ -376,6 +377,7 @@ async function documentImpacts(root: string, manifest: Manifest, freshness: Evid
 
 function regenerationPlan(manifest: Manifest, freshness: EvidenceFreshness[]): RegenerationAction[] {
   const byState = new Map(freshness.map((item) => [item.evidenceId, item.state]));
+  const freshnessById = new Map(freshness.map((item) => [item.evidenceId, item]));
   const staleIds = new Set(freshness.filter((item) => item.state === 'stale' || item.state === 'missing').map((item) => item.evidenceId));
   const flows = new Map<string, Set<string>>();
   for (const evidence of manifest.evidence) {
@@ -391,8 +393,14 @@ function regenerationPlan(manifest: Manifest, freshness: EvidenceFreshness[]): R
 
   for (const evidence of [...manifest.evidence].sort((a, b) => a.id.localeCompare(b.id))) {
     if (!staleIds.has(evidence.id) || !evidence.derivedFrom?.length || !evidence.path) continue;
-    if (evidence.format !== 'png' && evidence.format !== 'gif') continue;
-    if (evidence.producer && (evidence.producer.kind !== 'renderer' || evidence.producer.id !== 'terminal')) continue;
+    if (!evidence.format) continue;
+    if (!evidence.producer) {
+      if (evidence.format !== 'png' && evidence.format !== 'gif') continue;
+    } else {
+      if (evidence.producer.kind !== 'renderer') continue;
+      if (evidence.producer.id !== 'terminal' && !evidence.producer.id.startsWith('plugin/')) continue;
+    }
+    if (freshnessById.get(evidence.id)?.reasons.some((reason) => reason.code === 'plugin-unavailable')) continue;
     const sourceEvidenceId = evidence.derivedFrom[0];
     if (!sourceEvidenceId || byState.get(sourceEvidenceId) === 'unknown') continue;
     actions.push({
@@ -401,6 +409,7 @@ function regenerationPlan(manifest: Manifest, freshness: EvidenceFreshness[]): R
       evidenceId: evidence.id,
       format: evidence.format,
       outputPath: evidence.path,
+      ...(evidence.producer?.id && evidence.producer.id !== 'terminal' ? { rendererId: evidence.producer.id } : {}),
     });
   }
   return actions;

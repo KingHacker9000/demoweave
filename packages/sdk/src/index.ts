@@ -14,6 +14,13 @@ export const pluginApiVersion = 1 as const;
 export type JsonPrimitive = string | number | boolean | null;
 export type JsonValue = JsonPrimitive | JsonValue[] | { [key: string]: JsonValue };
 export type PluginOptions = Record<string, JsonValue>;
+export type DeepReadonly<T> = T extends (...args: never[]) => unknown
+  ? T
+  : T extends readonly (infer U)[]
+    ? readonly DeepReadonly<U>[]
+    : T extends object
+      ? { readonly [K in keyof T]: DeepReadonly<T[K]> }
+      : T;
 export type PluginDriverStepType = FlowStep['type'];
 
 export interface PluginDetectorResult {
@@ -81,9 +88,45 @@ export interface PluginDriverContribution {
   create(context: PluginDriverFactoryContext): PluginSurfaceDriver;
 }
 
+export interface PluginRendererAccepts {
+  kinds: EvidenceKind[];
+  formats: EvidenceFormat[];
+}
+
+export interface PluginRendererInput {
+  source: DeepReadonly<Evidence>;
+  sourceBytes: Readonly<Uint8Array>;
+  format: EvidenceFormat;
+}
+
+export interface PluginRendererResult {
+  kind: EvidenceKind;
+  format: EvidenceFormat;
+  mimeType: string;
+  data: string | Uint8Array;
+  label?: string;
+}
+
+export interface PluginRenderer {
+  render(input: PluginRendererInput): Promise<PluginRendererResult> | PluginRendererResult;
+  close(): Promise<void> | void;
+}
+
+export interface PluginRendererFactoryContext {
+  options: Readonly<PluginOptions>;
+}
+
+export interface PluginRendererContribution {
+  id: string;
+  accepts: PluginRendererAccepts[];
+  outputFormats: EvidenceFormat[];
+  create(context: PluginRendererFactoryContext): PluginRenderer;
+}
+
 export interface PluginRegistry {
   registerDetector(contribution: PluginDetectorContribution): void;
   registerDriver(contribution: PluginDriverContribution): void;
+  registerRenderer(contribution: PluginRendererContribution): void;
 }
 
 export interface DemoWeavePlugin {

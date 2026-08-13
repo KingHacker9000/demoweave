@@ -31,9 +31,11 @@ test('plugin CLI commands are inspectable and update --apply is selective and no
   const listed = cli(['plugins', 'list', '--project', root, '--json']);
   assert.equal(listed.status, 0, listed.stderr);
   assert.deepEqual(JSON.parse(listed.stdout).plugins[0].drivers, ['fixture-service-driver']);
+  assert.deepEqual(JSON.parse(listed.stdout).plugins[0].renderers, ['fixture-service-card']);
   const doctor = cli(['plugins', 'doctor', '--project', root, '--json']);
   assert.equal(doctor.status, 0, doctor.stderr);
   assert.equal(JSON.parse(doctor.stdout).ok, true);
+  assert.deepEqual(JSON.parse(doctor.stdout).plugins[0].renderers, ['fixture-service-card']);
   assert.deepEqual(await fs.readFile(manifestPath), initialManifest);
 
   assert.equal(cli(['inspect', root]).status, 0);

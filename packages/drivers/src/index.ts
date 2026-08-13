@@ -169,3 +169,4 @@ export {
   PluginHostError,
 } from './plugin-host.js';
 export type { PluginHostInfo } from './plugin-host.js';
+export type { PluginRendererDescriptor, PluginRendererExecutionResult } from './plugin-host.js';

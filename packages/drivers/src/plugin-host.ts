@@ -5,6 +5,8 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import {
   EvidenceSchema,
+  EvidenceFormatSchema,
+  EvidenceKindSchema,
   FrameworkSchema,
   ManifestSchema,
   ProjectProfileSchema,
@@ -24,6 +26,9 @@ import {
   type PluginDetectorContribution,
   type PluginDriverContribution,
   type PluginOptions,
+  type PluginRendererContribution,
+  type PluginRendererInput,
+  type PluginRendererResult,
   type PluginRegistry,
 } from '@demoweave/sdk';
 import type { DriverContext, DriverStepResult, SurfaceDriver } from './index.js';
@@ -43,6 +48,21 @@ export interface PluginHostInfo {
   fingerprint: string;
   detectors: string[];
   drivers: string[];
+  renderers: string[];
+}
+
+export interface PluginRendererDescriptor {
+  id: string;
+  contributionId: string;
+  accepts: Array<{ kinds: import('@demoweave/core').EvidenceKind[]; formats: import('@demoweave/core').EvidenceFormat[] }>;
+  outputFormats: import('@demoweave/core').EvidenceFormat[];
+  version?: string;
+  pluginFingerprint: string;
+}
+
+export interface PluginRendererExecutionResult {
+  descriptor: PluginRendererDescriptor;
+  result: PluginRendererResult;
 }
 
 interface ConfiguredPlugin {
@@ -56,6 +76,7 @@ interface LoadedPlugin {
   fingerprint: string;
   detectors: PluginDetectorContribution[];
   drivers: PluginDriverContribution[];
+  renderers: PluginRendererContribution[];
 }
 
 function sha256(input: Buffer | string): string {
@@ -129,6 +150,57 @@ function validateDriverResult(value: unknown, step: FlowStep): DriverStepResult 
     throw invalidDriverResult(`Plugin driver evidence must be an array for step ${step.id}.`);
   }
   return result as unknown as DriverStepResult;
+}
+
+const canonicalMimeTypes = new Map<string, string>([
+  ['json', 'application/json'], ['txt', 'text/plain'], ['csv', 'text/csv'], ['md', 'text/markdown'],
+  ['html', 'text/html'], ['png', 'image/png'], ['jpeg', 'image/jpeg'], ['webp', 'image/webp'],
+  ['gif', 'image/gif'], ['webm', 'video/webm'], ['mp4', 'video/mp4'], ['svg', 'image/svg+xml'],
+  ['srt', 'application/x-subrip'], ['vtt', 'text/vtt'], ['ipynb', 'application/x-ipynb+json'],
+]);
+
+function invalidRendererResult(message: string): PluginHostError {
+  return new PluginHostError('PLUGIN_RENDERER_RESULT_INVALID', message);
+}
+
+function validateRendererResult(value: unknown, requestedFormat: import('@demoweave/core').EvidenceFormat): PluginRendererResult {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw invalidRendererResult('Plugin renderer returned a non-object result.');
+  }
+  const result = value as Record<string, unknown>;
+  const allowed = new Set(['kind', 'format', 'mimeType', 'data', 'label']);
+  if (Object.keys(result).some((key) => !allowed.has(key))) {
+    throw invalidRendererResult('Plugin renderer result contains unsupported fields.');
+  }
+  if (!EvidenceKindSchema.safeParse(result.kind).success) {
+    throw invalidRendererResult('Plugin renderer returned an invalid Evidence kind.');
+  }
+  if (!EvidenceFormatSchema.safeParse(result.format).success) {
+    throw invalidRendererResult('Plugin renderer returned an invalid Evidence format.');
+  }
+  if (result.format !== requestedFormat) {
+    throw invalidRendererResult(`Plugin renderer returned format ${String(result.format)}; expected ${requestedFormat}.`);
+  }
+  if (typeof result.mimeType !== 'string' || !result.mimeType.trim()) {
+    throw invalidRendererResult('Plugin renderer MIME type must be a non-empty string.');
+  }
+  const expectedMime = canonicalMimeTypes.get(requestedFormat);
+  if (expectedMime && result.mimeType !== expectedMime) {
+    throw invalidRendererResult(`Evidence format ${requestedFormat} requires MIME type ${expectedMime}.`);
+  }
+  if (typeof result.data !== 'string' && !(result.data instanceof Uint8Array)) {
+    throw invalidRendererResult('Plugin renderer data must be a string or Uint8Array.');
+  }
+  if (result.label !== undefined && (typeof result.label !== 'string' || !result.label.trim())) {
+    throw invalidRendererResult('Plugin renderer label must be a non-empty string when supplied.');
+  }
+  return {
+    kind: result.kind as PluginRendererResult['kind'],
+    format: result.format as PluginRendererResult['format'],
+    mimeType: result.mimeType,
+    data: typeof result.data === 'string' ? result.data : Uint8Array.from(result.data),
+    ...(result.label !== undefined ? { label: result.label as string } : {}),
+  };
 }
 
 async function readConfiguration(root: string): Promise<ConfiguredPlugin[]> {
@@ -234,6 +306,7 @@ async function loadOne(projectRoot: string, configured: ConfiguredPlugin): Promi
   ]));
   const detectors: PluginDetectorContribution[] = [];
   const drivers: PluginDriverContribution[] = [];
+  const renderers: PluginRendererContribution[] = [];
   let open = true;
   const registry: PluginRegistry = Object.freeze({
     registerDetector(contribution: PluginDetectorContribution) {
@@ -259,6 +332,32 @@ async function loadOne(projectRoot: string, configured: ConfiguredPlugin): Promi
       }
       drivers.push(Object.freeze({ ...contribution, surfaceTypes: [...contribution.surfaceTypes], stepTypes: [...contribution.stepTypes] }));
     },
+    registerRenderer(contribution: PluginRendererContribution) {
+      if (!open) throw new PluginHostError('PLUGIN_REGISTRATION_CLOSED', `Registration is closed for plugin ${stablePlugin.id}.`);
+      validateContributionId('renderer', contribution);
+      const validAccepts = Array.isArray(contribution.accepts)
+        && contribution.accepts.length > 0
+        && contribution.accepts.every((accepts) => accepts && typeof accepts === 'object'
+          && Array.isArray(accepts.kinds) && accepts.kinds.length > 0
+          && accepts.kinds.every((kind) => EvidenceKindSchema.safeParse(kind).success)
+          && new Set(accepts.kinds).size === accepts.kinds.length
+          && Array.isArray(accepts.formats) && accepts.formats.length > 0
+          && accepts.formats.every((format) => EvidenceFormatSchema.safeParse(format).success)
+          && new Set(accepts.formats).size === accepts.formats.length);
+      if (!validAccepts
+        || !Array.isArray(contribution.outputFormats)
+        || contribution.outputFormats.length === 0
+        || contribution.outputFormats.some((format) => !EvidenceFormatSchema.safeParse(format).success)
+        || new Set(contribution.outputFormats).size !== contribution.outputFormats.length
+        || typeof contribution.create !== 'function') {
+        throw new PluginHostError('PLUGIN_CONTRIBUTION_INVALID', `Renderer ${contribution.id} has an invalid factory descriptor.`);
+      }
+      renderers.push(Object.freeze({
+        ...contribution,
+        accepts: contribution.accepts.map((accepts) => Object.freeze({ kinds: [...accepts.kinds], formats: [...accepts.formats] })),
+        outputFormats: [...contribution.outputFormats],
+      }));
+    },
   });
   try {
     const registration = stablePlugin.register(registry) as unknown;
@@ -272,7 +371,7 @@ async function loadOne(projectRoot: string, configured: ConfiguredPlugin): Promi
   } finally {
     open = false;
   }
-  return { configured, plugin: stablePlugin, fingerprint, detectors, drivers };
+  return { configured, plugin: stablePlugin, fingerprint, detectors, drivers, renderers };
 }
 
 async function atomicWrite(target: string, bytes: Buffer | string, suffix: string): Promise<void> {
@@ -316,7 +415,7 @@ export class PluginHost {
   constructor(readonly projectRoot: string, private readonly plugins: LoadedPlugin[]) {}
 
   list(): PluginHostInfo[] {
-    return this.plugins.map(({ configured, plugin, fingerprint, detectors, drivers }) => ({
+    return this.plugins.map(({ configured, plugin, fingerprint, detectors, drivers, renderers }) => ({
       module: configured.module,
       id: plugin.id,
       apiVersion: plugin.apiVersion,
@@ -324,12 +423,62 @@ export class PluginHost {
       fingerprint,
       detectors: detectors.map((item) => item.id),
       drivers: drivers.map((item) => item.id),
+      renderers: renderers.map((item) => item.id),
     }));
   }
 
   fingerprints(): ReadonlyMap<string, string> {
-    return new Map(this.plugins.flatMap(({ plugin, fingerprint, drivers }) =>
-      drivers.map((driver) => [`plugin/${plugin.id}/${driver.id}`, fingerprint] as const)));
+    return new Map(this.plugins.flatMap(({ plugin, fingerprint, drivers, renderers }) =>
+      [...drivers, ...renderers].map((contribution) => [`plugin/${plugin.id}/${contribution.id}`, fingerprint] as const)));
+  }
+
+  rendererDescriptors(): PluginRendererDescriptor[] {
+    return this.plugins.flatMap(({ plugin, fingerprint, renderers }) => renderers.map((renderer) => ({
+      id: `plugin/${plugin.id}/${renderer.id}`,
+      contributionId: renderer.id,
+      accepts: renderer.accepts.map((accepts) => ({ kinds: [...accepts.kinds], formats: [...accepts.formats] })),
+      outputFormats: [...renderer.outputFormats],
+      ...(plugin.version ? { version: plugin.version } : {}),
+      pluginFingerprint: fingerprint,
+    })));
+  }
+
+  async renderWith(rendererId: string, input: PluginRendererInput): Promise<PluginRendererExecutionResult> {
+    for (const loaded of this.plugins) {
+      for (const contribution of loaded.renderers) {
+        const descriptor = this.rendererDescriptors().find((item) => item.id === rendererId);
+        if (!descriptor || descriptor.contributionId !== contribution.id || rendererId !== `plugin/${loaded.plugin.id}/${contribution.id}`) continue;
+        let renderer;
+        try {
+          renderer = contribution.create({ options: loaded.configured.options });
+        } catch (error) {
+          throw new PluginHostError('PLUGIN_RENDERER_FACTORY_FAILED', `Renderer factory ${rendererId} failed: ${error instanceof Error ? error.message : String(error)}`);
+        }
+        if (!renderer || typeof renderer.render !== 'function' || typeof renderer.close !== 'function') {
+          throw new PluginHostError('PLUGIN_RENDERER_INVALID', `Renderer factory ${rendererId} returned an invalid renderer.`);
+        }
+        let result: PluginRendererResult;
+        try {
+          const detachedInput: PluginRendererInput = {
+            source: deepFreeze(structuredClone(input.source)),
+            sourceBytes: Uint8Array.from(input.sourceBytes),
+            format: input.format,
+          };
+          result = validateRendererResult(await renderer.render(detachedInput), input.format);
+        } catch (error) {
+          if (error instanceof PluginHostError) throw error;
+          throw new PluginHostError('PLUGIN_RENDERER_EXECUTION_FAILED', `Renderer ${rendererId} failed: ${error instanceof Error ? error.message : String(error)}`);
+        } finally {
+          try {
+            await renderer.close();
+          } catch (error) {
+            throw new PluginHostError('PLUGIN_RENDERER_CLOSE_FAILED', `Renderer ${rendererId} close failed: ${error instanceof Error ? error.message : String(error)}`);
+          }
+        }
+        return { descriptor, result };
+      }
+    }
+    throw new PluginHostError('PLUGIN_RENDERER_NOT_FOUND', `Plugin renderer is not available: ${rendererId}`);
   }
 
   async applyDetectors(profile: ProjectProfile): Promise<ProjectProfile> {
@@ -503,7 +652,7 @@ export async function loadPluginHost(projectRoot: string): Promise<PluginHost> {
     const loaded = await loadOne(root, entry);
     if (pluginIds.has(loaded.plugin.id)) throw new PluginHostError('PLUGIN_ID_DUPLICATE', `Duplicate plugin id: ${loaded.plugin.id}`);
     pluginIds.add(loaded.plugin.id);
-    for (const contribution of [...loaded.detectors, ...loaded.drivers]) {
+    for (const contribution of [...loaded.detectors, ...loaded.drivers, ...loaded.renderers]) {
       if (contributionIds.has(contribution.id)) throw new PluginHostError('PLUGIN_CONTRIBUTION_DUPLICATE', `Duplicate plugin contribution id: ${contribution.id}`);
       contributionIds.add(contribution.id);
     }

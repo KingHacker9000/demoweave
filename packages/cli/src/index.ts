@@ -6,6 +6,7 @@ import { spawnSync } from 'node:child_process';
 import {
   DocumentPlanError,
   DocumentPlanSchema,
+  EvidenceFormatSchema,
   analyzeProject,
   applyDocumentPlanFile,
   discardDocumentPlanFile,
@@ -47,9 +48,10 @@ function commandAvailable(command: string): { ok: boolean; version?: string } {
   };
 }
 
-function renderFormat(value: string): 'png' | 'gif' {
-  if (value === 'png' || value === 'gif') return value;
-  throw new Error(`Unsupported render format: ${value}. Expected png or gif.`);
+function renderFormat(value: string) {
+  const parsed = EvidenceFormatSchema.safeParse(value);
+  if (parsed.success) return parsed.data;
+  throw new Error(`Unsupported render format: ${value}. Expected an EvidenceFormat v1 value.`);
 }
 
 function compositionFormat(value: string): 'mp4' | 'gif' {
@@ -310,29 +312,33 @@ program.command('run')
   });
 
 program.command('render')
-  .description('Render terminal Evidence to a polished media asset')
-  .argument('<evidence-id-or-path>', 'terminal Evidence id from Manifest v1 or a TerminalTrack v1 JSON path')
-  .requiredOption('--format <format>', 'output format: png or gif', renderFormat)
+  .description('Render Evidence with one eligible built-in or configured plugin renderer')
+  .argument('<evidence-id-or-path>', 'Evidence id from Manifest v1 or a TerminalTrack v1 JSON path')
+  .requiredOption('--format <format>', 'EvidenceFormat v1 output format', renderFormat)
+  .option('--renderer <renderer-id>', 'exact renderer id (terminal or plugin/<plugin-id>/<renderer-id>)')
   .option('--project <path>', 'project root', '.')
   .option('--out <path>', 'project-relative output path')
   .action(async (reference, options) => {
     try {
+      const pluginHost = await loadPluginHost(path.resolve(options.project));
       const result = await renderEvidence(reference, {
         projectRoot: options.project,
         format: options.format,
+        pluginHost,
+        ...(options.renderer ? { rendererId: options.renderer } : {}),
         ...(options.out ? { outputPath: options.out } : {}),
       });
       if (result.evidenceId) await snapshotEvidenceArtifact(options.project, result.evidenceId);
       console.log(`Rendered: ${result.evidenceId ?? reference}`);
       if (result.sourceEvidenceId) console.log(`Derived from: ${result.sourceEvidenceId}`);
       console.log(`Format: ${result.format.toUpperCase()}`);
-      console.log(`Dimensions: ${result.width}x${result.height}`);
+      if (result.width !== undefined && result.height !== undefined) console.log(`Dimensions: ${result.width}x${result.height}`);
       if (result.durationMs !== undefined) console.log(`Duration: ${(result.durationMs / 1_000).toFixed(2)}s`);
       if (result.frameCount !== undefined) console.log(`Frames: ${result.frameCount}`);
       console.log(`Size: ${formatBytes(result.sizeBytes)}`);
       console.log(`Output: ${repoRelative(process.cwd(), result.outputPath)}`);
     } catch (error) {
-      const code = error instanceof RendererError ? error.code : 'RENDER_FAILED';
+      const code = error instanceof RendererError || error instanceof PluginHostError ? error.code : 'RENDER_FAILED';
       console.error(`${code}: ${error instanceof Error ? error.message : String(error)}`);
       process.exitCode = 1;
     }

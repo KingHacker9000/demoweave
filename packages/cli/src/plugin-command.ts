@@ -33,6 +33,7 @@ export function registerPluginCommands(program: Command): void {
           console.log(`  Module: ${item.module}`);
           console.log(`  Detectors: ${item.detectors.join(', ') || 'none'}`);
           console.log(`  Drivers: ${item.drivers.join(', ') || 'none'}`);
+          console.log(`  Renderers: ${item.renderers.join(', ') || 'none'}`);
         }
       } catch (error) {
         report(error, Boolean(options.json));
@@ -51,6 +52,7 @@ export function registerPluginCommands(program: Command): void {
           return;
         }
         console.log(`Plugin doctor: OK (${items.length} configured)`);
+        for (const item of items) console.log(`  ${item.id} renderers: ${item.renderers.join(', ') || 'none'}`);
         console.log('Configured plugins are trusted Node.js code and are not sandboxed.');
       } catch (error) {
         report(error, Boolean(options.json));

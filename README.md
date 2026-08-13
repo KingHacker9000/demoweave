@@ -115,6 +115,23 @@ On Linux, Playwright may also need its system browser dependencies; `playwright 
 
 `inspect` writes the generated `.demoweave/project.json` profile. `init` creates Flow, Evidence, document-plan, timeline, and tutorial metadata directories. `validate` checks the profile, committed Flows, DocumentPlans, TimelinePlans, TutorialPlans, Evidence manifest, and cross-file bindings without requiring FFmpeg just to parse metadata. Visual QA reports are strictly packet/source-bound by `qa finalize` before they become Evidence.
 
+## Use configured trusted plugins
+
+M14's source-workspace `@demoweave/sdk` supports detector, driver-factory, and renderer contributions loaded only from the target project's ordered `.demoweave/config.json`. DemoWeave does not discover, install, or sandbox plugins; configured modules are trusted Node.js code with CLI process privileges.
+
+Renderer plugins advertise accepted source Evidence kinds/formats and output formats. The built-in terminal renderer keeps the stable ID `terminal`; plugin renderers use `plugin/<plugin-id>/<renderer-id>`. Selection is exact when `--renderer` is supplied, otherwise exactly one renderer must be eligible—plugins never silently shadow the built-in renderer.
+
+```bash
+node packages/cli/dist/index.js plugins list --project <path>
+node packages/cli/dist/index.js plugins doctor --project <path>
+node packages/cli/dist/index.js render <evidence-id> \
+  --project <path> \
+  --format <format> \
+  --renderer plugin/<plugin-id>/<renderer-id>
+```
+
+A renderer receives detached source Evidence and artifact bytes and returns typed bytes/text plus metadata. DemoWeave owns the safe output path, atomic write, deterministic derived Evidence ID, Manifest mutation, artifact hash, producer/fingerprint, `derivedFrom`, and portable provenance. The real [plugin SDK fixture](fixtures/plugin-sdk/README.md) proves JSON result Evidence → deterministic SVG plus freshness, selective repair, ambiguity, and no-churn behavior.
+
 ## Run a terminal evidence workflow
 
 This repository ships the Flow and source evidence used by the animation above:
@@ -377,9 +394,9 @@ The versioned JSON contracts live in [`schemas/`](schemas/).
 
 ## Project status
 
-DemoWeave is in active development. **M0–M11 plus Pilots P0 and P1 are complete; the Windows slice of M12 and Android slice of M13 are implemented and proven:** the project can inspect multi-ecosystem and native Android repositories; execute terminal, Playwright web, research/notebook, Windows UI Automation, and Android ADB Flows; capture fingerprinted terminal, browser, native-result, Windows-window, or Android-device Evidence; and run the established rendering, composition, tutorial, visual-QA, freshness, and reviewed-Markdown workflows.
+DemoWeave is in active development. **M0–M11, M14, and Pilots P0/P1 are complete; the Windows slice of M12 and Android slice of M13 are implemented and proven:** the project can inspect multi-ecosystem and native Android repositories; execute terminal, Playwright web, research/notebook, Windows UI Automation, Android ADB, and explicitly configured trusted-plugin workflows; capture fingerprinted Evidence; render through built-in or plugin renderers; and run the established composition, tutorial, visual-QA, freshness, and reviewed-Markdown workflows.
 
-Windows desktop and Android are the currently proven native UI backends. macOS/Linux desktop and iOS remain planned. Interactive PTY input, browser/mobile recording, narration/TTS, publishing, OCR-based secret detection, and automatic visual fixes remain later/optional work.
+Windows desktop and Android are the currently proven native UI backends. macOS/Linux desktop and iOS remain planned. `@demoweave/sdk` remains source-workspace-only and is not published to npm. Interactive PTY input, browser/mobile recording, narration/TTS, publishing, OCR-based secret detection, and automatic visual fixes remain later/optional work.
 
 See [ROADMAP.md](ROADMAP.md) for milestone boundaries and future surface drivers.
 
@@ -391,7 +408,7 @@ pnpm test
 pnpm typecheck
 ```
 
-CI installs Chromium and FFmpeg, runs build/full tests/typecheck on Ubuntu and Windows, exercises the existing M5–M11 smokes, and validates Android analyzer/CLI/ADB protocol behavior with injected runners. The committed Android screenshot comes from a separate real API 36 emulator proof; hosted CI does not pretend to run an emulator.
+CI installs Chromium and FFmpeg, runs build/full tests/typecheck on Ubuntu and Windows, exercises the existing M5–M11 smokes, validates Android analyzer/CLI/ADB protocol behavior with injected runners, and runs the real external-style plugin loader/renderer fixture without browser or native-UI dependencies. The committed Android screenshot comes from a separate real API 36 emulator proof; hosted CI does not pretend to run an emulator.
 
 ## License
 

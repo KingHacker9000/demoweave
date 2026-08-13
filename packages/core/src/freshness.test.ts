@@ -6,6 +6,7 @@ import path from 'node:path';
 import test, { type TestContext } from 'node:test';
 import {
   FreshnessReportSchema,
+  EvidenceFormatSchema,
   analyzeFreshness,
   snapshotEvidenceArtifact,
   snapshotFlowEvidence,
@@ -245,9 +246,20 @@ test('runtime and published FreshnessReport v1 contracts stay aligned', async ()
     summary: { fresh: 1, stale: 0, missing: 0, unknown: 0, impactedDocuments: 0, actions: 0 },
   };
   assert.equal(FreshnessReportSchema.safeParse(sample).success, true);
+  assert.equal(FreshnessReportSchema.safeParse({
+    ...sample,
+    regeneration: [{
+      kind: 'render-evidence', sourceEvidenceId: 'source', evidenceId: 'source-card-svg', format: 'svg',
+      outputPath: 'docs-media/source-card-svg.svg', rendererId: 'plugin/example/card',
+    }],
+    summary: { ...sample.summary, actions: 1 },
+  }).success, true);
   const published = JSON.parse(await fs.readFile(path.join(repository, 'schemas', 'freshness-report.schema.json'), 'utf8')) as any;
   assert.equal(published.properties.schemaVersion.const, 1);
   assert.deepEqual(published.$defs.evidenceFreshness.properties.state.enum, ['fresh', 'stale', 'missing', 'unknown']);
   assert.equal(published.$defs.reason.properties.code.enum.includes('plugin-changed'), true);
   assert.equal(published.$defs.reason.properties.code.enum.includes('plugin-unavailable'), true);
+  const renderAction = published.$defs.action.oneOf.find((item: any) => item.properties.kind.const === 'render-evidence');
+  assert.deepEqual(renderAction.properties.format.enum, EvidenceFormatSchema.options);
+  assert.equal(renderAction.required.includes('rendererId'), false);
 });

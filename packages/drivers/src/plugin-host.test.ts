@@ -142,6 +142,81 @@ test('duplicate plugin and contribution ids fail instead of shadowing', async (c
   }};\n`);
   await configure(root, [{ module: duplicateDrivers, options: {} }]);
   await expectCode(() => loadPluginHost(root), 'PLUGIN_CONTRIBUTION_DUPLICATE');
+
+  const duplicateRenderers = await moduleFile(root, 'duplicate-renderers', `export default {id:"renderers",apiVersion:1,register(r){
+    const renderer={id:"duplicate-renderer",accepts:[{kinds:["result"],formats:["json"]}],outputFormats:["svg"],create(){return {render(){return {kind:"image",format:"svg",mimeType:"image/svg+xml",data:"<svg/>"}},close(){}}}};
+    r.registerRenderer(renderer);r.registerRenderer(renderer);
+  }};\n`);
+  await configure(root, [{ module: duplicateRenderers, options: {} }]);
+  await expectCode(() => loadPluginHost(root), 'PLUGIN_CONTRIBUTION_DUPLICATE');
+});
+
+test('renderer registration validates descriptors and closes synchronously', async (context) => {
+  const root = await project(context);
+  const invalid = await moduleFile(root, 'invalid-renderer', `export default {id:"invalid-renderer",apiVersion:1,register(r){
+    r.registerRenderer({id:"card",accepts:[{kinds:["not-a-kind"],formats:["json"]}],outputFormats:["svg"],create(){}})
+  }};\n`);
+  await configure(root, [{ module: invalid, options: {} }]);
+  await expectCode(() => loadPluginHost(root), 'PLUGIN_CONTRIBUTION_INVALID');
+
+  const delayed = await moduleFile(root, 'delayed-renderer', `export default {id:"delayed-renderer",apiVersion:1,register(r){globalThis.__demoweaveDelayedRegistry=r}};\n`);
+  await configure(root, [{ module: delayed, options: {} }]);
+  await loadPluginHost(root);
+  const registry = Reflect.get(globalThis, '__demoweaveDelayedRegistry') as { registerRenderer(value: unknown): void };
+  assert.throws(() => registry.registerRenderer({ id: 'late' }), (error: unknown) => error instanceof PluginHostError && error.code === 'PLUGIN_REGISTRATION_CLOSED');
+  Reflect.deleteProperty(globalThis, '__demoweaveDelayedRegistry');
+});
+
+test('plain JavaScript renderer factories, inputs, results, and lifecycle are runtime guarded', async (context) => {
+  const root = await project(context);
+  const plugin = await moduleFile(root, 'runtime-renderer', `export default {id:"runtime-renderer",apiVersion:1,version:"1.2.3",register(r){
+    r.registerRenderer({id:"card",accepts:[{kinds:["result"],formats:["json"]}],outputFormats:["svg"],create({options}){
+      if(options.mode==="factory-throws") throw new Error("factory boom");
+      return {render(input){
+        if(options.mode==="render-throws") throw new Error("render boom");
+        if(options.mode==="non-object") return "bad";
+        if(options.mode==="format-mismatch") return {kind:"image",format:"png",mimeType:"image/png",data:"bad"};
+        if(options.mode==="invalid-kind") return {kind:"invalid",format:"svg",mimeType:"image/svg+xml",data:"bad"};
+        if(options.mode==="invalid-format") return {kind:"image",format:"invalid",mimeType:"image/svg+xml",data:"bad"};
+        if(options.mode==="mime-mismatch") return {kind:"image",format:"svg",mimeType:"image/png",data:"bad"};
+        if(options.mode==="invalid-data") return {kind:"image",format:"svg",mimeType:"image/svg+xml",data:42};
+        if(options.mode==="invalid-label") return {kind:"image",format:"svg",mimeType:"image/svg+xml",data:"bad",label:""};
+        if(options.mode==="extra-field") return {kind:"image",format:"svg",mimeType:"image/svg+xml",data:"bad",path:"escape.svg"};
+        if(!Object.isFrozen(options)||!Object.isFrozen(input.source)||!Object.isFrozen(input.source.provenance)) throw new Error("mutable context");
+        input.sourceBytes[0]=0;
+        return {kind:"image",format:"svg",mimeType:"image/svg+xml",data:new Uint8Array([60,115,118,103,47,62]),label:"Card"};
+      },close(){globalThis.__demoweaveRendererClosed=(globalThis.__demoweaveRendererClosed??0)+1}};
+    }})
+  }};\n`);
+  const source = {
+    schemaVersion: 1 as const, id: 'source', kind: 'result' as const, status: 'available' as const,
+    format: 'json' as const, path: '.demoweave/evidence/artifacts/source.json', mimeType: 'application/json',
+    provenance: { sources: [] },
+  };
+  const modes = [
+    ['factory-throws', 'PLUGIN_RENDERER_FACTORY_FAILED'], ['render-throws', 'PLUGIN_RENDERER_EXECUTION_FAILED'],
+    ['non-object', 'PLUGIN_RENDERER_RESULT_INVALID'], ['format-mismatch', 'PLUGIN_RENDERER_RESULT_INVALID'],
+    ['invalid-kind', 'PLUGIN_RENDERER_RESULT_INVALID'], ['invalid-format', 'PLUGIN_RENDERER_RESULT_INVALID'],
+    ['mime-mismatch', 'PLUGIN_RENDERER_RESULT_INVALID'], ['invalid-data', 'PLUGIN_RENDERER_RESULT_INVALID'],
+    ['invalid-label', 'PLUGIN_RENDERER_RESULT_INVALID'], ['extra-field', 'PLUGIN_RENDERER_RESULT_INVALID'],
+  ] as const;
+  for (const [mode, code] of modes) {
+    await configure(root, [{ module: plugin, options: { mode } }]);
+    const host = await loadPluginHost(root);
+    await expectCode(() => host.renderWith('plugin/runtime-renderer/card', { source, sourceBytes: Uint8Array.from([123, 125]), format: 'svg' }), code);
+  }
+
+  await configure(root, [{ module: plugin, options: { mode: 'valid', secret: 'invocation-only' } }]);
+  const host = await loadPluginHost(root);
+  assert.deepEqual(host.list()[0]?.renderers, ['card']);
+  assert.equal(host.rendererDescriptors()[0]?.id, 'plugin/runtime-renderer/card');
+  assert.equal(host.fingerprints().has('plugin/runtime-renderer/card'), true);
+  const bytes = Uint8Array.from([123, 125]);
+  const rendered = await host.renderWith('plugin/runtime-renderer/card', { source, sourceBytes: bytes, format: 'svg' });
+  assert.equal(new TextDecoder().decode(rendered.result.data as Uint8Array), '<svg/>');
+  assert.deepEqual([...bytes], [123, 125]);
+  assert.equal(Reflect.get(globalThis, '__demoweaveRendererClosed') as number > 0, true);
+  Reflect.deleteProperty(globalThis, '__demoweaveRendererClosed');
 });
 
 test('plain JavaScript detectors receive a detached recursively frozen profile', async (context) => {

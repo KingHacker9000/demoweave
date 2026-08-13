@@ -17,13 +17,13 @@
       "label": "External plugin result",
       "format": "json",
       "path": ".demoweave/evidence/artifacts/plugin-service-result.json",
-      "artifactHash": "sha256:b4a4618ce53e0f0493ffe20e586b70022f9b31287c6df7fb86cb0954548e22b9",
+      "artifactHash": "sha256:6ebe2323ba0a400872f4444a6a03977f7043f2f64b270d318d81d175042edbe7",
       "mimeType": "application/json",
       "producer": {
         "kind": "driver",
         "id": "plugin/fixture-service/fixture-service-driver",
         "version": "0.0.1",
-        "pluginFingerprint": "sha256:cc26d42bac067848fc33f9f1ea40ccfba298853b238a5a1fd09ee73939364e1c"
+        "pluginFingerprint": "sha256:7b4697870a6a9e6c8de4ef3a39b228479b8a3b5fe1f9d83f5313e75d03a80887"
       },
       "provenance": {
         "flowId": "service-proof",
@@ -34,10 +34,43 @@
           {
             "path": "marker.json",
             "role": "fixture",
-            "hash": "sha256:f49e56e521e08a7e923a44c2a7998f40efa0ac1aaff98357920a93d121d31dfc"
+            "hash": "sha256:ee36e24b22180e490fbc94280760c01b0bf81ee607550c2b42f8f1cf3af69cd0"
           }
         ]
       }
+    },
+    {
+      "schemaVersion": 1,
+      "id": "plugin-service-result-fixture-service-card-svg",
+      "kind": "image",
+      "status": "available",
+      "label": "fixture-service documentation card",
+      "format": "svg",
+      "path": "docs-media/plugin-service-result-fixture-service-card-svg.svg",
+      "artifactHash": "sha256:aa2b427aefe37b1e47581c35049dfac399296846ec9648a51537b6c855393087",
+      "mimeType": "image/svg+xml",
+      "producer": {
+        "kind": "renderer",
+        "id": "plugin/fixture-service/fixture-service-card",
+        "version": "0.0.1",
+        "pluginFingerprint": "sha256:7b4697870a6a9e6c8de4ef3a39b228479b8a3b5fe1f9d83f5313e75d03a80887"
+      },
+      "provenance": {
+        "flowId": "service-proof",
+        "stepId": "capture-result",
+        "surfaceId": "service-fixture-service",
+        "flowHash": "sha256:d2073682c00ece20f76439865f07c49cd691ffaef128b8d69f8f86e67ebbe112",
+        "sources": [
+          {
+            "path": "marker.json",
+            "role": "fixture",
+            "hash": "sha256:ee36e24b22180e490fbc94280760c01b0bf81ee607550c2b42f8f1cf3af69cd0"
+          }
+        ]
+      },
+      "derivedFrom": [
+        "plugin-service-result"
+      ]
     }
   ]
 }

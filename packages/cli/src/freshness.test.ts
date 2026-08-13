@@ -35,6 +35,9 @@ function dependencies(run: (reference: string, options?: FlowExecutionOptions) =
     snapshotEvidenceArtifact: async () => {
       throw new Error('snapshot should not run for Flow actions');
     },
+    loadPluginHost: async () => {
+      throw new Error('plugin host should not load for Flow actions');
+    },
   };
 }
 

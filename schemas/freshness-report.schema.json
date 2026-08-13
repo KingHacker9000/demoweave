@@ -102,8 +102,9 @@
             "kind": { "const": "render-evidence" },
             "sourceEvidenceId": { "type": "string", "minLength": 1 },
             "evidenceId": { "type": "string", "minLength": 1 },
-            "format": { "enum": ["png", "gif"] },
-            "outputPath": { "type": "string", "minLength": 1 }
+            "format": { "enum": ["png", "jpeg", "webp", "gif", "webm", "mp4", "svg", "json", "csv", "txt", "md", "ansi", "html", "srt", "vtt", "ipynb"] },
+            "outputPath": { "type": "string", "minLength": 1 },
+            "rendererId": { "type": "string", "minLength": 1 }
           }
         }
       ]
