@@ -182,6 +182,28 @@ After a material source changes, use the normal freshness workflow. The generic 
 
 The committed `fixtures/research` example demonstrates native SVG plot, CSV table, JSON metrics, and executed IPYNB Evidence. Its tiny Node notebook executor exists only to keep CI dependency-free; it is not a Jupyter implementation.
 
+## Configured trusted plugin workflow
+
+Use only plugins already listed in the target project's `.demoweave/config.json`. Inspect them before execution:
+
+```bash
+demoweave plugins list --project <path>
+demoweave plugins doctor --project <path>
+```
+
+Configured plugins are trusted Node.js code with CLI process privileges. Never auto-discover, auto-enable, install, or claim sandboxing for a plugin. Keep plugin options project-configured and do not persist invocation-only secrets or runtime IDs in ProjectProfile, Flow, Evidence, Manifest, or provenance.
+
+Plugin renderers transform existing Manifest Evidence through the normal render command:
+
+```bash
+demoweave render <evidence-id> --format <format>
+demoweave render <evidence-id> --format <format> --renderer plugin/<plugin-id>/<renderer-id>
+```
+
+Use `--renderer` when more than one eligible renderer exists. The built-in terminal renderer is `terminal`; a plugin must never silently shadow it. Plugin renderers receive detached/read-only source Evidence, source bytes, the requested format, and read-only configured options. They return typed bytes/text plus metadata only. DemoWeave owns source/path safety, configured `mediaDir`, atomic output, deterministic derived Evidence, hashes, producer/fingerprint, `derivedFrom`, provenance, Manifest mutation, freshness, and selective regeneration. If the producing plugin is unavailable, treat freshness as `unknown` and do not regenerate automatically.
+
+The checked-in `fixtures/plugin-sdk` proof converts real JSON result Evidence into a deterministic SVG documentation card without external assets, timestamps, randomness, or machine-specific content.
+
 ## Timeline composition workflow
 
 `TimelinePlan v1` lives under `.demoweave/timelines/` and describes presentation only. It is separate from Flow v1.
@@ -413,11 +435,13 @@ Current executable surface drivers:
 - **web** — Playwright Chromium semantic interaction + PNG screenshot capture against an already-running app;
 - **Windows desktop** — explicit-PID Windows UI Automation + top-level application-window PNG capture;
 - **Android mobile** — invocation-scoped ADB/UIAutomator semantic interaction + full-device PNG capture against an already-running app;
-- **research / notebook** — explicit process execution + immutable native artifact capture; no environment inference or notebook-UI recording.
+- **research / notebook** — explicit process execution + immutable native artifact capture; no environment inference or notebook-UI recording;
+- **configured trusted plugins** — additive detectors, driver factories, and Evidence renderers loaded explicitly from project config; no discovery, installation, or sandbox.
 
 Current presentation/review tooling:
 
 - terminal PNG/GIF rendering;
+- configured plugin rendering across explicitly advertised Evidence kind/format pairs and EvidenceFormat v1 outputs;
 - TimelinePlan MP4/GIF composition over local PNG/GIF media;
 - TutorialPlan package generation from existing MP4 Evidence;
 - VisualQAPacket/VisualQAReport agent-reviewed QA for fresh PNG/GIF/MP4 Evidence.
@@ -429,6 +453,7 @@ Not yet available:
 - macOS/Linux desktop or iOS capture;
 - Windows desktop scrolling or element capture;
 - Android element capture, arbitrary gestures/multi-touch, or app launching;
+- plugin discovery, installation, or sandboxing;
 - narration/TTS generation;
 - publishing/upload integration;
 - OCR-based secret detection;
@@ -466,6 +491,7 @@ Current metadata layout:
 docs-media/
   <terminal-evidence-id>.png
   <terminal-evidence-id>.gif
+  <plugin-derived-evidence-id>.<format>
   <timeline-id>.mp4
   <timeline-id>.gif
   tutorials/

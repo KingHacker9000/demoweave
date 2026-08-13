@@ -1,4 +1,4 @@
-import type { TerminalEventStream, TerminalTrack } from '@demoweave/core';
+import type { EvidenceFormat, TerminalEventStream, TerminalTrack } from '@demoweave/core';
 
 export type TerminalTextStyle = {
   foreground?: string;
@@ -59,15 +59,21 @@ export type TerminalLayout = {
 };
 
 export type RenderedMedia = {
-  format: 'png' | 'gif';
+  format: EvidenceFormat;
   outputPath: string;
-  width: number;
-  height: number;
+  width?: number;
+  height?: number;
   sizeBytes: number;
   durationMs?: number;
   frameCount?: number;
   evidenceId?: string;
   sourceEvidenceId?: string;
+};
+
+export type RenderedTerminalMedia = RenderedMedia & {
+  format: 'png' | 'gif';
+  width: number;
+  height: number;
 };
 
 export type TerminalRenderSource = {

@@ -10,6 +10,7 @@ export type { ProcessResult, ProcessRunner } from './ffmpeg.js';
 export type {
   PresentationAction,
   RenderedMedia,
+  RenderedTerminalMedia,
   TerminalCell,
   TerminalFrameModel,
   TerminalLayout,
@@ -35,6 +36,8 @@ export {
 } from './render.js';
 export type {
   RenderEvidenceOptions,
+  PluginRendererDescriptor,
+  PluginRendererHost,
   RendererCapabilities,
   RenderTerminalTrackOptions,
 } from './render.js';

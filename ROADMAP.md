@@ -24,10 +24,10 @@ DemoWeave is **multi-surface by design**. A repository may expose web, CLI, desk
 | M11 — Research / notebook driver | ✅ Complete | Explicit research/notebook execution → immutable native plot/table/result/IPYNB Evidence |
 | M12 — Desktop drivers | 🚧 Partial | Portable backend boundary + proven Windows UI Automation/window-capture backend; macOS/Linux deferred |
 | M13 — Mobile drivers | 🚧 Partial | Android ADB/UIAutomator + device screenshot proven; iOS planned |
-| **M14 — Plugin/driver SDK** | **🚧 Current** | **M14A loader, detectors, driver factories, host Evidence, and freshness implemented; renderer plugins pending** |
+| M14 — Plugin/driver SDK | ✅ Complete | Trusted detectors, driver factories, renderer plugins, fingerprints, freshness, and external fixture proof |
+| **M15 — Documentation publishers** | **🚧 Current** | **Publisher contract and integrations are next; no publisher runtime is implemented yet** |
 
-Milestone PR history: M0/M1 #1, M2 #2, M3 #3, M4 #4, P0 #5, M5 #6, M6 #7, M7 #8, M5 hardening #9, P1 #10, M8 #11, M9 #12, M10 #13, M11 #14, M12A #15, M12B #16, M13 Android #17.
-
+Milestone PR history: M0/M1 #1, M2 #2, M3 #3, M4 #4, P0 #5, M5 #6, M6 #7, M7 #8, M5 hardening #9, P1 #10, M8 #11, M9 #12, M10 #13, M11 #14, M12A #15, M12B #16, M13 Android #17, M14A #19. M14B is tracked in draft PR #20.
 ## Product principles
 
 - **Agent supplies intelligence; DemoWeave supplies deterministic tooling.**
@@ -319,35 +319,35 @@ Remaining mobile work:
 
 Flow v1 remains platform-neutral; device serials, ADB commands, package/activity launch details, and coordinates do not belong in Flow or persistent metadata.
 
-## M14 — Plugin/driver SDK
+## M14 — Plugin/driver SDK ✅
 
-M14A establishes the trusted plugin host without changing Flow v1 or opening ProjectProfile v1 to arbitrary values.
+M14 establishes the trusted plugin host without changing Flow v1 or opening ProjectProfile v1 to arbitrary values.
 
-Delivered in M14A:
+Delivered:
 
 - workspace-only `@demoweave/sdk` with plugin API v1 and `definePlugin`;
 - explicit ordered `.demoweave/config.json` plugin configuration with no discovery or installation;
 - project-root-safe local ESM loading and target-project package resolution;
-- closed deterministic registration with detector and per-Flow driver-factory contributions;
+- closed deterministic registration with detector, per-Flow driver-factory, and renderer contributions;
 - additive schema-validated surfaces/framework facts in normal `inspect`;
 - plugin drivers in normal `run` and selective `update --apply`, with ambiguity failures instead of built-in overrides;
-- host-owned Evidence/artifact/Manifest writes plus existing Flow/source fingerprint completion;
-- entry-bytes/identity/options plugin fingerprints and explicit changed/unavailable freshness reasons;
-- `plugins list` and `plugins doctor` inspection commands;
-- external-style service fixture and Windows/Linux-oriented security, lifecycle, freshness, selective-repair, and no-churn tests.
+- renderer declarations for accepted Evidence kinds/formats and output formats;
+- stable renderer IDs (`terminal` and `plugin/<plugin-id>/<renderer-id>`) with exact selection and explicit ambiguity/unsupported diagnostics;
+- detached/read-only renderer inputs and runtime validation of JavaScript result shape, format, kind, MIME, data, and label before mutation;
+- host-owned safe output paths, atomic writes, deterministic derived Evidence IDs, Manifest normalization, artifact hashes, producer identity, plugin fingerprints, `derivedFrom`, and portable provenance;
+- generalized backwards-compatible `render-evidence` regeneration across EvidenceFormat v1 with optional exact plugin renderer IDs;
+- plugin-changed/source-upstream selective renderer repair, plugin-unavailable unknown/zero-action behavior, and second-update byte-identical no-churn proof;
+- `plugins list` and `plugins doctor` renderer reporting;
+- real external-style JSON result → deterministic SVG card fixture plus built-in/plugin ambiguity proof;
+- Windows/Linux-oriented security, lifecycle, validation, freshness, selective-repair, and no-churn tests.
 
 Plugins are trusted Node.js code with CLI process privileges; DemoWeave does not sandbox them. `@demoweave/sdk` remains source-workspace-only and is not claimed as an npm publication.
 
-Remaining M14 work:
+M14 does not add plugin installation/discovery, publisher/upload behavior, renderer-specific Flow syntax, or unsupported platform claims. Publishers remain M15 work.
 
-- renderer registration/resolution and one external-style renderer proof;
-- completion documentation and shared-skill guidance after the renderer contract is proven.
+## M15 — Documentation publishers 🚧 Current
 
-Publishers remain M15 work.
-
-## M15 — Documentation publishers
-
-Integrate rather than replace existing stacks: plain Markdown/GitHub, Fumadocs, Mintlify, Docusaurus, VitePress, MkDocs, etc.
+Define and implement factual publisher integrations that complement rather than replace existing stacks: plain Markdown/GitHub, Fumadocs, Mintlify, Docusaurus, VitePress, MkDocs, and similar targets. M14 intentionally contains no publisher/upload runtime.
 
 ---
 
@@ -374,11 +374,11 @@ DemoWeave 1.0 should provide stable agent workflows/contracts, multi-surface ana
 | 13 | ✅ M10 — visual QA | reproducible agent review gate |
 | 14 | ✅ M11 — research/notebook | native research results + notebook Evidence |
 | 15 | 🚧 M12 — desktop | Windows available; macOS/Linux deferred |
-| 16 | **🚧 M13 — mobile** | **Android available; iOS planned** |
-| 17 | **🚧 M14 — plugin SDK** | **M14A implemented; renderer plugins pending** |
-| 18 | M15 — publishers | documentation publishing integrations |
+| 16 | 🚧 M13 — mobile | Android available; iOS planned |
+| 17 | ✅ M14 — plugin SDK | trusted detectors, drivers, and renderer plugins |
+| 18 | **🚧 M15 — publishers** | **documentation publishing integrations** |
 | 19 | 1.0 hardening | public stable release |
 
 ## Current next step
 
-Review M14A's trust/path model, cross-platform loader behavior, plugin fingerprint freshness, and real fixture Evidence. Stop before renderer-plugin integration and M15 publishers; iOS and macOS/Linux desktop backends remain separate work.
+Define the M15 publisher contract before adding runtime integrations. Preserve M14's explicit trusted-plugin model, host-owned Evidence/provenance boundaries, and no-discovery/no-installation behavior; iOS and macOS/Linux desktop backends remain separate work.

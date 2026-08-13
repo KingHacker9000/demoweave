@@ -23,12 +23,14 @@ interface UpdateActionDependencies {
   runFlow: typeof runFlow;
   renderEvidence: typeof renderEvidence;
   snapshotEvidenceArtifact: typeof snapshotEvidenceArtifact;
+  loadPluginHost: typeof loadPluginHost;
 }
 
 const defaultDependencies: UpdateActionDependencies = {
   runFlow,
   renderEvidence,
   snapshotEvidenceArtifact,
+  loadPluginHost,
 };
 
 function stateMarker(state: string): string {
@@ -95,6 +97,10 @@ export async function applyRegenerationAction(
     projectRoot: root,
     format: action.format,
     outputPath: action.outputPath,
+    ...(action.rendererId ? {
+      rendererId: action.rendererId,
+      pluginHost: await dependencies.loadPluginHost(root),
+    } : {}),
   });
   if (rendered.evidenceId) await dependencies.snapshotEvidenceArtifact(root, rendered.evidenceId);
 }

@@ -205,7 +205,7 @@ test('reports missing id, wrong kind, missing artifact, and unsafe paths', async
   const wrongKind = await temporaryProject(context, { evidenceKind: 'image' });
   await assert.rejects(
     renderEvidence('terminal', { projectRoot: wrongKind.root, format: 'png', rasterizer: fakeRasterizer }),
-    (error: unknown) => error instanceof RendererError && error.code === 'WRONG_EVIDENCE_KIND',
+    (error: unknown) => error instanceof RendererError && error.code === 'RENDER_UNSUPPORTED',
   );
 
   const missingArtifact = await temporaryProject(context, { artifact: false });
