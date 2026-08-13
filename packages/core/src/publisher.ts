@@ -330,6 +330,26 @@ async function resolveSafeOutput(root: string, relativePath: string, code: strin
   return target;
 }
 
+async function canonicalOutputIdentity(target: string): Promise<string> {
+  if (await exists(target)) return fs.realpath(target);
+  let ancestor = target;
+  while (!(await exists(ancestor))) {
+    const parent = path.dirname(ancestor);
+    if (parent === ancestor) break;
+    ancestor = parent;
+  }
+  const realAncestor = await fs.realpath(ancestor);
+  return path.resolve(realAncestor, path.relative(ancestor, target));
+}
+
+function sameFilesystemPath(left: string, right: string): boolean {
+  const normalizedLeft = path.resolve(left);
+  const normalizedRight = path.resolve(right);
+  return process.platform === 'win32'
+    ? normalizedLeft.toLocaleLowerCase('en-US') === normalizedRight.toLocaleLowerCase('en-US')
+    : normalizedLeft === normalizedRight;
+}
+
 function normalizePlan(plan: PublisherPlan): PublisherPlan {
   return {
     ...plan,
@@ -480,9 +500,15 @@ async function resolveDependency(root: string, sourcePath: string, rawPath: stri
   return { path: dependencyPath, file };
 }
 
+function encodePublicationPath(relativePath: string): string {
+  return relativePath.split('/').map((segment) => (
+    segment === '.' || segment === '..' ? segment : encodeURIComponent(segment)
+  )).join('/');
+}
+
 function targetLink(fromDestination: string, toDestination: string, suffix: string): string {
   const relative = path.posix.relative(path.posix.dirname(fromDestination), toDestination) || path.posix.basename(toDestination);
-  return `${relative}${suffix}`;
+  return `${encodePublicationPath(relative)}${suffix}`;
 }
 
 function applyRewrites(source: string, rewrites: Rewrite[]): string {
@@ -655,7 +681,7 @@ function portableJoin(...parts: string[]): string {
 
 async function buildPreview(projectRoot: string, reference: string): Promise<PreviewBuild> {
   const root = await canonicalProjectRoot(projectRoot);
-  const { plan } = await resolvePlan(root, reference);
+  const { plan, path: planPath } = await resolvePlan(root, reference);
   const adapter = adapters.get(plan.publisher);
   if (!adapter) throw new PublisherError('UNKNOWN_PUBLISHER', `Unknown publisher adapter: ${plan.publisher}`);
   const targetRootPath = await resolveSafeOutput(root, plan.targetRoot, 'UNSAFE_PUBLICATION_TARGET_ROOT');
@@ -667,6 +693,47 @@ async function buildPreview(projectRoot: string, reference: string): Promise<Pre
   const candidates = await adapter.build({ projectRoot: root, plan, evidenceByPath });
   const planHash = sha256(canonicalPublisherPlan(plan));
   const manifestPath = await resolveSafeOutput(root, `.demoweave/publications/${plan.id}.json`, 'UNSAFE_PUBLICATION_MANIFEST_PATH');
+  const controlRoot = path.join(root, '.demoweave');
+  const canonicalControlRoot = await canonicalOutputIdentity(controlRoot);
+  const protectedFiles = await Promise.all([
+    ...plan.entries.map(async (entry) => ({
+      path: entry.source,
+      kind: 'source Markdown',
+      identity: await resolveExistingProjectFile(root, entry.source, 'UNRESOLVED_PUBLICATION_SOURCE'),
+    })),
+    ...candidates.filter((candidate) => candidate.kind === 'dependency').map(async (candidate) => ({
+      path: candidate.sourcePath,
+      kind: 'dependency asset',
+      identity: await resolveExistingProjectFile(root, candidate.sourcePath, 'UNRESOLVED_PUBLICATION_SOURCE'),
+    })),
+    Promise.resolve({ path: normalizePortablePath(path.relative(root, planPath).replaceAll('\\', '/')), kind: 'PublisherPlan', identity: planPath }),
+    canonicalOutputIdentity(manifestPath).then((identity) => ({
+      path: `.demoweave/publications/${plan.id}.json`,
+      kind: 'PublicationManifest',
+      identity,
+    })),
+  ]);
+  for (const candidate of candidates) {
+    const publicationPath = portableJoin(plan.targetRoot, candidate.relativePath);
+    const target = await resolveSafeOutput(root, publicationPath, 'UNSAFE_PUBLICATION_TARGET');
+    const targetIdentity = await canonicalOutputIdentity(target);
+    const controlOverlap = inside(controlRoot, target) || inside(canonicalControlRoot, targetIdentity);
+    const protectedOverlap = protectedFiles.find((item) => sameFilesystemPath(item.identity, targetIdentity));
+    if (controlOverlap || protectedOverlap) {
+      const protectedDescription = controlOverlap
+        ? '.demoweave control tree'
+        : `${protectedOverlap!.kind} ${protectedOverlap!.path}`;
+      throw new PublisherError(
+        'PUBLICATION_TARGET_OVERLAP',
+        `Publication target ${publicationPath} overlaps ${protectedDescription}`,
+        [{
+          code: 'PUBLICATION_TARGET_OVERLAP',
+          path: publicationPath,
+          message: `Publication candidates must be distinct from sources, dependencies, PublisherPlan/PublicationManifest files, and .demoweave control paths; overlaps ${protectedDescription}`,
+        }],
+      );
+    }
+  }
   const baseline = await readPublicationManifest(manifestPath);
   const owned = new Map((baseline.manifest?.planId === plan.id ? baseline.manifest.publishedFiles : []).map((file) => [file.path, file.hash]));
   const files: PublicationPreviewFile[] = [];
